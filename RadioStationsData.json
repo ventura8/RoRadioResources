@@ -1,0 +1,1635 @@
+﻿[
+  {
+    "Name": "General",
+    "List": [
+      {
+        "GUID": "55c502e9-f2cc-451e-b0bd-93cce55e0288",
+        "Title": "Radio Zu",
+        "Url": "https://ivm.antenaplay.ro/liveaudio/radiozu/playlist.m3u8",
+        "ImageUrl": "Radiozu.png",
+        "Description": "Hiturile se ascultă la Zu"
+      },
+      {
+        "GUID": "80e0cae0-b2a3-4403-8f76-283becfcbf0b",
+        "Title": "Pro FM",
+        "Url": "https://edge126.rcs-rds.ro/profm/profm.mp3",
+        "ImageUrl": "Profm.png",
+        "Description": "Legalize Joy!"
+      },
+      {
+        "GUID": "7633e2a7-589e-4191-bfdf-0cc2da224941",
+        "Title": "Kiss FM",
+        "Url": "http://live.kissfm.ro/kissfm.aacp",
+        "ImageUrl": "kissfm.png",
+        "Description": "#1HIT RADIO"
+      },
+      {
+        "GUID": "2b052a5a-a34d-4b85-9b6d-8291afd5688d",
+        "Title": "Itsy Bitsy FM",
+        "Url": "http://live.itsybitsy.ro:8000/itsybitsy",
+        "ImageUrl": "ItsyBitsy.png",
+        "Description": "Bucurie în familie"
+      },
+      {
+        "GUID": "75b82af5-a59c-4336-b727-9be276ceb095",
+        "Title": "Radio Impuls",
+        "Url": "http://stream.radio-impuls.ro/stream2",
+        "ImageUrl": "RadioImpuls.png",
+        "Description": "#hitperepeat"
+      },
+      {
+        "GUID": "9e9708b8-01cf-4053-b4ef-cb8232725245",
+        "Title": "Magic FM",
+        "Url": "http://live.magicfm.ro:9128/magicfm.aacp",
+        "ImageUrl": "MagicFm.png",
+        "Description": "always great music"
+      },
+      {
+        "GUID": "d7490bab-0033-4b97-9ead-5fc1f04054af",
+        "Title": "Music FM",
+        "Url": "http://edge126.rdsnet.ro:84/profm/music-fm.mp3",
+        "ImageUrl": "musicfm.png",
+        "Description": "Just Music"
+      },
+      {
+        "GUID": "d946c209-aadf-4c76-b9bd-e87b280e5377",
+        "Title": "Național FM",
+        "Url": "http://live.nationalfm.ro:8001/",
+        "ImageUrl": "NationalFm.png"
+      },
+      {
+        "GUID": "5fcc9409-7604-4e6c-a175-22c46223310b",
+        "Title": "Radio 7",
+        "Url": "http://80.86.106.32:8000/radio7.mp3",
+        "ImageUrl": "radio7.png",
+        "Description": "S E V E N"
+      },
+      {
+        "GUID": "177a5ebe-14b8-4cbb-85cb-adc5f4ea0c29",
+        "Title": "Radio Dor",
+        "Url": "http://ivm.antenaplay.ro/liveaudio/radiodor/playlist.m3u8",
+        "ImageUrl": "radiodor.png",
+        "Description": "Muzica de acasă"
+      },
+      {
+        "GUID": "d676a5a2-09e2-481f-9e2f-11736febb902",
+        "Title": "romantic fm",
+        "Url": "http://ivm.antenaplay.ro/liveaudio/radioromantic/playlist.m3u8",
+        "ImageUrl": "romanticfm.png",
+        "Description": "Muzică. Nu zgomot"
+      },
+      {
+        "GUID": "276f0723-1e92-4179-92e8-6e449c4ffd88",
+        "Title": "Radio TRINITAS",
+        "Url": "http://live.radiotrinitas.ro:8003/;stream/1",
+        "ImageUrl": "radiotrinitas.png"
+      },
+      {
+        "GUID": "b74e91d2-0fc0-4498-9d78-9a4a1cab8402",
+        "Title": "Radio Guerrila",
+        "Url": "http://live.guerrillaradio.ro:8010/guerrilla.aac",
+        "ImageUrl": "Guerrilla.png",
+        "Description": "Binili Învinge"
+      },
+      {
+        "GUID": "c6ee3d3f-9d41-4dfa-bad9-209824b8fdc9",
+        "Title": "Europa FM",
+        "Url": "http://astreaming.europafm.ro:8000/EuropaFM_aac",
+        "ImageUrl": "EuropaFM.png",
+        "Description": "Pentru mine. De 20 de ani"
+      },
+      {
+        "GUID": "17bf2063-ac01-4e97-91e7-5b636aa40217",
+        "Title": "Gold FM",
+        "Url": "http://80.86.106.110:8020/radiogoldfm-32.aac",
+        "ImageUrl": "GoldFM.png",
+        "Description": "Greatest hits"
+      },
+      {
+        "GUID": "21d3fedc-350b-436e-88b6-76deedf57979",
+        "Title": "Smart Radio",
+        "Url": "http://live.smartradio.ro:9128/live",
+        "ImageUrl": "smartradio.png"
+      },
+      {
+        "GUID": "a7902600-044b-4493-869f-0d1b341e19e6",
+        "Title": "Sport Total FM",
+        "Url": "http://84.247.83.36:8001/;",
+        "ImageUrl": "sporttotalfm.png",
+        "Description": "Mai mult decat fotbal !"
+      },
+      {
+        "GUID": "496c2ba0-099d-4d71-a0ea-d4dade1d5022",
+        "Title": "TANĂNA",
+        "Url": "http://live.tananana.ro:8010/stream-48.aac",
+        "ImageUrl": "radio-tananana.png",
+        "Description": "MUZICĂ PUSĂ CU MÂNA"
+      },
+      {
+        "GUID": "fca9ca08-e075-4c93-990d-219ebfe6b89f",
+        "Title": "Vibe fm",
+        "Url": "http://astreaming.vibefm.ro:8000/VibeFM_aac",
+        "ImageUrl": "vibefm.png"
+      },
+      {
+        "GUID": "7699c53b-dc92-48ab-9727-5a4a6860e9f8",
+        "Title": "Virgin Radio",
+        "Url": "http://astreaming.virginradio.ro:8000/virgin_aacp_64k",
+        "ImageUrl": "virginradio.png"
+      },
+      {
+        "GUID": "5624eb26-e174-48b6-9f0c-c3aaefb5f41e",
+        "Title": "Radio Total FM",
+        "Url": "http://radiototal.radioca.st/stream/;",
+        "ImageUrl": "radio-total.png"
+      }
+    ]
+  },
+  {
+    "Name": "Local",
+    "List": [
+      {
+        "GUID": "c1c41eec-dbd5-4531-a44c-2a992d28f3a7",
+        "Title": "Radio Cafe",
+        "Url": "http://live.radiocafe.ro:8048/live.aac",
+        "ImageUrl": "radiocafe.png",
+        "Description": "Muzica de poveste"
+      },
+      {
+        "GUID": "23bee85f-fd5a-4c13-adab-df79b1ef8105",
+        "Title": "Big Fm",
+        "Url": "http://82.208.143.10:8000/",
+        "ImageUrl": "bigfmdeva.png"
+      },
+      {
+        "GUID": "8abc8a62-8090-472c-8585-c1293751ca35",
+        "Title": "CFM Litoral",
+        "Url": "http://stream2.radiocfm.ro:9090/CFM",
+        "ImageUrl": "cfm.png",
+        "Description": "Aici, muzica nu se repeta!"
+      },
+      {
+        "GUID": "be192d3a-75d3-4ac3-bdfd-ab6f06ae26ea",
+        "Title": "City rádió",
+        "Url": "http://live.city-radio.ro:8800/",
+        "ImageUrl": "cityradio.png"
+      },
+      {
+        "GUID": "660a9d2b-f611-4b00-9698-a2e5a71b2a85",
+        "Title": "Radio Brașov",
+        "Url": "http://live.radiobrasov.ro/stream.mp3?nocache=",
+        "ImageUrl": "radio-brasov.png"
+      },
+      {
+        "GUID": "9b6c50a2-de82-4e12-8bc5-feee2af0c4bd",
+        "Title": "Radio SuperFM",
+        "Url": "http://live.superfm.ro/stream.mp3?nocache=",
+        "ImageUrl": "superfm-brasov.png"
+      },
+      {
+        "GUID": "703ecde0-5bf1-4938-8cbd-a0af41ecfb3d",
+        "Title": "Radio ROMANi ONLiNE",
+        "Url": "http://149.202.92.181:8000/",
+        "ImageUrl": "rro.png"
+      },
+      {
+        "GUID": "94a6e00f-88b2-4594-98d4-80c53f371e3e",
+        "Title": "Radio Băilesti",
+        "Url": "http://86.123.234.0/bailestifm",
+        "ImageUrl": "RadioBailesti.png"
+      },
+      {
+        "GUID": "2f88eccb-fe71-453c-985f-401fdbead903",
+        "Title": "Radio Brăila Dens FM",
+        "Url": "http://82.208.137.144:8014/;",
+        "ImageUrl": "brailadens.jpg"
+      },
+      {
+        "GUID": "95dbe3ee-1714-4419-99e6-eb4f574db1a3",
+        "Title": "Radio Fix",
+        "Url": "http://86.122.4.136:8000/;",
+        "ImageUrl": "RadioFix.jpg"
+      },
+      {
+        "GUID": "1723f3cb-0ee6-46a4-ac14-a06d302a5af5",
+        "Title": "Radio Ghimpați",
+        "Url": "http://173.212.224.141:8800/stream"
+      },
+      {
+        "GUID": "221dc454-d464-441d-ba32-fb0be58e81fc",
+        "Title": "Radio Prahova",
+        "Url": "https://streamx.rph.ro:8100/relay",
+        "ImageUrl": "radioprahova.png"
+      },
+      {
+        "GUID": "031b58cd-be67-4989-be94-905c1fc2cc78",
+        "Title": "Radio Reîntregirea",
+        "Url": "http://82.208.137.144:8016/;",
+        "ImageUrl": "radioreintregirea.png"
+      },
+      {
+        "GUID": "86e0a7de-4224-4b67-9f30-c7de022fdef0",
+        "Title": "Radio Top",
+        "Url": "http://live.radiotop.ro:8000/;",
+        "ImageUrl": "radiotopsuceava.jpg"
+      },
+      {
+        "GUID": "76575127-2a78-413c-9187-c679240f5de3",
+        "Title": "Radio AS",
+        "Url": "http://radioas.suceava.rdsnet.ro:8000/sample128",
+        "ImageUrl": "radio-as-suceava.png"
+      },
+      {
+        "GUID": "71482e9f-abe2-4fbc-b1bd-c488190ccd01",
+        "Title": "Radio Sud Constanța",
+        "Url": "http://asculta.radiosudconstanta.com:8000/;",
+        "ImageUrl": "radio-sud-constanta.png"
+      },
+      {
+        "GUID": "1194fd1f-dd65-4a26-af9f-924ac23c2d9a",
+        "Title": "roman fm",
+        "Url": "http://82.208.131.85:8000/;",
+        "ImageUrl": "romanfm.png"
+      },
+      {
+        "GUID": "800f85ef-eb82-46f8-9a47-5860bfde75fb",
+        "Title": "Smile fm",
+        "Url": "http://smilefm.vaslui.net:8000/",
+        "ImageUrl": "smile-fm-vaslui.png"
+      },
+      {
+        "GUID": "a8b6fb80-b7f5-458c-ba8e-c951e9858761",
+        "Title": "Radio Sky",
+        "Url": "http://89.43.138.116:8000/radiosky.mp3",
+        "ImageUrl": "radiosky.png"
+      },
+      {
+        "GUID": "000f1d65-ce78-41e4-90ca-ddb5b1daa23d",
+        "Title": "Paprika Rádió",
+        "Url": "http://stream1.paprikaradio.ro:8000/;",
+        "ImageUrl": "paprika-radio-hu.png"
+      },
+      {
+        "GUID": "9967c025-fe27-49c5-a0a5-c96eb23ffe71",
+        "Title": "Sepsi Rádió",
+        "Url": "https://stream.sepsiradio.ro:8001/SepsiRadio",
+        "ImageUrl": "sepsiradio.png"
+      },
+      {
+        "GUID": "bc9a38d8-b057-4574-9970-1c9ae77196c5",
+        "Title": "Radio Zuper FM",
+        "Url": "http://live.radiozuper.ro:8000/radiozuper.mp3",
+        "ImageUrl": "radio-zuper.png"
+      },
+      {
+        "GUID": "9d8e2065-b38c-4cda-9f5a-9203733f4c4a",
+        "Title": "Stil FM",
+        "Url": "http://188.26.114.235:8000/;",
+        "ImageUrl": "stil-fm.png"
+      },
+      {
+        "GUID": "97df39b8-9051-4609-a6ab-aff24c104f2a",
+        "Title": "Transilvania Hits",
+        "Url": "http://live.transylvaniahits.eu:8002/stream",
+        "ImageUrl": "transilvania-hits.png"
+      },
+      {
+        "GUID": "59d4b245-8480-44c0-b092-b40904d34fe6",
+        "Title": "Radio Stil Mix Dance",
+        "Url": "http://stream.zeno.fm/886ym329mbruv",
+        "ImageUrl": "radio-stil-mix-dance.png"
+      },
+      {
+        "GUID": "f22e1443-4dc3-47eb-8315-e04c0f8f6f86",
+        "Title": "Radio Orion 88,6 FM",
+        "Url": "http://s20.myradiostream.com:11166/;",
+        "ImageUrl": "radio-orion-sebes.png",
+        "Description": "Ascultă diferența!"
+      },
+      {
+        "GUID": "a04ca12a-1a12-4519-9d3b-69b70ba8aa34",
+        "Title": "Radio Orion 96,6 FM",
+        "Url": "http://orionfm.go.ro:8008/live.mp3"
+      },
+      {
+        "GUID": "4e2d3432-5409-4189-96b7-1fa0a441190c",
+        "Title": "Radio RVE",
+        "Url": "http://94.75.227.133:7280/"
+      },
+      {
+        "GUID": "3014fa2c-418a-4694-af8b-e9fed24eec43",
+        "Title": "Radio Arad",
+        "Url": "http://radioarad.arad1.ro:8000/radio-arad",
+        "ImageUrl": "radio-arad.png"
+      },
+      {
+        "GUID": "24954142-5d9e-44f5-b05c-18ac47a194b7",
+        "Title": "Kolozsvári Rádió",
+        "Url": "http://89.238.227.6:8386/"
+      },
+      {
+        "GUID": "f3d3ca03-7434-41b0-8777-147c3b469f85",
+        "Title": "Radio Dobrogea",
+        "Url": "http://stream.arhivaradiodobrogea.ro:7000/dobrogea-mobil"
+      },
+      {
+        "GUID": "56263d33-cddf-44a4-9a48-427990f99586",
+        "Title": "Radio Someș",
+        "Url": "http://www.radiosomes.ro:8000/"
+      },
+      {
+        "GUID": "f25544f0-f000-48b5-9ee9-4f55782d510b",
+        "Title": "Radio Timișoara",
+        "Url": "http://89.238.227.6:8352/"
+      },
+      {
+        "GUID": "8943cc24-6355-4d2c-a8b1-22e49ce794d4",
+        "Title": "West City Radio FM",
+        "Url": "http://live.westcityradio.ro:8000/mp3",
+        "ImageUrl": "west-radio.png"
+      },
+      {
+        "GUID": "baebef67-9acd-4317-a2b2-d932af78e6be",
+        "Title": "Hit FM Alba",
+        "Url": "http://s3.myradiostream.com/4404/listen.mp3",
+        "ImageUrl": "hit-fm-alba.jpg"
+      },
+      {
+        "GUID": "f0bd52d5-e78c-41c5-bc6a-482f0ccb380d",
+        "Title": "N-Joy Radio",
+        "Url": "http://live.btvradio.bg/njoy.mp3",
+        "ImageUrl": "Njoy-bg.png"
+      },
+      {
+        "GUID": "8d7153a3-4c90-4663-9183-2842aab0c742",
+        "Title": "Radio NRJ",
+        "Url": "http://stream.metacast.eu/nrj.ogg",
+        "ImageUrl": "energy_logo.png"
+      }
+    ]
+  },
+  {
+    "Name": "News",
+    "List": [
+      {
+        "GUID": "97e4b844-01d1-4ee9-96e2-4dbdc944e1b0",
+        "Title": "Digi FM",
+        "Url": "https://edge76.rcs-rds.ro/digifm/digifm.mp3",
+        "ImageUrl": "DigiFM.png",
+        "Description": "Ca să știi"
+      },
+      {
+        "GUID": "a4d81887-9b8c-4999-9a4e-36428f58ca81",
+        "Title": "Realitatea FM",
+        "Url": "http://195.42.138.43/liveaudio/liveaudio.stream/playlist.m3u8",
+        "ImageUrl": "RealitateaFM.jpg"
+      },
+      {
+        "GUID": "9a47e913-6a50-454e-b084-edb19cba326c",
+        "Title": "rfi România",
+        "Url": "http://asculta.rfi.ro:9128/live.aac",
+        "ImageUrl": "rfi.png"
+      }
+    ]
+  },
+  {
+    "Name": "Rock",
+    "List": [
+      {
+        "GUID": "c6bbffc4-844b-4e68-ad5b-278cbee38e4c",
+        "Title": "Rock fm",
+        "Url": "https://live.rockfm.ro/rockfm.aacp",
+        "ImageUrl": "rockfm.png",
+        "Description": "It Rocks!"
+      },
+      {
+        "GUID": "8c14f2b8-14e8-4882-9c18-9ab28f4a6b73",
+        "Title": "Star 98 fm",
+        "Url": "http://104.250.149.122:9052/"
+      }
+    ]
+  },
+  {
+    "Name": "Radio Transilvania",
+    "List": [
+      {
+        "GUID": "5dd5aafb-e8a3-40f1-b945-3889ea026444",
+        "Title": "Radio Transilvania Baia Mare",
+        "Url": "http://stream-rt.davacloud.ro:8000/BaiaMare.mp3",
+        "ImageUrl": "radio-transilvania.png"
+      },
+      {
+        "GUID": "5cfad438-c361-4ccb-a62a-76c2b2f4e3fa",
+        "Title": "Radio Transilvania Oradea",
+        "Url": "http://92.61.114.191:9720//;stream.nsv&type=mp3",
+        "ImageUrl": "radio-transilvania.png"
+      },
+      {
+        "GUID": "95d62b4a-8d5e-406e-9750-ac8843263b61",
+        "Title": "Radio Transilvania Cluj",
+        "Url": "http://stream-rt.davacloud.ro:8000/Cluj.mp3",
+        "ImageUrl": "radio-transilvania.png"
+      },
+      {
+        "GUID": "1a9e7e84-2be7-4e71-9e76-60aea54d4953",
+        "Title": "Radio Transilvania Satu Mare",
+        "Url": "http://93.114.66.11:8000/SatuMare.mp3",
+        "ImageUrl": "radio-transilvania.png"
+      },
+      {
+        "GUID": "5002a0eb-8d72-49c1-b57d-191481b30ad5",
+        "Title": "Radio Transilvania Zalău",
+        "Url": "http://stream-rt.davacloud.ro:8000/Zalau.mp3",
+        "ImageUrl": "radio-transilvania.png"
+      },
+      {
+        "GUID": "323684b2-ae87-44c8-b178-f6a7d63621f7",
+        "Title": "Radio Transilvania Bistrița",
+        "Url": "http://stream-rt.davacloud.ro:8000/Bistrita.mp3",
+        "ImageUrl": "radio-transilvania.png"
+      },
+      {
+        "GUID": "9ca6847b-4bc2-473e-89eb-8af93ad89b26",
+        "Title": "Radio Transilvania Luduș",
+        "Url": "http://stream-rt.davacloud.ro:8000/Ludus.mp3",
+        "ImageUrl": "radio-transilvania.png"
+      },
+      {
+        "GUID": "2aee2159-d614-48cc-960c-6844775da2ba",
+        "Title": "Radio Transilvania Aleșd",
+        "Url": "http://92.61.114.191:9720//;stream.nsv&type=mp3",
+        "ImageUrl": "radio-transilvania.png"
+      },
+      {
+        "GUID": "142b69ce-63f3-4bf0-a7d4-9fcab76b17b6",
+        "Title": "Radio Transilvania Turda",
+        "Url": "http://137.74.148.249:8002/stream%20Title1=Radio%20Transilvania%20Turda%20Length1=-1%20Version=2",
+        "ImageUrl": "radio-transilvania.png"
+      },
+      {
+        "GUID": "1666b5b0-3019-4d87-9876-75161ffa5b88",
+        "Title": "Radio Transilvania Mediaș",
+        "Url": "http://stream-rt.davacloud.ro:8000/Medias.mp3",
+        "ImageUrl": "radio-transilvania.png"
+      }
+    ]
+  },
+  {
+    "Name": "Radio România",
+    "List": [
+      {
+        "GUID": "ef93c3d6-b7e1-4a49-94f7-173527f7d3ad",
+        "Title": "Radio România Constanța",
+        "Url": "http://89.238.227.6:8332/;stream/1",
+        "ImageUrl": "RomaniaCluj.png"
+      },
+      {
+        "GUID": "451d8240-46c0-46f3-828c-a076ca30ef55",
+        "Title": "Radio România Actualități",
+        "Url": "http://89.238.227.6:8006/",
+        "ImageUrl": "RomaniaActualitati.png",
+        "Description": "Numărul 1 în România"
+      },
+      {
+        "GUID": "841e4651-dba0-40d2-8bf1-a1b5fac33d1e",
+        "Title": "Radio România Cultural",
+        "Url": "http://stream2.srr.ro:8012/;stream/1",
+        "ImageUrl": "RadioCultural.png"
+      },
+      {
+        "GUID": "9bd11087-1e11-4e7d-9f6d-7e00c3e7e412",
+        "Title": "Radio România Antena Satelor",
+        "Url": "http://89.238.227.6:8042/",
+        "ImageUrl": "AntenaSatelor.png",
+        "Description": "Un radio despre VIAȚA LA ȚARĂ"
+      },
+      {
+        "GUID": "cfb0fccc-b489-4ffe-84d4-6e4a85e7574e",
+        "Title": "Radio România Cluj",
+        "Url": "http://89.238.227.6:8384/",
+        "ImageUrl": "RomaniaCluj.png"
+      },
+      {
+        "GUID": "33acfdc3-5324-41ea-a71b-13e0b961342b",
+        "Title": "Radio România Muzical",
+        "Url": "http://stream2.srr.ro:8022/;stream/1",
+        "ImageUrl": "RomaniaMuzical.png"
+      },
+      {
+        "GUID": "1d0d4c2f-7245-44d8-aa7a-07783c050116",
+        "Title": "Radio România Antena Sibiului",
+        "Url": "http://89.238.227.6:8380/",
+        "ImageUrl": "RadioAntenaSibiului.png"
+      },
+      {
+        "GUID": "c30ee4ce-80f0-4bb3-840b-fb2f28f19c69",
+        "Title": "Radio România Iași",
+        "Url": "http://89.238.227.6:8202/",
+        "ImageUrl": "RomaniaCluj.png"
+      },
+      {
+        "GUID": "3a0edd0a-ad21-404f-b5dc-38da79c2079a",
+        "Title": "Radio România Reșița",
+        "Url": "http://89.238.227.6:8344/stream/1/",
+        "ImageUrl": "RomaniaCluj.png"
+      },
+      {
+        "GUID": "45175547-b9bd-49d2-8baa-a0511bf75eec",
+        "Title": "Radio România București",
+        "Url": "http://stream2.srr.ro:8030/stream/1/",
+        "ImageUrl": "RomaniaCluj.png"
+      },
+      {
+        "GUID": "213a276f-0341-481c-bcce-c16cf64d58b1",
+        "Title": "Radio România Timișoara",
+        "Url": "http://89.238.227.6:8350/stream/1/",
+        "ImageUrl": "RomaniaCluj.png"
+      },
+      {
+        "GUID": "ce13dbba-79d4-4911-856b-6cf45d341938",
+        "Title": "Radio România Craiova",
+        "Url": "http://stream2.srr.ro:8370/stream/1/",
+        "ImageUrl": "RomaniaCluj.png"
+      },
+      {
+        "GUID": "f8865429-1274-46c0-a05c-e1a8dbf73779",
+        "Title": "Radio România International 1",
+        "Url": "http://89.238.227.6:8052/;",
+        "ImageUrl": "rri.png"
+      },
+      {
+        "GUID": "0406b61d-8e87-4356-819f-f41146a14fe5",
+        "Title": "Radio România International 2",
+        "Url": "http://89.238.227.6:8062/;",
+        "ImageUrl": "rri.png"
+      },
+      {
+        "GUID": "23413191-003d-4e41-867b-c0755d038aee",
+        "Title": "Radio România International 3",
+        "Url": "http://89.238.227.6:8072/;",
+        "ImageUrl": "rri.png"
+      },
+      {
+        "GUID": "063d418a-5036-4adc-96d0-28814d852892",
+        "Title": "Radio România 3Net",
+        "Url": "http://media.3netmedia.ro:8080/hls/stream.m3u8",
+        "ImageUrl": "rr3net.png"
+      },
+      {
+        "GUID": "dc8446af-d631-4371-b364-05afcd28e2b5",
+        "Title": "Radio România Târgu Mureș",
+        "Url": "http://streaming.radiomures.ro:8302",
+        "ImageUrl": "RomaniaCluj.png"
+      }
+    ]
+  },
+  {
+    "Name": "Dance",
+    "List": [
+      {
+        "GUID": "0676abbd-524b-42c2-95e6-a0fd587dba19",
+        "Title": "Dance FM",
+        "Url": "https://edge126.rcs-rds.ro/profm/dancefm.mp3",
+        "ImageUrl": "DanceFm.png",
+        "Description": "Beat of Romania"
+      },
+      {
+        "GUID": "2a7b96b3-8f44-47aa-9473-89db349c8a6a",
+        "Title": "Radio Deea",
+        "Url": "http://radiocdn.nxthost.com/radio-deea",
+        "ImageUrl": "radiodeea.png"
+      },
+      {
+        "GUID": "e954259c-085c-41cc-9cff-8e13d0f0d9c8",
+        "Title": "Radio Uniplus",
+        "Url": "http://uniplus.stfu.ro:9090/live?type=.mp3/;stream.mp3",
+        "ImageUrl": "radiouniplus.png"
+      },
+      {
+        "GUID": "9a226879-04d4-4ef0-8b97-1c024c076af9",
+        "Title": "One FM",
+        "Url": "http://live.onefm.ro:9128/onefm.aacp",
+        "ImageUrl": "onefm.png",
+        "Description": "Dance Station"
+      },
+      {
+        "GUID": "cf5f18f5-fa3a-4f12-8ef7-6fc9a8e7ab4a",
+        "Title": "Nostalgia FM",
+        "Url": "http://93.189.147.117:8000/nostalgiafm.mp3"
+      },
+      {
+        "GUID": "77ecdae2-28c7-4e46-9539-a121da6688af",
+        "Title": "Flash FM",
+        "Url": "http://51.255.69.2:8044/stream"
+      },
+      {
+        "GUID": "cc611be2-ec44-4b47-84aa-07f7fde7c528",
+        "Title": "Funstudio DanceRadio",
+        "Url": "http://37.58.63.90/"
+      },
+      {
+        "GUID": "aa588ead-8458-4ca3-85ed-d07560762c0c",
+        "Title": "Party Radio Romania",
+        "Url": "http://partyradio.zapto.org:9964/;"
+      },
+      {
+        "GUID": "18c7a0b7-a0b9-4472-9c12-998146732947",
+        "Title": "Vibe FM",
+        "Url": "http://stream.zeno.fm/s98kga59qnruv",
+        "ImageUrl": "vibefmdance.png"
+      },
+      {
+        "GUID": "41cd53b7-d43b-4b87-aeb3-85c9ba333e03",
+        "Title": "Play Radio Hit",
+        "Url": "http://str2b.openstream.co/1419",
+        "ImageUrl": "playhit.png"
+      },
+      {
+        "GUID": "9f78ec3d-e06e-4a59-9476-e2cb194878d6",
+        "Title": "MB Music Radio",
+        "Url": "http://s33.myradiostream.com/16150/listen.mp3",
+        "ImageUrl": "mbmusic.png"
+      },
+      {
+        "GUID": "1abfdd23-8112-40dd-9494-475c3922e12f",
+        "Title": "Radio Mega Hit",
+        "Url": "http://radiomegahit.zapto.org:8080/;stream.nsv",
+        "ImageUrl": "megahit.jpg",
+        "Description": "Aici Muzica Face Diferenta!"
+      },
+      {
+        "GUID": "40c7aec6-8f72-41e9-90a6-5ac382b3374d",
+        "Title": "Radio Intexfm",
+        "Url": "http://149.202.158.82:9788/;",
+        "ImageUrl": "radio-intexfm.png"
+      },
+      {
+        "GUID": "c246d808-9760-4015-94ac-2f9d49e254de",
+        "Title": "Dance Effect Radio",
+        "Url": "http://asculta.danceeffect.ro:3333/",
+        "ImageUrl": "dance-effect-radio.png"
+      },
+      {
+        "GUID": "8f6170e9-b516-45d9-8aa3-d54e6ef5e925",
+        "Title": "Radio indiGo",
+        "Url": "https://live.gofm.ro:2000/stream/goFM.ro/stream.mp3?ver=882022"
+      },
+      {
+        "GUID": "29851a83-e9f9-42fb-8901-2bb621bea537",
+        "Title": "Indigo FM",
+        "Url": "http://82.78.176.198:7700/live"
+      }
+    ]
+  },
+  {
+    "Name": "Party",
+    "List": [
+      {
+        "GUID": "5554d556-9918-4d3d-80e2-8c8ea0d8df19",
+        "Title": "Fun FM Petrecere",
+        "Url": "http://petrecere.funfm.net:8000/",
+        "ImageUrl": "funfmpetrecere.png"
+      },
+      {
+        "GUID": "0d72b562-eb4c-476a-82fc-7b90a1c950d0",
+        "Title": "Oltenia Popular",
+        "Url": "http://89.39.189.21:8889/;",
+        "ImageUrl": "olteniapopular.png"
+      },
+      {
+        "GUID": "2f359717-b049-4573-924f-b96e0d3a494b",
+        "Title": "Radio Bădiță Popular",
+        "Url": "http://89.39.189.29:8000/;"
+      },
+      {
+        "GUID": "58295af5-92a9-47dd-92b4-8d95be835faf",
+        "Title": "Radio Capital FM Etno",
+        "Url": "http://etno.capitalfm.ro:7000/;"
+      },
+      {
+        "GUID": "d39145ed-f7e7-43b4-9268-346d6a7c1ab0",
+        "Title": "Radio Didina Romantica",
+        "Url": "http://192.95.54.59:7500/;"
+      },
+      {
+        "GUID": "0786222a-a52d-4fd8-a6de-1e751ac1cb86",
+        "Title": "Radio Etno Mania",
+        "Url": "http://live.radioetnomania.net:9300/"
+      },
+      {
+        "GUID": "1940549b-2dcd-4f23-8640-08b725af99f9",
+        "Title": "Radio Etno Vest",
+        "Url": "http://89.39.189.75:8500/;"
+      },
+      {
+        "GUID": "ff84bf8c-2ce2-4de3-b099-fb0abbb1207e",
+        "Title": "Radio Folclor",
+        "Url": "http://167.114.207.226:5000/;",
+        "ImageUrl": "radiofolclor.png"
+      },
+      {
+        "GUID": "33d77078-690c-4cc7-a4b9-be4080b664a7",
+        "Title": "Radio Hit FM Petrecere",
+        "Url": "http://petrecere.radiohitfm.ro:8340/",
+        "ImageUrl": "radio-hit-fm-petrecere.png"
+      },
+      {
+        "GUID": "e35eafcc-71cb-4c83-ad1e-7244627aefd0",
+        "Title": "Radio Liberty popular",
+        "Url": "http://populara.radioliberty.ro:1989/;",
+        "ImageUrl": "radio-liberty-popular.png"
+      },
+      {
+        "GUID": "80644d61-f94c-4a61-a21f-33b026b3124f",
+        "Title": "Radio Luceafar",
+        "Url": "http://live.radioluceafar.com:8000/;"
+      },
+      {
+        "GUID": "1f51d395-0ad4-4614-919a-b482d474de26",
+        "Title": "Radio Petrecaretzu",
+        "Url": "http://radiopetrecaretzu.zapto.org:8383/"
+      },
+      {
+        "GUID": "3c234cec-ed3e-494b-b40a-b42ef28ff93c",
+        "Title": "Radio Popular Autentic",
+        "Url": "http://mp3.radiopopular.ro:7777/;stream.mp3"
+      },
+      {
+        "GUID": "55578395-bcfd-4fff-abad-0d7adb66ffe0",
+        "Title": "Radio Tradiţional Popular",
+        "Url": "http://populara.radiotraditional.ro:7600/"
+      },
+      {
+        "GUID": "5a451a7e-92f9-4c18-b51d-c60aac896922",
+        "Title": "Radio Napoca Petrecere",
+        "Url": "http://178.32.107.151:2439/stream",
+        "ImageUrl": "napoca-petrecere.png"
+      },
+      {
+        "GUID": "fdd53cb3-9f35-4b23-b6b8-833a10a83d8f",
+        "Title": "Radio Mirajul Muzicii",
+        "Url": "http://live.radiomiraj.ro:9952/",
+        "ImageUrl": "mirajulmuzicii.jpg"
+      }
+    ]
+  },
+  {
+    "Name": "Jazz",
+    "List": [
+      {
+        "GUID": "8c907db5-3165-4e19-8319-cf588bbfeec9",
+        "Title": "Cool Jazz 100",
+        "Url": "http://192.99.170.8:5646/stream"
+      },
+      {
+        "GUID": "017e3434-f1fc-4019-a795-ebb383a25c73",
+        "Title": "Salalondon Radio",
+        "Url": "http://salalondon.ddns.net:8002/;"
+      },
+      {
+        "GUID": "a9ed9e5a-a837-4135-bd78-bbac54a2eae8",
+        "Title": "Jazz 98.5FM WSAX",
+        "Url": "http://96.31.83.86:8003/1/wsax01"
+      },
+      {
+        "GUID": "2e259582-6eab-4599-8adb-1343701764fc",
+        "Title": "Jazz Juice Radio",
+        "Url": "http://91.121.134.105:8004/stream"
+      },
+      {
+        "GUID": "d95c1fd0-f7fd-4fcb-8e8c-5c40ba9d7243",
+        "Title": "Radio M2 Jazz",
+        "Url": "http://live.m2radio.fr/m2jazz-128.mp3"
+      },
+      {
+        "GUID": "443062dd-7d98-4384-ad21-fd10b5c26adc",
+        "Title": "Radio King Blues/Jazz",
+        "Url": "http://88.198.69.145:8496/;"
+      },
+      {
+        "GUID": "5430c47b-2d4d-477c-bedf-da03964a2097",
+        "Title": "Pure Jazz Radio",
+        "Url": "http://71.125.12.37:8000/"
+      },
+      {
+        "GUID": "7e20e02e-0b5b-42e3-b0c8-ffd6a8fdb333",
+        "Title": "Radio Caprice Cool Jazz",
+        "Url": "http://79.120.39.202:9085/"
+      },
+      {
+        "GUID": "884f8a55-85bb-4317-b5ff-23d7de06601c",
+        "Title": "Radio Caprice Jazz Pop",
+        "Url": "http://79.120.39.202:9135/"
+      },
+      {
+        "GUID": "ebbaa4a0-4212-474d-bb86-bea37d29e613",
+        "Title": "Smooth Jazz Radio",
+        "Url": "http://stream18.shoutcastsolutions.com:8227/",
+        "ImageUrl": "smoothjazz.png"
+      },
+      {
+        "GUID": "8460f055-3019-4d9d-9c7a-eba0e1b6d992",
+        "Title": "Smooth Jazz Tampa Bay",
+        "Url": "http://144.217.158.59:5270/stream/;"
+      },
+      {
+        "GUID": "d7435547-6ba5-4c86-ac7e-d12e26dbc05d",
+        "Title": "Smooth Jazz NYC",
+        "Url": "http://144.217.158.59:5024/stream"
+      },
+      {
+        "GUID": "b0acbca1-0381-4ec4-8ec5-9410730a74e8",
+        "Title": "Smooth Jazz Oasis",
+        "Url": "http://144.217.158.59:5330/stream"
+      },
+      {
+        "GUID": "581c0ea9-1952-4f36-857a-55e3f6373837",
+        "Title": "Szpila Radio",
+        "Url": "http://91.185.191.213:8200/listen1"
+      }
+    ]
+  },
+  {
+    "Name": "Soul",
+    "List": [
+      {
+        "GUID": "d4abd811-3089-497d-9c69-8369777766be",
+        "Title": "CALM RADIO",
+        "Url": "http://streams.calmradio.com:16328/stream/1/"
+      },
+      {
+        "GUID": "8a7af6fe-c0cb-41d4-bcb2-e4d24037427c",
+        "Title": "Generation Soul Disco Funk",
+        "Url": "http://91.121.104.123:8000/"
+      },
+      {
+        "GUID": "c9e156dd-8b7a-454e-8ce5-dcd79372f239",
+        "Title": "Groove City Radio",
+        "Url": "http://46.28.49.164:7668/stream"
+      },
+      {
+        "GUID": "bf7e4e8f-39dc-433d-b0d2-1676fd913856",
+        "Title": "Motown Sound",
+        "Url": "http://192.99.177.195:8006/stream"
+      }
+    ]
+  },
+  {
+    "Name": "House",
+    "List": [
+      {
+        "GUID": "e4859960-cb73-49cd-ba73-fea4eef988e8",
+        "Title": "24 House Radio",
+        "Url": "http://stream.adradio.ro/24",
+        "ImageUrl": "24house.png"
+      },
+      {
+        "GUID": "3a59a9a4-a339-4e20-868c-88c1adaffa1c",
+        "Title": "Radio Pro B",
+        "Url": "http://89.18.27.150:8888/;",
+        "ImageUrl": "radioprob.png"
+      },
+      {
+        "GUID": "32446607-f103-4302-a153-cf89360f0ab5",
+        "Title": "Radio Bandit",
+        "Url": "http://live.radiobandit.ro:8000/bandit.mp3",
+        "ImageUrl": "radiobandit.png"
+      },
+      {
+        "GUID": "5b22549c-a0e3-4a23-ab56-8974d06ab3bd",
+        "Title": "EnergyFM",
+        "Url": "http://89.39.189.59:9300/;stream.nsv",
+        "ImageUrl": "energy-fm-house.png"
+      }
+    ]
+  },
+  {
+    "Name": "Trance",
+    "List": [
+      {
+        "GUID": "b7ffc58a-b3db-4ad7-8675-80fa68ceadd0",
+        "Title": "1Mix Radio",
+        "Url": "http://94.23.209.225:8062/"
+      },
+      {
+        "GUID": "8310a2a4-c9f1-4153-8b16-ed61c0cb28d4",
+        "Title": "DI Radio Digital Impulse",
+        "Url": "http://5.39.71.159:8405/stream"
+      },
+      {
+        "GUID": "677eda5c-4672-4ec9-9b3d-365acd0ae3a2",
+        "Title": "Radio Caprice Dream Trance",
+        "Url": "http://79.120.39.202:9029/"
+      },
+      {
+        "GUID": "cf236b8e-ab1e-4977-a95a-36cd39354963",
+        "Title": "TranceBase.FM",
+        "Url": "http://178.162.200.5/trb.mp3"
+      },
+      {
+        "GUID": "53279d7b-3f30-4e6f-9663-b31d1c82684a",
+        "Title": "WALLYradio",
+        "Url": "http://37.59.42.207:8128/stream"
+      }
+    ]
+  },
+  {
+    "Name": "Hip hop",
+    "List": [
+      {
+        "GUID": "ccc17760-1aaf-433d-a4d5-e889ae7bceb0",
+        "Title": "Radio Tequila Hip hop",
+        "Url": "http://necenzurat.radiotequila.ro:7000/",
+        "ImageUrl": "radio-tequila-hip-hop.png"
+      },
+      {
+        "GUID": "5c409caf-87f3-4198-8cc3-a11816124c48",
+        "Title": "Radio Greu de difuzat",
+        "Url": "http://radio.voceastrazii.net:8012/stream/1/",
+        "ImageUrl": "greudedifuzat.png"
+      },
+      {
+        "GUID": "f684f703-0cc5-432f-a4b8-cc16a7c611ad",
+        "Title": "Radio Traditional",
+        "Url": "http://178.32.183.159:7500/;",
+        "ImageUrl": "traditionalhiphop.png"
+      },
+      {
+        "GUID": "f0615fbe-30b6-493f-be02-46b8b22de13d",
+        "Title": "Radio Romanian Hip Hop",
+        "Url": "https://hosting.posturideradio.ro/8400/stream?ver=112924",
+        "ImageUrl": "RRHIPHOP.png"
+      },
+      {
+        "GUID": "37ab1f36-98fd-4721-808d-3cbed9964538",
+        "Title": "Radio Nephrite Underground",
+        "Url": "https://radionephrite.icloudrr.eu:10995/stream",
+        "ImageUrl": "radionephrite.png"
+      },
+      {
+        "GUID": "1346455d-cc46-49a0-a161-8d43b2930d8a",
+        "Title": "Radio SunBlack Romania",
+        "Url": "http://live.radiosun.ro/sunblack",
+        "ImageUrl": "sunblack.jpg"
+      },
+      {
+        "GUID": "02651ac0-962b-47a1-bb65-6e37b3b686de",
+        "Title": "Radio SasNet",
+        "Url": "http://radio.sasnet.eu:8888/;",
+        "ImageUrl": "radio-sasnet-romania.png"
+      },
+      {
+        "GUID": "e02c57f5-9f93-4486-8bc7-104cad515d45",
+        "Title": "Radio H3",
+        "Url": "http://167.114.64.181:8634/stream",
+        "Description": "Home of Hip Hop"
+      },
+      {
+        "GUID": "6a2d918b-21d3-4196-b125-fb9db4cc9deb",
+        "Title": "Hot 107.1 FM",
+        "Url": "http://192.99.34.205:8607/stream"
+      },
+      {
+        "GUID": "e31b5fb8-aefe-42ee-9527-817eb6c38799",
+        "Title": "Official Hip Hop Radio",
+        "Url": "http://37.187.90.196:9132/stream"
+      },
+      {
+        "GUID": "7eda6070-5825-4557-b667-7d7df5515b5d",
+        "Title": "TTTRadio.net",
+        "Url": "http://144.217.158.181/live",
+        "ImageUrl": "tttradio.png"
+      },
+      {
+        "GUID": "20255cb9-c3d8-43e1-88fa-41cd0908cc62",
+        "Title": "Young Urban Lifestyles Radio",
+        "Url": "http://192.99.0.170:5535/stream"
+      },
+      {
+        "GUID": "02f0cb47-c49e-49b0-b286-07b55031b0fe",
+        "Title": "jamz",
+        "Url": "http://185.33.21.112:11282/"
+      },
+      {
+        "GUID": "da5c87be-aa95-4d9e-a0b9-e152c8ede7eb",
+        "Title": "Radio Cartier",
+        "Url": "http://radiocartier.zapto.org:8048/"
+      }
+    ]
+  },
+  {
+    "Name": "90's",
+    "List": [
+      {
+        "GUID": "4f803f97-7c4d-4505-a376-6190e77ecb24",
+        "Title": "Play 90's",
+        "Url": "https://live.playradio.org:8443/90HD",
+        "ImageUrl": "play90.png"
+      },
+      {
+        "GUID": "2933ed5f-1449-42ad-b61e-a9c22701d2bf",
+        "Title": "Play Radio Hit 90s",
+        "Url": "http://str2b.openstream.co/1421",
+        "ImageUrl": "play-radio-hit-90s.jpg"
+      },
+      {
+        "GUID": "d57ad3d7-ea07-4230-bfa1-d51da9abbe4a",
+        "Title": "181 FM",
+        "Url": "http://208.84.155.85:8048/",
+        "Description": "Lite 90s"
+      },
+      {
+        "GUID": "77ac3861-e69b-4883-b3d0-94481db4c75a",
+        "Title": "80s 90s",
+        "Url": "http://185.33.21.112:11267/"
+      },
+      {
+        "GUID": "c4852bbd-d109-4ba7-98ef-e98dd1198d39",
+        "Title": "90er Stream",
+        "Url": "http://90er.stream.laut.fm/90er"
+      },
+      {
+        "GUID": "12943325-375c-4429-8a5b-cf378f6915ab",
+        "Title": "Radio UNO Digital",
+        "Url": "http://server-uk1.radioseninternet.net:8000/;"
+      },
+      {
+        "GUID": "42cb13b4-38a8-4442-8fb9-b2f17124ead3",
+        "Title": "BoB 90's",
+        "Url": "http://77.78.0.131:8000/"
+      },
+      {
+        "GUID": "e86b6deb-9805-4ef7-8814-14c1c948d168",
+        "Title": "Digital Impulse Best 90's",
+        "Url": "http://5.39.71.159:8643/stream"
+      },
+      {
+        "GUID": "9f50f347-4d0b-4b37-b26e-807f3d1a4d46",
+        "Title": "Eldoradio 90's",
+        "Url": "http://shoutcast.rtl.lu/eldo90s"
+      },
+      {
+        "GUID": "949886ec-4ee1-481c-b3b8-bd5bb2435e26",
+        "Title": "Eurodance 90's",
+        "Url": "http://94.23.221.158:9197/stream"
+      },
+      {
+        "GUID": "39a4fbe6-9a43-4421-b634-711e2dcd0a61",
+        "Title": "My 70s/90s Years",
+        "Url": "http://85.25.95.234:8100/"
+      },
+      {
+        "GUID": "2c50e779-b641-4424-abec-4c71cf2620cc",
+        "Title": "Play Radio 90's",
+        "Url": "http://live.playradio.org:9000/;"
+      },
+      {
+        "GUID": "b5f349ef-1762-48e7-9b58-7ad68d203430",
+        "Title": "Radio 90 Hit",
+        "Url": "http://radio90hit.net:8000/listen.mp3",
+        "ImageUrl": "radio90hit.jpg"
+      },
+      {
+        "GUID": "c15a354c-e7ab-47ec-bfb6-edf524954fc0",
+        "Title": "Radio Dancefloor - 90s",
+        "Url": "http://streaming.radiodancefloor.it:443/;"
+      },
+      {
+        "GUID": "573a9104-b539-4541-b200-464f35510f7a",
+        "Title": "Gherla FM",
+        "Url": "http://stream.adradio.ro/gherlafm",
+        "ImageUrl": "gherlafm.png"
+      }
+    ]
+  },
+  {
+    "Name": "Other",
+    "List": [
+      {
+        "GUID": "4aba0013-9093-44d1-aba9-59bd1436c6ab",
+        "Title": "Radio Clasic Kids",
+        "Url": "http://www.clasicradio.ro:7600/;",
+        "ImageUrl": "clasickids.jpg"
+      },
+      {
+        "GUID": "f1dc2ada-833d-446f-b9f9-83a4180b9601",
+        "Title": "Radio Clasic Popular",
+        "Url": "http://37.251.146.169:7700/;stream.mp3",
+        "ImageUrl": "clasicpopular.jpg"
+      },
+      {
+        "GUID": "0c88f3d3-9b5f-4ce6-a519-56c43eabfc9d",
+        "Title": "radio PRO diaspora",
+        "Url": "http://62.75.162.168:8000/;",
+        "ImageUrl": "prodiaspora.jpg",
+        "Description": "Un Radio de VIS"
+      },
+      {
+        "GUID": "77224b56-1b53-4ed3-8113-bae23ff7b826",
+        "Title": "star fm",
+        "Url": "http://94.24.49.44:8400/;",
+        "ImageUrl": "starfm.jpg"
+      },
+      {
+        "GUID": "fc2a5b8c-ffea-49f8-ae7b-476ae8900d72",
+        "Title": "Terra fm",
+        "Url": "http://188.26.110.59:8000/terra.mp3",
+        "ImageUrl": "radioterra.png"
+      },
+      {
+        "GUID": "85ccda2e-6477-4e59-8abb-a6f23db7f672",
+        "Title": "Radio ziDzi",
+        "Url": "http://151.80.9.228:6969/stream",
+        "ImageUrl": "radiozidzi.jpeg"
+      },
+      {
+        "GUID": "c14129b7-b12c-47d8-b571-7dea2d842e42",
+        "Title": "Favorit fm",
+        "Url": "http://91.250.252.251:8001/",
+        "ImageUrl": "favorit-fm.png"
+      },
+      {
+        "GUID": "0c01455a-ca24-4db2-9015-d1b5807f820d",
+        "Title": "Dip Music",
+        "Url": "http://163.172.7.220:8021/"
+      },
+      {
+        "GUID": "0d2953f4-20d7-462d-b604-5ce3b01cc878",
+        "Title": "Fun fm",
+        "Url": "http://live.funfm.net:8000/"
+      },
+      {
+        "GUID": "203c52c1-6aaf-48e5-8579-4ee7aa9ff25a",
+        "Title": "Radio 1",
+        "Url": "http://radio1manele.no-ip.org:8000/;stream.mp3"
+      },
+      {
+        "GUID": "b13eafe3-6b8f-486c-bf83-2d4bdab4b4b2",
+        "Title": "Radio Amma",
+        "Url": "http://93.115.37.60:7002/"
+      },
+      {
+        "GUID": "5879fd3e-9d7e-476a-80e0-d2f1ce2b60a9",
+        "Title": "Radio Atentat",
+        "Url": "http://149.202.158.82:7777/stream"
+      },
+      {
+        "GUID": "31847679-7602-4119-a856-c0b2ca833e61",
+        "Title": "Radio Delir",
+        "Url": "http://167.114.207.233:8000/;"
+      },
+      {
+        "GUID": "2dcec717-2b85-42e3-99f5-47d286cbe3d2",
+        "Title": "Radio Expert",
+        "Url": "http://live1.radioexpertfm.ro:8889/;"
+      },
+      {
+        "GUID": "3c433682-604b-453a-b441-ab777c7fa7c9",
+        "Title": "Radio Funky",
+        "Url": "http://live.radiofunky.ro:8888/;"
+      },
+      {
+        "GUID": "f313455c-9bda-43d0-96a0-dabe53c0f184",
+        "Title": "Radio Fan",
+        "Url": "http://fanradio.radiofanro.ro:3750/;"
+      },
+      {
+        "GUID": "9fa8fb1b-ed13-4c15-88bc-cee535b8468d",
+        "Title": "Radio Gansta",
+        "Url": "http://live.radiogangsta.ro:8800/;"
+      },
+      {
+        "GUID": "8e1410a6-f235-4a20-919d-7b40e191e6a4",
+        "Title": "Radio Hit Fm",
+        "Url": "http://asculta.radiohitfm.ro:8340/;"
+      },
+      {
+        "GUID": "97896ce6-4154-40ae-84bc-f114f060043f",
+        "Title": "Radio Impact",
+        "Url": "http://89.39.189.159:8000/;stream.mp3"
+      },
+      {
+        "GUID": "9db59f10-400f-4e07-9b88-940f167b1944",
+        "Title": "Radio Iubire",
+        "Url": "http://89.39.189.24:7070/"
+      },
+      {
+        "GUID": "e63f1a47-f6b4-44e0-9380-dbde49c914c5",
+        "Title": "Radio Legend",
+        "Url": "http://188.165.152.46:6969/"
+      },
+      {
+        "GUID": "978dd604-f643-400c-92c0-685b3515b856",
+        "Title": "Radio Liberty",
+        "Url": "http://5.196.53.110:1989/stream"
+      },
+      {
+        "GUID": "7b796b75-812f-463a-bf6c-525103495614",
+        "Title": "Radio Manele FM",
+        "Url": "http://91.121.139.194:8888/"
+      },
+      {
+        "GUID": "78a556fc-6b2e-400a-afc3-8552fd34fba2",
+        "Title": "Radio Nebunya",
+        "Url": "http://radionebunya.sytes.net:7575/;"
+      },
+      {
+        "GUID": "b47a4c31-f5a4-4fd0-bdd9-1478ba56bdae",
+        "Title": "Radio Stil",
+        "Url": "http://176.31.60.21:8888/stream"
+      },
+      {
+        "GUID": "563a9ec4-9f6a-4aa1-9176-213084e2d12b",
+        "Title": "Radio Vip",
+        "Url": "http://radiovip.servemp3.com:8000/;"
+      },
+      {
+        "GUID": "385e08af-7f4c-4b00-919f-d15283de9b26",
+        "Title": "Radiofly",
+        "Url": "http://asculta.radioflyromania.ro:8075/;"
+      },
+      {
+        "GUID": "4330a117-89a8-4cd3-91ae-00ecb74c84ce",
+        "Title": "Radio classic Amsterdam",
+        "Url": "http://94.23.148.11:8294/stream"
+      },
+      {
+        "GUID": "57d67c78-783c-4583-9ac6-acc4941a5a7d",
+        "Title": "Discofox Hithaus",
+        "Url": "http://85.25.108.154:11550/"
+      },
+      {
+        "GUID": "6e13294b-7686-4b59-aeb1-ae524cc75b85",
+        "Title": "Radio Dinamic",
+        "Url": "http://asculta.radiodinamic.com:9000/;"
+      },
+      {
+        "GUID": "aae9807e-b93d-4fb9-9564-9706f0f89c57",
+        "Title": "Radio Funky",
+        "Url": "http://popular.radiofunky.ro:8888/;"
+      },
+      {
+        "GUID": "2369ad5e-eab1-46ae-82af-35edc3c765ce",
+        "Title": "Radio La Placere",
+        "Url": "http://149.202.158.81:9910/;"
+      },
+      {
+        "GUID": "aa2a1130-36f5-4dcd-9855-f629e71b0cef",
+        "Title": "Radio Taraf",
+        "Url": "http://asculta.radiotaraf.ro:7100/;",
+        "ImageUrl": "radio-taraf.png"
+      },
+      {
+        "GUID": "7e9ed5fd-de42-4bba-be8e-098771c66e04",
+        "Title": "Radio Tequila Manele",
+        "Url": "http://live.radiotequila.ro:7000/",
+        "ImageUrl": "radio-tequila-manele.png"
+      },
+      {
+        "GUID": "1a4b1668-cc85-45d6-b95f-7d484b787647",
+        "Title": "Radio Diaspora FM",
+        "Url": "http://213.202.252.109/8006/stream",
+        "ImageUrl": "radio-diaspora-fm.jpg"
+      },
+      {
+        "GUID": "68aa301a-f030-4637-bc65-f0b47ecd635b",
+        "Title": "Radio CNM",
+        "Url": "http://asculta.radiocnm.ro:8002/live"
+      },
+      {
+        "GUID": "ed6d3bd6-ae3e-405c-ac82-e1678630aaa5",
+        "Title": "Radio Filadelfia Romania",
+        "Url": "http://asculta.radiofiladelfia.ro:8080/stream/2/",
+        "ImageUrl": "Radio-Filadelfia.jpg"
+      },
+      {
+        "GUID": "9909e9cd-9046-47ba-bfb8-c18bfdfcce23",
+        "Title": "Atlas FM",
+        "Url": "http://5.2.168.50:8000/",
+        "ImageUrl": "AtlasFM.jpg"
+      },
+      {
+        "GUID": "45b6c6e5-bcce-4d3c-a12a-bb78cef17b35",
+        "Title": "Dream FM",
+        "Url": "http://dreamfm.dtech.ro:9220/"
+      },
+      {
+        "GUID": "67ad149e-1bf0-4461-b507-a864ea907612",
+        "Title": "Dark Edge Radio",
+        "Url": "http://stream.darkedge.ro:8000/",
+        "ImageUrl": "dark-edge-radio.jpg"
+      },
+      {
+        "GUID": "d16e13c2-5658-4c45-9839-33f871312032",
+        "Title": "DiBi Radio",
+        "Url": "http://asculta.dibiradio.ro:8000/stream/1/"
+      },
+      {
+        "GUID": "646765ae-1eab-468e-831c-c49d86a21a26",
+        "Title": "Gherla FM",
+        "Url": "http://89.39.189.70:8000/"
+      },
+      {
+        "GUID": "66837e1e-413b-486a-aef5-b895379d5c22",
+        "Title": "Metronom FM",
+        "Url": "http://server.metronom.ro:8000/metronom128",
+        "ImageUrl": "metronomfm.jpg"
+      },
+      {
+        "GUID": "248fff49-f0ca-41b9-b974-02de15b7d14c",
+        "Title": "Micul Samaritean FM",
+        "Url": "http://162.251.160.26/stream",
+        "ImageUrl": "micul-samaritean.jpg"
+      },
+      {
+        "GUID": "a493ec2e-60a0-43e5-9bae-127dc50c7fcf",
+        "Title": "Melos FM",
+        "Url": "http://melos.ro:8803/"
+      },
+      {
+        "GUID": "45e1d455-6832-4f76-8103-7392aae4ee7f",
+        "Title": "Muntenia FM",
+        "Url": "http://munteniafm.servemp3.com:8000/"
+      },
+      {
+        "GUID": "5a6f6e9c-3f1a-4dc7-b328-66328412d20c",
+        "Title": "Mária Rádió Erdély",
+        "Url": "http://stream.mariaradio.ro:8000/MRE_LQ",
+        "ImageUrl": "mariaradio.jpg"
+      },
+      {
+        "GUID": "6a2f33b1-e61a-4839-9843-6e7a70c7a08f",
+        "Title": "Ortodox Radio",
+        "Url": "http://ortodoxradio.ro:8000/stream64"
+      },
+      {
+        "GUID": "7417431d-5c04-465c-9c9b-a14e2ec7dbc0",
+        "Title": "Plusz FM",
+        "Url": "http://hosting2.42netmedia.com:8961/stream"
+      },
+      {
+        "GUID": "74d4e1e4-61df-4a91-90e4-7bb6ff8f101e",
+        "Title": "Radio Gosen",
+        "Url": "http://ascultaradiogosen.no-ip.org:8125/"
+      },
+      {
+        "GUID": "4c1287d2-1f17-4d53-87a0-a4b78c3cfb8f",
+        "Title": "Radio Sound for you",
+        "Url": "http://radio-soundfouryou.radi0.im:8000/"
+      },
+      {
+        "GUID": "7e3b81b7-5bdb-4c7e-882d-45266c332b16",
+        "Title": "Radio Sun Dance",
+        "Url": "http://live.radiosun.ro/sundance"
+      },
+      {
+        "GUID": "d34adba8-af5d-4df3-89d6-3983a2dc08e1",
+        "Title": "Radio Vocea Speranței",
+        "Url": "http://rvs.crestin.tv:8002/",
+        "ImageUrl": "sperantei.png"
+      },
+      {
+        "GUID": "cb30aac5-b9f3-4f24-aa89-6b5d175bc306",
+        "Title": "Radio 69",
+        "Url": "http://emisie.radio69romania.ro:7500/"
+      },
+      {
+        "GUID": "e963bcda-eac8-4262-8b84-d90d4586c4e7",
+        "Title": "Radio Accent",
+        "Url": "http://86.122.157.14:8900/",
+        "ImageUrl": "radio-accent.png"
+      },
+      {
+        "GUID": "d69f2923-da55-4ffd-b897-295b99fed0bf",
+        "Title": "Radio Aquila",
+        "Url": "http://asculta.radio-aquila.ro:8000/stream"
+      },
+      {
+        "GUID": "f957f61c-8c2c-4272-b8a1-eaa5fc8ece13",
+        "Title": "Radio B Zone",
+        "Url": "http://5.39.71.159:8000/stream"
+      },
+      {
+        "GUID": "46f7ea61-da20-4534-b1df-5b7c63ac38bb",
+        "Title": "Radio Best FM",
+        "Url": "http://193.238.57.106:2000/",
+        "ImageUrl": "best-fm.png"
+      },
+      {
+        "GUID": "7c7964a1-63ae-4ef3-9d52-1128d50ae877",
+        "Title": "Radio Bucovina",
+        "Url": "http://live.radiobucovina.ro:8000/"
+      },
+      {
+        "GUID": "d42ea38c-355a-44d4-9e0c-2cb46a3fc638",
+        "Title": "Radio Campus",
+        "Url": "http://82.208.130.74:7000/"
+      },
+      {
+        "GUID": "422271a9-3a62-43f0-97f9-85347c91da10",
+        "Title": "Radio Clasic Hits",
+        "Url": "http://www.clasicradio.ro:7000/"
+      },
+      {
+        "GUID": "b74a63a8-9137-4773-b75e-2220c789c836",
+        "Title": "Radio Click",
+        "Url": "http://live.radioclick.ro:8008/",
+        "ImageUrl": "radio-click.png"
+      },
+      {
+        "GUID": "595e7384-0f8d-4f1b-af57-c6f6991cc30f",
+        "Title": "Radio Contact",
+        "Url": "http://radio-contact.ice.infomaniak.ch/radio-contact-high.aac"
+      },
+      {
+        "GUID": "dd7e0a24-7a71-4724-9a95-8bb8ca87bf2d",
+        "Title": "Radio CopiluMik",
+        "Url": "http://live.radiocopilumik.com:9986/"
+      },
+      {
+        "GUID": "8baafb70-0c44-4266-ab02-b4c93f1d7bc9",
+        "Title": "Radio Crazy",
+        "Url": "http://live.crazyradio.ro:8024/stream"
+      },
+      {
+        "GUID": "c84a1e7b-880a-4ee1-a3f2-a23858a6f857",
+        "Title": "Radio Delta",
+        "Url": "http://94.24.49.42:9998/"
+      },
+      {
+        "GUID": "b2513a72-e76e-4275-b0a6-2859c1ab52f8",
+        "Title": "Radio Doina FM",
+        "Url": "http://89.43.138.116:8000/radiodoina.mp3"
+      },
+      {
+        "GUID": "10d1deb6-ba2e-45bb-b8b3-a78c752a769a",
+        "Title": "Radio Doxologia",
+        "Url": "http://rlive.doxologia.ro/stream.mp3"
+      },
+      {
+        "GUID": "f18f97a2-6e9e-4214-be77-875055e25960",
+        "Title": "Radio Fibra",
+        "Url": "http://188.165.152.44:9000/"
+      },
+      {
+        "GUID": "443a523c-ccaf-4c34-a3e1-b53823088933",
+        "Title": "Radio Fx Net",
+        "Url": "http://asculta.radiofxnet.ro:8458/"
+      },
+      {
+        "GUID": "8afd574b-25b5-4b4d-b79b-13ade6b5cdd0",
+        "Title": "Radio Gaia",
+        "Url": "http://sc-radiogaia.1.fm:10036/",
+        "ImageUrl": "radio-gaia.png"
+      },
+      {
+        "GUID": "b2f56d2c-d01c-49fa-844e-e39f0cf64e11",
+        "Title": "Radio Gaga",
+        "Url": "http://rc.radiogaga.ro:8000/live"
+      },
+      {
+        "GUID": "b8b9d5e0-3e5f-496f-872c-2fad8e842d3b",
+        "Title": "Radio Hit Romania",
+        "Url": "http://live.radio-hit.ro:8888/"
+      },
+      {
+        "GUID": "a1f9c3b5-773c-477d-a1bf-0cf06d2ef837",
+        "Title": "Radio Hit Fm",
+        "Url": "http://live.radiohitfm.net:8989/",
+        "ImageUrl": "hitfm.png"
+      },
+      {
+        "GUID": "ace78d90-9970-4eed-808b-9becbd826f58",
+        "Title": "Radio Hot Style",
+        "Url": "http://mp3.radiohot.ro:8000/"
+      },
+      {
+        "GUID": "1ca3ac4d-90ce-439b-8474-041140a022e0",
+        "Title": "Jurnal FM",
+        "Url": "http://89.39.189.101:8230/"
+      },
+      {
+        "GUID": "798fc88a-d93d-484a-b2d4-b6867e9f371d",
+        "Title": "Radio Live 247",
+        "Url": "http://asculta-server19.radiolive247.ro:9000/"
+      },
+      {
+        "GUID": "775e2033-4ec1-4014-9db8-822200f445d3",
+        "Title": "Radio x net",
+        "Url": "http://asculta.radioxnet.ro:8888/"
+      },
+      {
+        "GUID": "108b9fe4-429a-49b0-9b3e-74a7a13abe3e",
+        "Title": "Radio Minisat",
+        "Url": "http://radio.minisat.ro:8000/"
+      },
+      {
+        "GUID": "eca5b4d3-5722-4b3d-93bf-3f00cfc8d021",
+        "Title": "Radio Noise",
+        "Url": "http://radionoise.no-ip.biz:9100/"
+      },
+      {
+        "GUID": "d6829b24-7d7b-47e1-a23f-8141e3b34e62",
+        "Title": "Radio Popular",
+        "Url": "http://colinde.radiopopular.ro:8888/"
+      },
+      {
+        "GUID": "a1d91bda-a219-4803-88f3-e21e86bdf720",
+        "Title": "Radio Stănca mântuirii",
+        "Url": "http://radio.stancamantuirii.net:8000/"
+      },
+      {
+        "GUID": "1a4990c0-15af-4be2-88c3-8f001b14d297",
+        "Title": "Radio Renașterea",
+        "Url": "http://radiorenasterea.ro:8000/renasterea.aac"
+      },
+      {
+        "GUID": "e555d4b2-8720-49b4-b371-0d1bfac5f5f2",
+        "Title": "Marosvásárhelyi Rádió",
+        "Url": "http://streaming.radiomures.ro:8312/"
+      },
+      {
+        "GUID": "e5267c33-d0eb-4331-988c-282caa56385a",
+        "Title": "Radio SOS",
+        "Url": "http://5.2.180.231:8000/stream"
+      },
+      {
+        "GUID": "86eff083-13dd-4458-ac71-475c3f7973fd",
+        "Title": "Radio Sud",
+        "Url": "http://media.gds.ro:8500/128.mp3"
+      },
+      {
+        "GUID": "390f58e2-5e24-4c9f-8d42-704fb14318ed",
+        "Title": "Radio SunGold",
+        "Url": "http://live.radiosun.ro/sungold"
+      },
+      {
+        "GUID": "aaac8821-bcc2-45ca-aaf8-878e778165df",
+        "Title": "Radio SunLove",
+        "Url": "http://live.radiosun.ro/sunlove"
+      },
+      {
+        "GUID": "8fd99b56-080c-4cb9-9e6a-eda8b09a031d",
+        "Title": "Radio Taraf",
+        "Url": "http://live.radiotaraf.ro:8181/;"
+      },
+      {
+        "GUID": "3425fbb3-e430-4744-ac67-88a92c030200",
+        "Title": "Radio Unison",
+        "Url": "http://audio.radiounisonro.bisericilive.com:8080/radiounisonro.mp3"
+      },
+      {
+        "GUID": "bddfb6e1-a077-46d7-9dce-d8af97da234a",
+        "Title": "Radio Vestea Bună",
+        "Url": "http://198.50.156.36:8246/stream"
+      },
+      {
+        "GUID": "9f54272b-75f6-4a12-a403-7c6ea31f1416",
+        "Title": "Radio Vocea Evangheliei",
+        "Url": "http://s5.radioboss.fm:8099/stream"
+      },
+      {
+        "GUID": "e5a4ce8a-7d18-41bf-88e2-da7ff32fbf37",
+        "Title": "Radio Vocea Evangheliei 92.1 FM",
+        "Url": "http://38.96.148.39:6700/"
+      },
+      {
+        "GUID": "24ef9439-4029-4852-963c-094622de7f57",
+        "Title": "Rete Due",
+        "Url": "http://stream.srg-ssr.ch/m/retedue/mp3_128"
+      },
+      {
+        "GUID": "8d167e83-8847-4ca9-b40e-65bf26c8d517",
+        "Title": "Retro FM",
+        "Url": "http://retro.babahhcdn.com/RETRO"
+      },
+      {
+        "GUID": "ef426d99-bab2-4f63-9906-0acb660975ea",
+        "Title": "Sláger Rádió",
+        "Url": "http://89.37.193.61:8000/raspi"
+      },
+      {
+        "GUID": "49a64841-d72b-4e2e-b7f0-dacb91bcafcd",
+        "Title": "Terra Radio",
+        "Url": "http://live.terrafm.ro:8000/",
+        "ImageUrl": "terraradio.png"
+      },
+      {
+        "GUID": "3946bb73-014e-4cc2-bd3f-ef9a598e462d",
+        "Title": "Vocea Armatei",
+        "Url": "http://ice1.stsisp.ro:8000/VoceaArmatei_mp3"
+      },
+      {
+        "GUID": "51496512-69b3-407e-ad96-897e2d98aae7",
+        "Title": "Vox FM",
+        "Url": "http://stream.voxfm.ro:8000/"
+      },
+      {
+        "GUID": "9c0e2545-c4fe-4ef4-a5cf-92e4aecad160",
+        "Title": "Radyo 90",
+        "Url": "http://17703.live.streamtheworld.com/POP90_SC?/;stream.mp3",
+        "ImageUrl": "radyo90.png"
+      }
+    ]
+  }
+]
