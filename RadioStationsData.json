@@ -230,7 +230,7 @@
       {
         "GUID": "86e0a7de-4224-4b67-9f30-c7de022fdef0",
         "Title": "Radio Top",
-        "Url": "http://live.radiotop.ro:8000/;",
+        "Url": "https://live.radiotop.ro/radio/8000/radio.mp3",
         "ImageUrl": "radiotopsuceava.jpg"
       },
       {
@@ -290,7 +290,7 @@
       {
         "GUID": "97df39b8-9051-4609-a6ab-aff24c104f2a",
         "Title": "Transilvania Hits",
-        "Url": "http://live.transylvaniahits.eu:8002/stream",
+        "Url": "https://ssl.ascultatare.ro/8004/stream",
         "ImageUrl": "transilvania-hits.png"
       },
       {
@@ -957,7 +957,7 @@
       {
         "GUID": "f0615fbe-30b6-493f-be02-46b8b22de13d",
         "Title": "Radio Romanian Hip Hop",
-        "Url": "https://hosting.posturideradio.ro/8400/stream?ver=112924",
+        "Url": "https://asculta.radioromanian.net/8400/stream",
         "ImageUrl": "RRHIPHOP.png"
       },
       {
@@ -1181,7 +1181,7 @@
       {
         "GUID": "2dcec717-2b85-42e3-99f5-47d286cbe3d2",
         "Title": "Radio Expert",
-        "Url": "http://live1.radioexpertfm.ro:8889/;"
+        "Url": "http://expertfm.zapto.org:8000/;"
       },
       {
         "GUID": "3c433682-604b-453a-b441-ab777c7fa7c9",
@@ -1332,7 +1332,7 @@
       {
         "GUID": "66837e1e-413b-486a-aef5-b895379d5c22",
         "Title": "Metronom FM",
-        "Url": "http://server.metronom.ro:8000/metronom128",
+        "Url": "http://metronom.live:8000/metronom1",
         "ImageUrl": "metronomfm.jpg"
       },
       {
