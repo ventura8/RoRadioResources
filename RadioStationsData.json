@@ -164,7 +164,7 @@
       {
         "GUID": "8abc8a62-8090-472c-8585-c1293751ca35",
         "Title": "CFM Litoral",
-        "Url": "http://stream2.radiocfm.ro:9090/CFM",
+        "Url": "https://stream2.radiocfm.ro:8443/CFM",
         "ImageUrl": "cfm.png",
         "Description": "Aici, muzica nu se repeta!"
       },
