@@ -164,7 +164,7 @@
       {
         "GUID": "8abc8a62-8090-472c-8585-c1293751ca35",
         "Title": "CFM Litoral",
-        "Url": "https://stream2.radiocfm.ro:8443/CFM",
+        "Url": "http://stream2.radiocfm.ro:9090/CFM",
         "ImageUrl": "cfm.png",
         "Description": "Aici, muzica nu se repeta!"
       },
@@ -770,6 +770,12 @@
         "Title": "Radio Mirajul Muzicii",
         "Url": "http://live.radiomiraj.ro:9952/",
         "ImageUrl": "mirajulmuzicii.jpg"
+      },
+      {
+        "GUID": "21631b8e-55bf-4b11-8a11-72d42a91ef71",
+        "Title": "Radio FanFM-RO",
+        "Url": "http://radiofanfmro.zapto.org:8585/live",
+        "ImageUrl": "radiofanfmro.png"
       }
     ]
   },
@@ -969,7 +975,7 @@
       {
         "GUID": "1346455d-cc46-49a0-a161-8d43b2930d8a",
         "Title": "Radio SunBlack Romania",
-        "Url": "http://live.radiosun.ro/sunblack",
+        "Url": "http://live.radiosun.ro/sunrock",
         "ImageUrl": "sunblack.jpg"
       },
       {
