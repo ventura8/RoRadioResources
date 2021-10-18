@@ -114,7 +114,7 @@
       {
         "GUID": "a7902600-044b-4493-869f-0d1b341e19e6",
         "Title": "Sport Total FM",
-        "Url": "http://84.247.83.36:8001/;",
+        "Url": "http://84.247.84.202:8001/;",
         "ImageUrl": "sporttotalfm.png",
         "Description": "Mai mult decat fotbal !"
       },
@@ -128,7 +128,7 @@
       {
         "GUID": "fca9ca08-e075-4c93-990d-219ebfe6b89f",
         "Title": "Vibe fm",
-        "Url": "http://astreaming.vibefm.ro:8000/VibeFM_aac",
+        "Url": "https://astreaming.edi.ro:8443/oneworldradio_aacp64k",
         "ImageUrl": "vibefm.png"
       },
       {
