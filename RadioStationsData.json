@@ -74,7 +74,7 @@
       {
         "GUID": "d676a5a2-09e2-481f-9e2f-11736febb902",
         "Title": "romantic fm",
-        "Url": "http://ivm.antenaplay.ro/liveaudio/radioromantic/playlist.m3u8",
+        "Url": "http://zuicast.digitalag.ro:9420/romanticfm",
         "ImageUrl": "romanticfm.png",
         "Description": "Muzică. Nu zgomot"
       },
