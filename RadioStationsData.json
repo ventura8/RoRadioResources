@@ -1109,6 +1109,59 @@
     ]
   },
   {
+    "Name": "GMusic",
+    "List" : [
+      {
+        "GUID": "e8fa1260-8ac9-4be3-921d-11b337e24053",
+        "Title": "Radio GMusic Dance",
+        "Url": "https://s6.webradio-hosting.com:7000/stream?icy=http",
+        "ImageUrl": "gmusic-dance.jpg"
+      },
+      {
+        "GUID": "1ba9d2f4-bb9c-47d5-87cd-7531dd152cb0",
+        "Title": "Radio GMusic Retro",
+        "Url": "https://s8.webradio-hosting.com:1201/stream?icy=http",
+        "ImageUrl": "gmusic-retro.jpg"
+      },
+      {
+        "GUID": "b212c271-6cb1-47fd-a9b3-292e09fdc4eb",
+        "Title": "Radio GMusic Planet Funk",
+        "Url": "https://play.wrhradios.com:7017/stream?icy=http",
+        "ImageUrl": "gmusic-funk.jpg"
+      },
+      {
+        "GUID": "2c8390d3-c6a6-42c0-ad79-f7f010f9a9d2",
+        "Title": "Radio GMusic Rock",
+        "Url": "https://s8.webradio-hosting.com:1203/stream?icy=http",
+        "ImageUrl": "gmusic-rock.jpg"
+      },
+      {
+        "GUID": "3c818bb2-512e-4555-9740-1a92bc9dc9a9",
+        "Title": "Radio GMusic Soft",
+        "Url": "https://s8.webradio-hosting.com:1202/stream?icy=http",
+        "ImageUrl": "gmusic-soft.jpg"
+      },
+      {
+        "GUID": "b608b5cf-08b0-42b1-9bda-2b547d73c30b",
+        "Title": "Radio GMusic Relax Garden",
+        "Url": "https://play.wrhradios.com:7000/stream?icy=http",
+        "ImageUrl": "gmusic-relax.jpg"
+      },
+      {
+        "GUID": "ad6a1eb9-8fa9-4a8d-9890-39f869d2b84e",
+        "Title": "Radio GMusic Trap",
+        "Url": "https://s8.webradio-hosting.com:1206/stream?icy=http",
+        "ImageUrl": "gmusic-trap.jpg"
+      },
+      {
+        "GUID": "879c9e21-24d9-427a-9eba-1fc2034a87c1",
+        "Title": "Radio GMusic Colinde",
+        "Url": "https://s8.webradio-hosting.com:1207/stream?icy=http",
+        "ImageUrl": "gmusic-colinde.jpg"
+      }
+    ]
+  },
+  {
     "Name": "Other",
     "List": [
       {
