@@ -46,10 +46,9 @@
       },
       {
         "GUID": "d7490bab-0033-4b97-9ead-5fc1f04054af",
-        "Title": "Music FM",
-        "Url": "http://edge126.rdsnet.ro:84/profm/music-fm.mp3",
-        "ImageUrl": "musicfm.png",
-        "Description": "Just Music"
+        "Title": "Chill FM",
+        "Url": "https://edge126.rcs-rds.ro/profm/chillfm.mp3",
+        "ImageUrl": "chillfm.png"
       },
       {
         "GUID": "d946c209-aadf-4c76-b9bd-e87b280e5377",
@@ -120,7 +119,7 @@
       },
       {
         "GUID": "496c2ba0-099d-4d71-a0ea-d4dade1d5022",
-        "Title": "TANĂNA",
+        "Title": "TANĂNANA",
         "Url": "http://live.tananana.ro:8010/stream-48.aac",
         "ImageUrl": "radio-tananana.png",
         "Description": "MUZICĂ PUSĂ CU MÂNA"
