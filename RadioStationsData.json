@@ -133,7 +133,7 @@
       {
         "GUID": "7699c53b-dc92-48ab-9727-5a4a6860e9f8",
         "Title": "Virgin Radio",
-        "Url": "http://astreaming.virginradio.ro:8000/virgin_aacp_64k",
+        "Url": "http://astreaming.edi.ro:8000/VirginRadio_aac",
         "ImageUrl": "virginradio.png"
       },
       {
