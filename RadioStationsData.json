@@ -126,14 +126,14 @@
       },
       {
         "GUID": "fca9ca08-e075-4c93-990d-219ebfe6b89f",
-        "Title": "Vibe fm",
-        "Url": "https://astreaming.edi.ro:8443/oneworldradio_aacp64k",
-        "ImageUrl": "vibefm.png"
+        "Title": "ONE WORLD RADIO",
+        "Url": "https://22673.live.streamtheworld.com/OWR_INTERNATIONAL_ADP/HLS/playlist.m3u8",
+        "ImageUrl": "oneworldradio.png"
       },
       {
         "GUID": "7699c53b-dc92-48ab-9727-5a4a6860e9f8",
         "Title": "Virgin Radio",
-        "Url": "http://astreaming.edi.ro:8000/VirginRadio_aac",
+        "Url": "https://astreaming.edi.ro:8443/VirginRadio_aac",
         "ImageUrl": "virginradio.png"
       },
       {
