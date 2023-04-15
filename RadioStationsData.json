@@ -14,7 +14,7 @@
         "Title": "Pro FM",
         "Url": "https://edge126.rcs-rds.ro/profm/profm.mp3",
         "ImageUrl": "Profm.png",
-        "Description": "Legalize Joy!"
+        "Description": "OPEN RADIO"
       },
       {
         "GUID": "7633e2a7-589e-4191-bfdf-0cc2da224941",
@@ -33,7 +33,7 @@
       {
         "GUID": "75b82af5-a59c-4336-b727-9be276ceb095",
         "Title": "Radio Impuls",
-        "Url": "http://stream.radio-impuls.ro/stream2",
+        "Url": "https://live.radio-impuls.ro/stream",
         "ImageUrl": "RadioImpuls.png",
         "Description": "#hitperepeat"
       },
