@@ -73,7 +73,7 @@
       {
         "GUID": "276f0723-1e92-4179-92e8-6e449c4ffd88",
         "Title": "Radio TRINITAS",
-        "Url": "http://live.radiotrinitas.ro:8003/;stream/1",
+        "Url": "https://live.radiotrinitas.ro:8003/;stream.nsv",
         "ImageUrl": "radiotrinitas.png"
       },
       {
