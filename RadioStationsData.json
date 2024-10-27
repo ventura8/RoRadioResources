@@ -111,19 +111,6 @@
         "Description": "Mai mult decat fotbal !"
       },
       {
-        "GUID": "496c2ba0-099d-4d71-a0ea-d4dade1d5022",
-        "Title": "TANĂNANA",
-        "Url": "http://live.tananana.ro:8010/stream-48.aac",
-        "ImageUrl": "radio-tananana.png",
-        "Description": "MUZICĂ PUSĂ CU MÂNA"
-      },
-      {
-        "GUID": "fca9ca08-e075-4c93-990d-219ebfe6b89f",
-        "Title": "ONE WORLD RADIO",
-        "Url": "https://25643.live.streamtheworld.com/OWR_INTERNATIONAL_ADP_SC",
-        "ImageUrl": "oneworldradio.png"
-      },
-      {
         "GUID": "7699c53b-dc92-48ab-9727-5a4a6860e9f8",
         "Title": "Virgin Radio",
         "Url": "https://astreaming.edi.ro:8443/VirginRadio_aac",
