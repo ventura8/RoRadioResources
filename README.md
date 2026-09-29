@@ -4,7 +4,7 @@ The station list of [RoRadio](https://github.com/ventura8/RoRadio), in one place
 
 | File | What it is |
 | :--- | :--- |
-| `RadioStationsData.json` | Every station: categories, and for each station its `GUID`, `Title`, `Url`, `ImageUrl`, `Description`. UTF-8 with BOM, CRLF. |
+| `RadioStationsData.json` | Every station: categories, and for each station its `GUID`, `Title`, `Url`, `ImageUrl`, `Description`. UTF-8 with BOM, LF (CRLF in a Windows checkout with `core.autocrlf`). |
 | `scripts/Test-StationStreams.ps1` | Probes the streams and says which are `alive`, `dead`, `http-NNN` or `no-audio`. |
 | `scripts/Update-StationUrls.ps1` | Finds a verified current url for every broken station and writes it into the list. |
 | `.github/workflows/refresh-stations.yml` | Runs the refresh every Monday, opens a pull request with the report and merges it. |
@@ -24,7 +24,7 @@ The station list of [RoRadio](https://github.com/ventura8/RoRadio), in one place
 - Never write a url that `Test-StationStreams.ps1` has not reported `alive`.
 - A station with no working stream anywhere is not deleted automatically: removing it drops it from listeners'
   favorites, so that is the owner's decision.
-- Keep the encoding (UTF-8 with BOM) and the CRLF line endings, so a fix is a one-line diff.
+- Keep the encoding (UTF-8 with BOM) and the line endings, so a fix is a one-line diff.
 
 ## Checking and refreshing by hand
 

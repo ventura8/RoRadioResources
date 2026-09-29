@@ -20,7 +20,8 @@
       5. Write a Markdown report (-ReportPath) of what changed and what did not.
 
     Only the Url field changes. GUID (what listeners' favorites refer to), title, category and order never do,
-    and the file keeps its encoding and line endings (UTF-8 with BOM, CRLF), so the diff is one line per fix.
+    and the file keeps its encoding and line endings (UTF-8 with BOM; LF in the repository, CRLF in a Windows
+    checkout with core.autocrlf), so the diff is one line per fix.
 
 .PARAMETER Catalog
     The station list. Default: RadioStationsData.json next to this folder.
