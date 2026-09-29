@@ -81,33 +81,87 @@ $results = $stations | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
     $curl = if (Get-Command curl.exe -ErrorAction SilentlyContinue) { 'curl.exe' } else { 'curl' }
     $discard = if ($IsWindows) { 'NUL' } else { '/dev/null' }
 
-    # One request: the first 4 KB at most, the status, the content type and how long each step took.
-    function Invoke-Probe([string]$Url) {
-        $format = '%{http_code}|%{content_type}|%{time_connect}|%{time_starttransfer}|%{size_download}'
-        $line = & $curl -s -L -o $discard -r 0-4095 --max-time $timeout -A 'RoRadio-station-probe' -w $format $Url 2>$null
-        $parts = "$line".Split('|')
-        [pscustomobject]@{
-            Code        = $parts[0]
-            ContentType = if ($parts.Count -gt 1) { $parts[1] } else { '' }
-            Connect     = if ($parts.Count -gt 2) { [double]::Parse($parts[2], [Globalization.CultureInfo]::InvariantCulture) } else { 0 }
-            FirstByte   = if ($parts.Count -gt 3) { [double]::Parse($parts[3], [Globalization.CultureInfo]::InvariantCulture) } else { 0 }
-            Bytes       = if ($parts.Count -gt 4) { [long]$parts[4] } else { 0 }
+    # The weekly refresh runs this on a GitHub runner against urls that come from the internet (directories, the
+    # status pages of stream servers). A url - or a redirect - that points into a private network, the machine
+    # itself or a cloud metadata address (169.254.169.254) is never requested: it counts as dead (CodeRabbit,
+    # RoRadioResources#2). Redirects are therefore followed here, one checked hop at a time, not by curl -L.
+    function Test-PrivateAddress([Net.IPAddress]$Address) {
+        if ($Address.IsIPv4MappedToIPv6) { $Address = $Address.MapToIPv4() }
+        if ([Net.IPAddress]::IsLoopback($Address) -or $Address.IsIPv6LinkLocal -or $Address.IsIPv6SiteLocal -or $Address.IsIPv6Multicast) { return $true }
+        $b = $Address.GetAddressBytes()
+        if ($Address.AddressFamily -eq [Net.Sockets.AddressFamily]::InterNetworkV6) {
+            return ($b[0] -band 0xFE) -eq 0xFC -or $Address.Equals([Net.IPAddress]::IPv6None)
         }
+
+        $b[0] -eq 0 -or $b[0] -eq 10 -or $b[0] -eq 127 -or $b[0] -ge 224 -or
+            ($b[0] -eq 169 -and $b[1] -eq 254) -or ($b[0] -eq 172 -and $b[1] -ge 16 -and $b[1] -le 31) -or
+            ($b[0] -eq 192 -and $b[1] -eq 168) -or ($b[0] -eq 100 -and $b[1] -ge 64 -and $b[1] -le 127)
     }
 
+    function Test-PublicUrl([string]$Url) {
+        try { $uri = [Uri]$Url } catch { return $false }
+        if (-not $uri.IsAbsoluteUri -or $uri.Scheme -notin 'http', 'https') { return $false }
+        try { $addresses = [Net.Dns]::GetHostAddresses($uri.DnsSafeHost) } catch { return $false }
+        $addresses.Count -gt 0 -and -not ($addresses | Where-Object { Test-PrivateAddress $_ })
+    }
+
+    # One request per hop: the first 4 KB at most, the status, the content type and how long each step took.
+    # Final is the url that answered (after redirects), so the ICY retry and HLS resolution start from there.
+    function Invoke-Probe([string]$Url) {
+        $format = '%{http_code}|%{content_type}|%{time_connect}|%{time_starttransfer}|%{size_download}|%{redirect_url}'
+        $current = $Url
+        foreach ($hop in 0..5) {
+            if (-not (Test-PublicUrl $current)) { break }
+            $line = & $curl -s -o $discard -r 0-4095 --max-time $timeout -A 'RoRadio-station-probe' -w $format $current 2>$null
+            $parts = "$line".Split('|')
+            $result = [pscustomobject]@{
+                Code        = $parts[0]
+                ContentType = if ($parts.Count -gt 1) { $parts[1] } else { '' }
+                Connect     = if ($parts.Count -gt 2) { [double]::Parse($parts[2], [Globalization.CultureInfo]::InvariantCulture) } else { 0 }
+                FirstByte   = if ($parts.Count -gt 3) { [double]::Parse($parts[3], [Globalization.CultureInfo]::InvariantCulture) } else { 0 }
+                Bytes       = if ($parts.Count -gt 4) { [long]$parts[4] } else { 0 }
+                Final       = $current
+            }
+            $redirect = if ($parts.Count -gt 5) { $parts[5] } else { '' }
+            if ($result.Code -notmatch '^3\d\d$' -or -not $redirect) { return $result }
+            $current = $redirect
+        }
+
+        [pscustomobject]@{ Code = '000'; ContentType = ''; Connect = 0; FirstByte = 0; Bytes = 0; Final = $current }
+    }
+
+    # A playlist's text and the url it came from (relative entries resolve against that), redirects checked.
     function Get-Body([string]$Url) {
-        & $curl -s -L --max-time $timeout -A 'RoRadio-station-probe' $Url 2>$null | Out-String
+        $file = [IO.Path]::GetTempFileName()
+        try {
+            $current = $Url
+            foreach ($hop in 0..5) {
+                if (-not (Test-PublicUrl $current)) { break }
+                $line = & $curl -s -o $file --max-time $timeout --max-filesize 1048576 -A 'RoRadio-station-probe' -w '%{http_code}|%{redirect_url}' $current 2>$null
+                $parts = "$line".Split('|')
+                if ($parts[0] -notmatch '^3\d\d$' -or $parts.Count -lt 2 -or -not $parts[1]) {
+                    return [pscustomobject]@{ Body = [IO.File]::ReadAllText($file); Final = $current }
+                }
+                $current = $parts[1]
+            }
+
+            [pscustomobject]@{ Body = ''; Final = $current }
+        } finally {
+            Remove-Item $file -ErrorAction SilentlyContinue
+        }
     }
 
     # Shoutcast 1 servers answer "ICY 200 OK" instead of an HTTP status line. curl 7.66 and later read that only
     # as HTTP/0.9 when --http0.9 is given, and even then report no status and no content type: the plain probe
     # sees nothing and would call a playing station dead (Pure Jazz Radio, Dip Music, 2026-09-29). Such a server
-    # is asked again that way, for a few seconds (it ignores the byte range and streams on), and the ICY status
-    # line and headers are read from the start of what it sent.
+    # is asked again that way, for a few seconds, and the ICY status line and headers are read from the start of
+    # what it sent. It ignores the byte range and streams on, so the rate is capped: at most ~96 KB per probe.
+    # $Url is the probe's Final url (redirects already followed and checked).
     function Invoke-IcyProbe([string]$Url) {
+        if (-not (Test-PublicUrl $Url)) { return $null }
         $file = [IO.Path]::GetTempFileName()
         try {
-            $null = & $curl -s --http0.9 -o $file --max-time ([Math]::Min($timeout, 6)) -A 'RoRadio-station-probe' $Url 2>$null
+            $null = & $curl -s --http0.9 -o $file --max-time ([Math]::Min($timeout, 6)) --limit-rate 16K -A 'RoRadio-station-probe' $Url 2>$null
             $length = (Get-Item $file).Length
             if ($length -eq 0) { return $null }
             $stream = [IO.File]::OpenRead($file)
@@ -137,7 +191,7 @@ $results = $stations | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
 
     $station = $_
     $probe = Invoke-Probe $station.Url
-    if ($probe.Code -in '000', '' -and $probe.Bytes -eq 0 -and ($icy = Invoke-IcyProbe $station.Url)) {
+    if ($probe.Code -in '000', '' -and $probe.Bytes -eq 0 -and ($icy = Invoke-IcyProbe $probe.Final)) {
         $probe = $icy
     }
 
@@ -147,9 +201,10 @@ $results = $stations | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
     if ($probe.Code -eq '200' -and ($station.Url -match '\.m3u8(\?|$)' -or $probe.ContentType -match 'mpegurl')) {
         $base = $station.Url
         foreach ($hop in 1..2) {
-            $next = (Get-Body $base) -split "`r?`n" | Where-Object { $_ -and -not $_.StartsWith('#') } | Select-Object -First 1
+            $playlist = Get-Body $base
+            $next = $playlist.Body -split "`r?`n" | Where-Object { $_ -and -not $_.StartsWith('#') } | Select-Object -First 1
             if (-not $next) { break }
-            $base = ([Uri]::new([Uri]$base, $next.Trim())).AbsoluteUri
+            $base = ([Uri]::new([Uri]$playlist.Final, $next.Trim())).AbsoluteUri
             if ($base -notmatch '\.m3u8(\?|$)') { break }
         }
 

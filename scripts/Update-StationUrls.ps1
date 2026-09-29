@@ -132,33 +132,46 @@ function Test-NameMark([string[]]$Marks, [string]$Text) {
     [bool]($Marks | Where-Object { $plain.Contains($_) })
 }
 
+function Get-UrlPath([string]$Url) {
+    try { ([Uri]$Url).AbsolutePath } catch { '' }
+}
+
 # c. The old server itself. A station that moved its mount or port on the same Icecast / Shoutcast server lists
 #    its current mounts on the server's status page (Radio Caprice's channels moved from ports 9085/9029/9135 to
-#    mounts on :8000, 2026-09-29). Only mounts whose name or url carry the station's name count.
-function Get-SameServerCandidates([string]$OldUrl, [string[]]$Marks) {
+#    mounts on :8000, 2026-09-29). Each mount is matched on its own name and path, never the host. A mark shared
+#    by several mounts is the brand every channel carries ("caprice", "jazz") and tells them apart from nothing:
+#    only marks that match exactly one mount count. One match is the station (strong); several are channels the
+#    marks cannot separate, and go to review (CodeRabbit, RoRadioResources#2).
+function Get-SameServerCandidate([string]$OldUrl, [string[]]$Marks) {
     try { $old = [Uri]$OldUrl } catch { return }
     $bases = @("$($old.Scheme)://$($old.Host):$($old.Port)")
     if ($old.Port -ne 8000) { $bases += "http://$($old.Host):8000" }
-    foreach ($base in $bases) {
+    $mounts = @(foreach ($base in $bases) {
         $icecast = Get-OptionalJson "$base/status-json.xsl"
         foreach ($source in @($icecast.icestats.source)) {
-            if ($source.listenurl -and (Test-NameMark $Marks "$($source.server_name) $($source.listenurl)")) {
-                [pscustomobject]@{ Url = $source.listenurl; Source = "same server, Icecast status ($base)"; Strong = $true }
+            if ($source.listenurl) {
+                [pscustomobject]@{ Url = $source.listenurl; Text = "$($source.server_name) $(Get-UrlPath $source.listenurl)"; Source = "same server, Icecast status ($base)" }
             }
         }
 
         $shoutcast = Get-OptionalJson "$base/statistics?json=1"
         foreach ($stream in @($shoutcast.streams)) {
-            if ($stream.streampath -and (Test-NameMark $Marks "$($stream.servertitle) $($stream.streampath)")) {
-                [pscustomobject]@{ Url = "$base$($stream.streampath)"; Source = "same server, Shoutcast status ($base)"; Strong = $true }
+            if ($stream.streampath) {
+                [pscustomobject]@{ Url = "$base$($stream.streampath)"; Text = "$($stream.servertitle) $($stream.streampath)"; Source = "same server, Shoutcast status ($base)" }
             }
         }
+    })
+
+    $specific = @($Marks | Where-Object { $mark = $_; @($mounts | Where-Object { Test-NameMark @($mark) $_.Text }).Count -eq 1 })
+    $found = @($mounts | Where-Object { $specific -and (Test-NameMark $specific $_.Text) })
+    foreach ($mount in $found) {
+        [pscustomobject]@{ Url = $mount.Url; Source = $mount.Source; Strong = $found.Count -eq 1 }
     }
 }
 
 # d. The Shoutcast directory: most Romanian manele web radios are listed there and nowhere else (Dip Music, Radio
 #    Amma, 2026-09-29). It has no country, so a name match is only a suggestion for the owner.
-function Get-ShoutcastCandidates([string]$Title) {
+function Get-ShoutcastCandidate([string]$Title) {
     $plainTitle = ConvertTo-PlainTitle $Title
     try {
         $found = Invoke-RestMethod -Method Post -Uri 'https://directory.shoutcast.com/Search/UpdateSearch' -Body @{ query = $Title } -UserAgent $userAgent -TimeoutSec 20
@@ -176,7 +189,7 @@ function Get-ShoutcastCandidates([string]$Title) {
 
 # e. radio.net: the exact name, in Romania or Moldova. Its search is fuzzy and its stream hosts are often CDNs
 #    without the station's name, so this too is only a suggestion.
-function Get-RadioNetCandidates([string]$Title) {
+function Get-RadioNetCandidate([string]$Title) {
     $plainTitle = ConvertTo-PlainTitle $Title
     $found = Get-OptionalJson "https://prod.radio-api.net/stations/search?count=10&query=$([Uri]::EscapeDataString($Title))"
     foreach ($entry in @($found.playables)) {
@@ -242,7 +255,7 @@ $results = foreach ($station in $failing) {
         }
     }
 
-    foreach ($candidate in @(Get-SameServerCandidates $station.Url $marks) + @(Get-ShoutcastCandidates $station.Title) + @(Get-RadioNetCandidates $station.Title)) {
+    foreach ($candidate in @(Get-SameServerCandidate $station.Url $marks) + @(Get-ShoutcastCandidate $station.Title) + @(Get-RadioNetCandidate $station.Title)) {
         if ($candidate) { $candidates.Add($candidate) }
     }
 

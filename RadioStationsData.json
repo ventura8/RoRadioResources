@@ -404,18 +404,6 @@
         "ImageUrl": "radio-transilvania.png"
       },
       {
-        "GUID": "2aee2159-d614-48cc-960c-6844775da2ba",
-        "Title": "Radio Transilvania Aleșd",
-        "Url": "http://stream2.radiotransilvania.ro:8000/Oradea",
-        "ImageUrl": "radio-transilvania.png"
-      },
-      {
-        "GUID": "142b69ce-63f3-4bf0-a7d4-9fcab76b17b6",
-        "Title": "Radio Transilvania Turda",
-        "Url": "http://stream2.radiotransilvania.ro:8000/Cluj",
-        "ImageUrl": "radio-transilvania.png"
-      },
-      {
         "GUID": "1666b5b0-3019-4d87-9876-75161ffa5b88",
         "Title": "Radio Transilvania Mediaș",
         "Url": "https://stream2.radiotransilvania.ro/Medias",
@@ -900,11 +888,6 @@
         "GUID": "9f50f347-4d0b-4b37-b26e-807f3d1a4d46",
         "Title": "Eldoradio 90's",
         "Url": "http://shoutcast.rtl.lu/eldo90s"
-      },
-      {
-        "GUID": "2c50e779-b641-4424-abec-4c71cf2620cc",
-        "Title": "Play Radio 90's",
-        "Url": "http://live.playradio.org:9090/90HD"
       },
       {
         "GUID": "b5f349ef-1762-48e7-9b58-7ad68d203430",
