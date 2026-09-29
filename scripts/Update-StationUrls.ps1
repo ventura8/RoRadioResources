@@ -74,28 +74,11 @@ if (-not $Catalog) { $Catalog = Join-Path (Split-Path $PSScriptRoot -Parent) 'Ra
 $Catalog = (Resolve-Path $Catalog).Path
 $probeScript = Join-Path $PSScriptRoot 'Test-StationStreams.ps1'
 $probeSettings = @{ TimeoutSeconds = $TimeoutSeconds; ThrottleLimit = $ThrottleLimit }
-$userAgent = 'RoRadio-station-refresh (+https://github.com/ventura8/RoRadioResources)'
 $scratch = Join-Path ([IO.Path]::GetTempPath()) "roradio-refresh-$PID"
 # Scratch files are written even under -WhatIf, which only guards the catalogue (a dry run failed without them).
 New-Item -ItemType Directory -Force -Path $scratch -WhatIf:$false | Out-Null
-
-function ConvertTo-PlainTitle([string]$Text) {
-    $decomposed = $Text.Normalize([Text.NormalizationForm]::FormD)
-    $kept = $decomposed.ToCharArray() | Where-Object { [Globalization.CharUnicodeInfo]::GetUnicodeCategory($_) -ne 'NonSpacingMark' }
-    (-join $kept).ToLowerInvariant().Trim()
-}
-
-function ConvertTo-Slug([string]$Text) {
-    ((ConvertTo-PlainTitle $Text) -replace "['’]", '' -replace '[^a-z0-9]+', '-').Trim('-')
-}
-
-# What of a station's name must show up in a host name for that host to be the station's own: the whole name
-# run together ("radionoise", "romanfm") and each distinctive word of four letters or more ("noise", "aquila").
-function Get-NameMark([string]$Title) {
-    $generic = 'radio', 'online', 'romania', 'music', 'muzica', 'live', 'stream', 'best', 'hits', 'station'
-    $words = @((ConvertTo-PlainTitle $Title) -split '[^a-z0-9]+' | Where-Object { $_ })
-    @(-join $words) + @($words | Where-Object { $_.Length -ge 4 -and $generic -notcontains $_ }) | Select-Object -Unique
-}
+. (Join-Path $PSScriptRoot 'lib/Net.ps1')
+. (Join-Path $PSScriptRoot 'lib/Names.ps1')
 
 # Probes an arbitrary list of { Title, Url, Guid } through a throw-away catalogue, so the verdicts come from
 # exactly the same code as the catalogue-wide probe.
@@ -104,36 +87,6 @@ function Invoke-StreamProbe([object[]]$Entries, [string]$Name) {
     $list = @($Entries | ForEach-Object { [ordered]@{ GUID = $_.Guid; Title = $_.Title; Url = $_.Url } })
     ConvertTo-Json -InputObject @([ordered]@{ Name = $Name; List = $list }) -Depth 5 | Set-Content -Path $path -Encoding utf8 -WhatIf:$false
     @(& $probeScript -Catalog $path @probeSettings)
-}
-
-function Get-Text([string]$Url) {
-    try {
-        $content = (Invoke-WebRequest -Uri $Url -UserAgent $userAgent -TimeoutSec 30 -MaximumRetryCount 2).Content
-        # A playlist (.pls, audio/x-scpls) is not a text content type to PowerShell: it comes back as bytes.
-        if ($content -is [byte[]]) { [Text.Encoding]::UTF8.GetString($content) } else { $content }
-    } catch {
-        Write-Warning "Could not read ${Url}: $($_.Exception.Message)"
-        ''
-    }
-}
-
-# A lookup that is allowed to find nothing (a status page most servers do not have): no retries, no warning.
-function Get-OptionalJson([string]$Url) {
-    try {
-        (Invoke-WebRequest -Uri $Url -UserAgent $userAgent -TimeoutSec 10).Content | ConvertFrom-Json
-    } catch {
-        $null
-    }
-}
-
-# True when the text carries one of the station's name marks (spaces and dashes ignored).
-function Test-NameMark([string[]]$Marks, [string]$Text) {
-    $plain = (ConvertTo-PlainTitle $Text) -replace '[\s\-_]', ''
-    [bool]($Marks | Where-Object { $plain.Contains($_) })
-}
-
-function Get-UrlPath([string]$Url) {
-    try { ([Uri]$Url).AbsolutePath } catch { '' }
 }
 
 # c. The old server itself. A station that moved its mount or port on the same Icecast / Shoutcast server lists
@@ -174,7 +127,7 @@ function Get-SameServerCandidate([string]$OldUrl, [string[]]$Marks) {
 function Get-ShoutcastCandidate([string]$Title) {
     $plainTitle = ConvertTo-PlainTitle $Title
     try {
-        $found = Invoke-RestMethod -Method Post -Uri 'https://directory.shoutcast.com/Search/UpdateSearch' -Body @{ query = $Title } -UserAgent $userAgent -TimeoutSec 20
+        $found = Invoke-RestMethod -Method Post -Uri 'https://directory.shoutcast.com/Search/UpdateSearch' -Body @{ query = $Title } -UserAgent $StationUserAgent -TimeoutSec 20
     } catch {
         return
     }
@@ -212,26 +165,23 @@ if ($Title) {
 $firstPass = Invoke-StreamProbe $toProbe 'all'
 $failing = @($firstPass | Where-Object Verdict -ne 'alive')
 if ($failing) {
-    Write-Host "$($failing.Count) failing; probing them again in $RetryDelaySeconds s."
+    Write-Information "$($failing.Count) failing; probing them again in $RetryDelaySeconds s." -InformationAction Continue
     Start-Sleep -Seconds $RetryDelaySeconds
     $failing = @(Invoke-StreamProbe $failing 'retry' | Where-Object Verdict -ne 'alive')
 }
-Write-Host "$($failing.Count) station(s) failed both probes."
+Write-Information "$($failing.Count) station(s) failed both probes." -InformationAction Continue
 
 # 3: candidates.
 $slugs = @()
 if ($failing) {
-    $sitemap = Get-Text 'https://myradioonline.ro/sitemap.xml'
-    $slugs = @([regex]::Matches($sitemap, '<loc>https://myradioonline\.ro/([a-z0-9-]+)</loc>') | ForEach-Object { $_.Groups[1].Value })
-    Write-Host "myradioonline.ro lists $($slugs.Count) stations."
+    $slugs = Get-MyRadioOnlineSitemap
+    Write-Information "myradioonline.ro lists $($slugs.Count) stations." -InformationAction Continue
 }
 
 $notStream = '\.(png|jpe?g|webp|gif|svg|ico|css|js|json|html?)(\?|$)|google|facebook|apple\.com|twitter|instagram|youtube|myradioonline|schema\.org|w3\.org'
 $results = foreach ($station in $failing) {
     $candidates = [Collections.Generic.List[object]]::new()
-    $slug = ConvertTo-Slug $station.Title
-    $pageSlugs = @($slug, ($slug -replace '^radio-', ''), "radio-$slug") | Select-Object -Unique | Where-Object { $slugs -contains $_ }
-    foreach ($pageSlug in $pageSlugs) {
+    foreach ($pageSlug in Get-MyRadioOnlineSlug $station.Title $slugs) {
         $page = Get-Text "https://myradioonline.ro/$pageSlug"
         foreach ($match in [regex]::Matches($page, '(?:src|url)="(https?://[^"]+)"')) {
             $url = [Net.WebUtility]::HtmlDecode($match.Groups[1].Value) -replace '[?&]time=\d+$', ''
@@ -249,7 +199,7 @@ $results = foreach ($station in $failing) {
         foreach ($entry in ($directory | ConvertFrom-Json)) {
             if ((ConvertTo-PlainTitle $entry.name) -ne $plainTitle -or -not $entry.url_resolved) { continue }
             if ($entry.countrycode -notin 'RO', 'MD') { continue }
-            $hosts = @($entry.homepage, $entry.url_resolved) | Where-Object { $_ } | ForEach-Object { try { ([Uri]$_).Host.ToLowerInvariant() } catch { '' } }
+            $hosts = @($entry.homepage, $entry.url_resolved) | Where-Object { $_ } | ForEach-Object { Get-UrlHost $_ }
             if (-not ($marks | Where-Object { $mark = $_; $hosts | Where-Object { $_.Replace('-', '').Contains($mark) } })) { continue }
             $candidates.Add([pscustomobject]@{ Url = $entry.url_resolved; Source = "radio-browser.info ($($entry.homepage))"; Strong = $true })
         }
@@ -319,7 +269,14 @@ if ($fixed -and $PSCmdlet.ShouldProcess($Catalog, "Update $($fixed.Count) statio
     [IO.File]::WriteAllText($Catalog, $text, [Text.UTF8Encoding]::new($hasBom))
 }
 
-# 5: the report.
+# 5: the report. It becomes the pull request body and docs/releases/<date>-refresh.md, so what can be a link is one.
+function Format-Source([string]$Source) {
+    if ($Source -match '^myradioonline\.ro/\S+$') { return "[$Source](https://$Source)" }
+    if ($Source -match '^radio-browser\.info \((https?://[^)]+)\)$') { return "radio-browser.info ([$($Matches[1])]($($Matches[1])))" }
+    if ($Source -match '^radio\.net \(([^)]+)\)$') { return "[radio.net ($($Matches[1]))](https://www.radio.net/s/$($Matches[1]))" }
+    $Source
+}
+
 $lines = [Collections.Generic.List[string]]::new()
 $lines.Add("Probed $(@($toProbe).Count) stations; $($results.Count) failed twice; $($fixed.Count) fixed.")
 $lines.Add('')
@@ -328,7 +285,7 @@ if ($fixed) {
     $lines.Add('')
     $lines.Add('| Station | Was | Old url | New url | Found on |')
     $lines.Add('| :--- | :--- | :--- | :--- | :--- |')
-    foreach ($fix in $fixed) { $lines.Add("| $($fix.Title) | $($fix.OldVerdict) | ``$($fix.OldUrl)`` | ``$($fix.NewUrl)`` | $($fix.Source) |") }
+    foreach ($fix in $fixed) { $lines.Add("| $($fix.Title) | $($fix.OldVerdict) | ``$($fix.OldUrl)`` | ``$($fix.NewUrl)`` | $(Format-Source $fix.Source) |") }
     $lines.Add('')
 }
 $review = @($results | Where-Object Suggested)
@@ -337,7 +294,7 @@ if ($review) {
     $lines.Add('')
     $lines.Add('| Station | Verdict here | Url | Candidate | Found on |')
     $lines.Add('| :--- | :--- | :--- | :--- | :--- |')
-    foreach ($item in $review) { $lines.Add("| $($item.Title) | $($item.OldVerdict) | ``$($item.OldUrl)`` | ``$($item.Suggested)`` | $($item.Source) |") }
+    foreach ($item in $review) { $lines.Add("| $($item.Title) | $($item.OldVerdict) | ``$($item.OldUrl)`` | ``$($item.Suggested)`` | $(Format-Source $item.Source) |") }
     $lines.Add('')
 }
 $unresolved = @($results | Where-Object { -not $_.NewUrl -and -not $_.Suggested })
@@ -350,7 +307,7 @@ if ($unresolved) {
     $lines.Add('')
 }
 $report = $lines -join "`n"
-if ($ReportPath) { Set-Content -Path $ReportPath -Value $report -Encoding utf8 }
-Write-Host $report
+if ($ReportPath) { Set-Content -Path $ReportPath -Value $report -Encoding utf8 -WhatIf:$false }
+Write-Information $report -InformationAction Continue
 Remove-Item -Recurse -Force $scratch -ErrorAction SilentlyContinue
 $results

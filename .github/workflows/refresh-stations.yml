@@ -1,8 +1,10 @@
-name: Refresh station urls
+name: Refresh station urls and logos
 
-# Broadcasters move their streams without notice. Once a week this probes every station, finds a verified
-# current url for the broken ones (scripts/Update-StationUrls.ps1), opens a pull request with the report and
-# merges it, so GitHub Pages serves the fixed list to every RoRadio install within minutes.
+# Broadcasters move their streams and change their logos without notice. Once a week this probes every station,
+# finds a verified current url for the broken ones (scripts/Update-StationUrls.ps1) and a logo for the stations
+# without one (scripts/Update-StationLogos.ps1), checks the list (scripts/ci/Invoke-Tests.ps1), writes the release
+# note docs/releases/<date>-refresh.md, opens a pull request with it and merges it, so GitHub Pages serves the fixed
+# list and logos to every RoRadio install within minutes.
 on:
   workflow_dispatch:
     inputs:
@@ -23,7 +25,7 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     permissions:
       contents: write       # push the refresh branch and merge it
       pull-requests: write  # open and merge the pull request
@@ -36,47 +38,93 @@ jobs:
       # More fixes than this in one run means the runner's network, not the stations, is the problem
       # (a US runner blocked by Romanian geo-restrictions): the pull request stays open for a human.
       MAX_AUTO_MERGE: '15'
+      # More new logos than this at once is worth a look before every listener sees them.
+      MAX_AUTO_MERGE_LOGOS: '20'
       MERGE: ${{ github.event_name == 'schedule' || inputs.merge }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
 
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.13'
+
+      - name: Install Pillow and Pester (pinned)
+        shell: pwsh
+        run: |
+          python -m pip install --quiet -r scripts/ci/requirements.txt
+          Install-Module Pester -RequiredVersion 6.2.0 -Scope CurrentUser -Force -SkipPublisherCheck
+
       - name: Probe the stations and fix the broken urls
+        id: urls
         shell: pwsh
         # Only outright dead streams: from a US runner an HTTP error can be geo-blocking (see the script's help).
-        run: ./scripts/Update-StationUrls.ps1 -ReplaceOnlyDead -ReportPath "$env:RUNNER_TEMP/report.md" | Out-Null
+        run: |
+          $results = ./scripts/Update-StationUrls.ps1 -ReplaceOnlyDead -ReportPath "$env:RUNNER_TEMP/urls.md"
+          "count=$(@($results | Where-Object NewUrl).Count)" >> $env:GITHUB_OUTPUT
 
-      - name: Open and merge the pull request
+      - name: Find logos for the stations without one
+        id: logos
+        # Released apps older than the Pages logo fallback (RoRadio 2.0.1, 1.6.x) look for a logo only in their own
+        # package and show an empty tile for one they do not bundle, so this step waits for the repository variable
+        # REFRESH_LOGOS, set to 'true' once the releases that load such logos from Pages are out (README).
+        if: vars.REFRESH_LOGOS == 'true'
+        shell: pwsh
+        run: |
+          $results = ./scripts/Update-StationLogos.ps1 -Python python -ReportPath "$env:RUNNER_TEMP/logos.md"
+          "count=$(@($results | Where-Object File).Count)" >> $env:GITHUB_OUTPUT
+
+      - name: Check the list before committing (a pull request opened by this workflow starts no CI)
+        shell: pwsh
+        run: ./scripts/ci/Invoke-Tests.ps1 -Python python
+
+      - name: Write the release note, open and merge the pull request
         shell: bash
+        env:
+          URLS: ${{ steps.urls.outputs.count }}
+          LOGOS: ${{ steps.logos.outputs.count || '0' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
-          report="$RUNNER_TEMP/report.md"
-          cat "$report" >> "$GITHUB_STEP_SUMMARY"
-          if git diff --quiet -- RadioStationsData.json; then
-            echo "No url changed." >> "$GITHUB_STEP_SUMMARY"
+          day=$(date -u +%F)
+          note="docs/releases/${day}-refresh.md"
+          logo_report=()
+          if [ -f "$RUNNER_TEMP/logos.md" ]; then logo_report=(-LogoReport "$RUNNER_TEMP/logos.md"); fi
+          pwsh -NoProfile -File scripts/New-RefreshNote.ps1 -UrlReport "$RUNNER_TEMP/urls.md" "${logo_report[@]}" \
+            -Path "$note" -Date "$day" -RunUrl "$RUN_URL"
+          cat "$note" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$URLS" = '0' ] && [ "$LOGOS" = '0' ]; then
+            echo "Nothing changed." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
-          changed=$(git diff --numstat -- RadioStationsData.json | cut -f1)
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git switch -C "$BRANCH"
-          git commit -q -m "Refresh $changed station url(s)" -- RadioStationsData.json
+          git add RadioStationsData.json RadioLogos "$note"
+          git commit -q -m "Refresh $URLS station url(s) and $LOGOS logo(s) ($day)"
           git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GH_REPO}.git" "HEAD:refs/heads/$BRANCH"
 
-          title="Refresh $changed station url(s) ($(date -u +%F))"
+          # The pull request body is the same note, its logos read from this commit (a relative path does not
+          # render there; the commit stays reachable through the pull request after the branch is deleted).
+          sha=$(git rev-parse HEAD)
+          pwsh -NoProfile -File scripts/New-RefreshNote.ps1 -UrlReport "$RUNNER_TEMP/urls.md" "${logo_report[@]}" \
+            -Path "$RUNNER_TEMP/body.md" -Date "$day" -RunUrl "$RUN_URL" \
+            -ImageBase "https://raw.githubusercontent.com/${GH_REPO}/${sha}/RadioLogos/"
+          title="Refresh $URLS station url(s) and $LOGOS logo(s) ($day)"
           if gh pr view "$BRANCH" --json state --jq .state 2>/dev/null | grep -qx OPEN; then
-            gh pr edit "$BRANCH" --title "$title" --body-file "$report"
+            gh pr edit "$BRANCH" --title "$title" --body-file "$RUNNER_TEMP/body.md"
           else
-            gh pr create --base master --head "$BRANCH" --title "$title" --body-file "$report"
+            gh pr create --base master --head "$BRANCH" --title "$title" --body-file "$RUNNER_TEMP/body.md"
           fi
 
           if [ "$MERGE" != 'true' ]; then
             echo "Merge not requested: the pull request stays open." >> "$GITHUB_STEP_SUMMARY"
-          elif [ "$changed" -gt "$MAX_AUTO_MERGE" ]; then
-            note="$changed urls changed, more than $MAX_AUTO_MERGE: not merged automatically."
-            gh pr comment "$BRANCH" --body "$note Check them from Romania before merging."
+          elif [ "$URLS" -gt "$MAX_AUTO_MERGE" ] || [ "$LOGOS" -gt "$MAX_AUTO_MERGE_LOGOS" ]; then
+            reason="$URLS urls and $LOGOS logos changed, more than $MAX_AUTO_MERGE urls or $MAX_AUTO_MERGE_LOGOS logos:"
+            reason="$reason not merged automatically."
+            gh pr comment "$BRANCH" --body "$reason Check the urls from Romania and look at the logos before merging."
           else
             gh pr merge "$BRANCH" --squash --delete-branch
             gh api -X POST "repos/$GH_REPO/pages/builds" --silent || echo "::warning::Could not request a Pages build."

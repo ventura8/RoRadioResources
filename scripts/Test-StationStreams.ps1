@@ -60,13 +60,9 @@ $stations = foreach ($category in (Get-Content $Catalog -Raw -Encoding utf8 | Co
     }
 }
 
-# Titles are matched without diacritics and case: Romanian writes ț/ș both with a cedilla and with a comma
-# below, the catalogue is not consistent about it, and Sentry's logs drop them entirely ("Constan?a").
-function ConvertTo-PlainTitle([string]$Text) {
-    $decomposed = $Text.Normalize([Text.NormalizationForm]::FormD)
-    $kept = $decomposed.ToCharArray() | Where-Object { [Globalization.CharUnicodeInfo]::GetUnicodeCategory($_) -ne 'NonSpacingMark' }
-    (-join $kept).ToLowerInvariant()
-}
+$netLibrary = Join-Path $PSScriptRoot 'lib/Net.ps1'
+. $netLibrary
+. (Join-Path $PSScriptRoot 'lib/Names.ps1')
 
 if ($Title) {
     $wanted = @($Title | ForEach-Object { ConvertTo-PlainTitle $_ })
@@ -74,48 +70,18 @@ if ($Title) {
     $missing = @($wanted | Where-Object { $plain = $_; -not ($stations | Where-Object { (ConvertTo-PlainTitle $_.Title) -eq $plain }) })
     if ($missing) { Write-Warning "Not in the catalogue: $($missing -join ', ')" }
 }
-Write-Host "Probing $(@($stations).Count) station(s), $TimeoutSeconds s each, $ThrottleLimit at a time..."
+Write-Information "Probing $(@($stations).Count) station(s), $TimeoutSeconds s each, $ThrottleLimit at a time..." -InformationAction Continue
 
 $results = $stations | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
     $timeout = $using:TimeoutSeconds
-    $curl = if (Get-Command curl.exe -ErrorAction SilentlyContinue) { 'curl.exe' } else { 'curl' }
     $discard = if ($IsWindows) { 'NUL' } else { '/dev/null' }
 
-    # The weekly refresh runs this on a GitHub runner against urls that come from the internet (directories, the
-    # status pages of stream servers). A url - or a redirect - that points into a private network, the machine
-    # itself or a cloud metadata address (169.254.169.254) is never requested: it counts as dead (CodeRabbit,
-    # RoRadioResources#2). Redirects are therefore followed here, one checked hop at a time, not by curl -L.
-    function Test-PrivateAddress([Net.IPAddress]$Address) {
-        if ($Address.IsIPv4MappedToIPv6) { $Address = $Address.MapToIPv4() }
-        if ([Net.IPAddress]::IsLoopback($Address) -or $Address.IsIPv6LinkLocal -or $Address.IsIPv6SiteLocal -or $Address.IsIPv6Multicast) { return $true }
-        $b = $Address.GetAddressBytes()
-        if ($Address.AddressFamily -eq [Net.Sockets.AddressFamily]::InterNetworkV6) {
-            return ($b[0] -band 0xFE) -eq 0xFC -or $Address.Equals([Net.IPAddress]::IPv6None)
-        }
-
-        $b[0] -eq 0 -or $b[0] -eq 10 -or $b[0] -eq 127 -or $b[0] -ge 224 -or
-            ($b[0] -eq 169 -and $b[1] -eq 254) -or ($b[0] -eq 172 -and $b[1] -ge 16 -and $b[1] -le 31) -or
-            ($b[0] -eq 192 -and $b[1] -eq 168) -or ($b[0] -eq 100 -and $b[1] -ge 64 -and $b[1] -le 127)
-    }
-
-    # The curl arguments that pin a request to an address checked here, or $null when the url may not be
-    # requested. Checking the name and letting curl resolve it again would leave a gap (DNS rebinding: the second
-    # answer can be private), so a name is bound with --resolve to the first checked address.
-    function Get-PinnedTarget([string]$Url) {
-        try { $uri = [Uri]$Url } catch { return $null }
-        if (-not $uri.IsAbsoluteUri -or $uri.Scheme -notin 'http', 'https') { return $null }
-        try { $addresses = [Net.Dns]::GetHostAddresses($uri.DnsSafeHost) } catch { return $null }
-        if ($addresses.Count -eq 0 -or ($addresses | Where-Object { Test-PrivateAddress $_ })) { return $null }
-        if ($uri.HostNameType -in 'IPv4', 'IPv6') { return , @() }
-        # IPv4 first: GitHub's runners have no IPv6 route, and a pinned IPv6 address would read as dead there.
-        $address = @($addresses | Where-Object AddressFamily -eq ([Net.Sockets.AddressFamily]::InterNetwork)) + @($addresses) | Select-Object -First 1
-        $literal = if ($address.AddressFamily -eq [Net.Sockets.AddressFamily]::InterNetworkV6) { "[$address]" } else { "$address" }
-        , @('--resolve', "$($uri.Host):$($uri.Port):$literal")
-    }
-
-    function Test-PublicUrl([string]$Url) {
-        $null -ne (Get-PinnedTarget $Url)
-    }
+    # Every runspace loads the network helpers itself: a url - or a redirect - that points into a private
+    # network, the machine itself or a cloud metadata address is never requested and counts as dead, and each
+    # request is pinned to the address that was checked (lib/Net.ps1; CodeRabbit, RoRadioResources#2).
+    $library = $using:netLibrary
+    . $library
+    $curl = $script:Curl
 
     # One request per hop: the first 4 KB at most, the status, the content type and how long each step took.
     # Final is the url that answered (after redirects), so the ICY retry and HLS resolution start from there.
@@ -253,5 +219,5 @@ $results = $stations | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
 
 $results = @($results | Sort-Object @{ Expression = { $_.Verdict -eq 'alive' } }, Title)
 $summary = $results | Group-Object Verdict | ForEach-Object { "$($_.Name)=$($_.Count)" }
-Write-Host ("Result: " + ($summary -join '  '))
+Write-Information ("Result: " + ($summary -join '  ')) -InformationAction Continue
 $results
