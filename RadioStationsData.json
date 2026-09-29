@@ -269,9 +269,9 @@
       },
       {
         "GUID": "4e2d3432-5409-4189-96b7-1fa0a441190c",
-        "Title": "Radio RVE",
+        "Title": "RVE Suceava",
         "Url": "https://stream.rvesv.ro/rvesv.mp3",
-        "ImageUrl": "radio-rve.png"
+        "ImageUrl": "rve-suceava.png"
       },
       {
         "GUID": "3014fa2c-418a-4694-af8b-e9fed24eec43",
@@ -564,7 +564,7 @@
       },
       {
         "GUID": "41cd53b7-d43b-4b87-aeb3-85c9ba333e03",
-        "Title": "Play Radio Hit",
+        "Title": "Radio Pro Music",
         "Url": "https://playradiohit-adradio.radioca.st/stream",
         "ImageUrl": "playhit.png"
       },
@@ -595,9 +595,9 @@
       },
       {
         "GUID": "8f6170e9-b516-45d9-8aa3-d54e6ef5e925",
-        "Title": "Radio indiGo",
+        "Title": "goFM",
         "Url": "https://live.gofm.ro:2020/stream/gofmro",
-        "ImageUrl": "radio-indigo.png"
+        "ImageUrl": "gofm.png"
       }
     ]
   },
@@ -699,9 +699,9 @@
       },
       {
         "GUID": "017e3434-f1fc-4019-a795-ebb383a25c73",
-        "Title": "Salalondon Radio",
+        "Title": "Jazz & Chill",
         "Url": "http://salalondon.ddns.net:8002/;",
-        "ImageUrl": "salalondon-radio.png"
+        "ImageUrl": "jazz-chill.png"
       },
       {
         "GUID": "a9ed9e5a-a837-4135-bd78-bbac54a2eae8",
@@ -763,9 +763,9 @@
       },
       {
         "GUID": "8a7af6fe-c0cb-41d4-bcb2-e4d24037427c",
-        "Title": "Generation Soul Disco Funk",
+        "Title": "Radio GoodLife",
         "Url": "https://gestream.fr/g-radio-hd.mp3",
-        "ImageUrl": "generation-soul-disco-funk.png"
+        "ImageUrl": "radio-goodlife.png"
       }
     ]
   },
@@ -792,7 +792,7 @@
       },
       {
         "GUID": "5b22549c-a0e3-4a23-ab56-8974d06ab3bd",
-        "Title": "EnergyFM",
+        "Title": "Deep House Energy",
         "Url": "https://fra-pioneer01.dedicateware.com:2930/stream",
         "ImageUrl": "energy-fm-house.png"
       }
@@ -890,7 +890,7 @@
       },
       {
         "GUID": "2933ed5f-1449-42ad-b61e-a9c22701d2bf",
-        "Title": "Play Radio Hit 90s",
+        "Title": "Radio Pro Music 90s",
         "Url": "https://playradiohit90-adradio.radioca.st/stream",
         "ImageUrl": "play-radio-hit-90s.jpg"
       },
@@ -903,9 +903,9 @@
       },
       {
         "GUID": "77ac3861-e69b-4883-b3d0-94481db4c75a",
-        "Title": "80s 90s",
+        "Title": "1.FM Euro 80's",
         "Url": "https://strm112.1.fm/80s_90s_mobile_mp3",
-        "ImageUrl": "80s-90s.png"
+        "ImageUrl": "1-fm-euro-80s.png"
       },
       {
         "GUID": "c4852bbd-d109-4ba7-98ef-e98dd1198d39",
@@ -1145,9 +1145,9 @@
       },
       {
         "GUID": "68aa301a-f030-4637-bc65-f0b47ecd635b",
-        "Title": "Radio CNM",
+        "Title": "ALT FM Arad",
         "Url": "https://altfm.faur.cc/alt_fm_256",
-        "ImageUrl": "radio-cnm.png"
+        "ImageUrl": "alt-fm-arad.png"
       },
       {
         "GUID": "ed6d3bd6-ae3e-405c-ac82-e1678630aaa5",
@@ -1187,9 +1187,9 @@
       },
       {
         "GUID": "45e1d455-6832-4f76-8103-7392aae4ee7f",
-        "Title": "Muntenia FM",
+        "Title": "MFM Dance",
         "Url": "https://ssl.radios.show/8012/stream",
-        "ImageUrl": "muntenia-fm.png"
+        "ImageUrl": "mfm-dance.png"
       },
       {
         "GUID": "5a6f6e9c-3f1a-4dc7-b328-66328412d20c",
@@ -1330,9 +1330,9 @@
       },
       {
         "GUID": "b8b9d5e0-3e5f-496f-872c-2fad8e842d3b",
-        "Title": "Radio Hit Romania",
+        "Title": "DHR FM",
         "Url": "https://live.dancemusic.ro/listen/dance/radio.mp3",
-        "ImageUrl": "radio-hit-romania.png"
+        "ImageUrl": "dhr-fm.png"
       },
       {
         "GUID": "a1f9c3b5-773c-477d-a1bf-0cf06d2ef837",
@@ -1357,12 +1357,6 @@
         "Title": "Radio Live 247",
         "Url": "https://online.radiolive247.ro:9010/radio.aac",
         "ImageUrl": "radio-live-247.png"
-      },
-      {
-        "GUID": "775e2033-4ec1-4014-9db8-822200f445d3",
-        "Title": "Radio x net",
-        "Url": "http://asculta.radioxnet.ro:8888/",
-        "ImageUrl": "radio-x-net.png"
       },
       {
         "GUID": "eca5b4d3-5722-4b3d-93bf-3f00cfc8d021",
@@ -1414,9 +1408,9 @@
       },
       {
         "GUID": "3425fbb3-e430-4744-ac67-88a92c030200",
-        "Title": "Radio Unison",
+        "Title": "RVE Zalău",
         "Url": "https://stream.rve-zalau.ro/rvezalau.mp3",
-        "ImageUrl": "radio-unison.png"
+        "ImageUrl": "rve-zalau.png"
       },
       {
         "GUID": "bddfb6e1-a077-46d7-9dce-d8af97da234a",
