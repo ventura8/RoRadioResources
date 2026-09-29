@@ -5,6 +5,7 @@ The station list of [RoRadio](https://github.com/ventura8/RoRadio), in one place
 | File | What it is |
 | :--- | :--- |
 | `RadioStationsData.json` | Every station: categories, and for each station its `GUID`, `Title`, `Url`, `ImageUrl`, `Description`. UTF-8 with BOM, LF (CRLF in a Windows checkout with `core.autocrlf`). |
+| `RadioLogos/` | The station logos, one file per `ImageUrl` (the name exactly, case included: Pages is case-sensitive). PNG preferred, at most 400 px on the longest side, a few tens of KB. |
 | `scripts/Test-StationStreams.ps1` | Probes the streams and says which are `alive`, `dead`, `http-NNN` or `no-audio`. |
 | `scripts/Update-StationUrls.ps1` | Finds a verified current url for every broken station and writes it into the list. |
 | `.github/workflows/refresh-stations.yml` | Runs the refresh every Monday, opens a pull request with the report and merges it. |
@@ -17,6 +18,11 @@ The station list of [RoRadio](https://github.com/ventura8/RoRadio), in one place
 - **The app's offline copy**: RoRadio includes this repository as the git submodule `RoRadioResources/` on both
   release lines (2.x on `master`, 1.x on `release/1.x`) and bundles this file. A new submodule pointer ships with
   the next app release.
+- **The logos** work the same way: the apps bundle `RadioLogos/` from the submodule, and a logo their package does
+  not have yet (added or replaced here after the release) is loaded from
+  `https://ventura8.github.io/RoRadioResources/RadioLogos/<ImageUrl>`. Apps older than that change (2.0.1, 1.6.x)
+  only know their bundled logos: a station given a new `ImageUrl` shows no logo there until they update, so an
+  existing logo is replaced in place (same file name) when it only needs refreshing.
 
 ## Rules for editing the list
 

@@ -98,11 +98,23 @@ $results = $stations | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
             ($b[0] -eq 192 -and $b[1] -eq 168) -or ($b[0] -eq 100 -and $b[1] -ge 64 -and $b[1] -le 127)
     }
 
+    # The curl arguments that pin a request to an address checked here, or $null when the url may not be
+    # requested. Checking the name and letting curl resolve it again would leave a gap (DNS rebinding: the second
+    # answer can be private), so a name is bound with --resolve to the first checked address.
+    function Get-PinnedTarget([string]$Url) {
+        try { $uri = [Uri]$Url } catch { return $null }
+        if (-not $uri.IsAbsoluteUri -or $uri.Scheme -notin 'http', 'https') { return $null }
+        try { $addresses = [Net.Dns]::GetHostAddresses($uri.DnsSafeHost) } catch { return $null }
+        if ($addresses.Count -eq 0 -or ($addresses | Where-Object { Test-PrivateAddress $_ })) { return $null }
+        if ($uri.HostNameType -in 'IPv4', 'IPv6') { return , @() }
+        # IPv4 first: GitHub's runners have no IPv6 route, and a pinned IPv6 address would read as dead there.
+        $address = @($addresses | Where-Object AddressFamily -eq ([Net.Sockets.AddressFamily]::InterNetwork)) + @($addresses) | Select-Object -First 1
+        $literal = if ($address.AddressFamily -eq [Net.Sockets.AddressFamily]::InterNetworkV6) { "[$address]" } else { "$address" }
+        , @('--resolve', "$($uri.Host):$($uri.Port):$literal")
+    }
+
     function Test-PublicUrl([string]$Url) {
-        try { $uri = [Uri]$Url } catch { return $false }
-        if (-not $uri.IsAbsoluteUri -or $uri.Scheme -notin 'http', 'https') { return $false }
-        try { $addresses = [Net.Dns]::GetHostAddresses($uri.DnsSafeHost) } catch { return $false }
-        $addresses.Count -gt 0 -and -not ($addresses | Where-Object { Test-PrivateAddress $_ })
+        $null -ne (Get-PinnedTarget $Url)
     }
 
     # One request per hop: the first 4 KB at most, the status, the content type and how long each step took.
@@ -111,8 +123,9 @@ $results = $stations | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
         $format = '%{http_code}|%{content_type}|%{time_connect}|%{time_starttransfer}|%{size_download}|%{redirect_url}'
         $current = $Url
         foreach ($hop in 0..5) {
-            if (-not (Test-PublicUrl $current)) { break }
-            $line = & $curl -s -o $discard -r 0-4095 --max-time $timeout -A 'RoRadio-station-probe' -w $format $current 2>$null
+            $pin = Get-PinnedTarget $current
+            if ($null -eq $pin) { break }
+            $line = & $curl -s @pin -o $discard -r 0-4095 --max-time $timeout -A 'RoRadio-station-probe' -w $format $current 2>$null
             $parts = "$line".Split('|')
             $result = [pscustomobject]@{
                 Code        = $parts[0]
@@ -136,8 +149,9 @@ $results = $stations | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
         try {
             $current = $Url
             foreach ($hop in 0..5) {
-                if (-not (Test-PublicUrl $current)) { break }
-                $line = & $curl -s -o $file --max-time $timeout --max-filesize 1048576 -A 'RoRadio-station-probe' -w '%{http_code}|%{redirect_url}' $current 2>$null
+                $pin = Get-PinnedTarget $current
+                if ($null -eq $pin) { break }
+                $line = & $curl -s @pin -o $file --max-time $timeout --max-filesize 1048576 -A 'RoRadio-station-probe' -w '%{http_code}|%{redirect_url}' $current 2>$null
                 $parts = "$line".Split('|')
                 if ($parts[0] -notmatch '^3\d\d$' -or $parts.Count -lt 2 -or -not $parts[1]) {
                     return [pscustomobject]@{ Body = [IO.File]::ReadAllText($file); Final = $current }
@@ -158,10 +172,11 @@ $results = $stations | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
     # what it sent. It ignores the byte range and streams on, so the rate is capped: at most ~96 KB per probe.
     # $Url is the probe's Final url (redirects already followed and checked).
     function Invoke-IcyProbe([string]$Url) {
-        if (-not (Test-PublicUrl $Url)) { return $null }
+        $pin = Get-PinnedTarget $Url
+        if ($null -eq $pin) { return $null }
         $file = [IO.Path]::GetTempFileName()
         try {
-            $null = & $curl -s --http0.9 -o $file --max-time ([Math]::Min($timeout, 6)) --limit-rate 16K -A 'RoRadio-station-probe' $Url 2>$null
+            $null = & $curl -s @pin --http0.9 -o $file --max-time ([Math]::Min($timeout, 6)) --limit-rate 16K -A 'RoRadio-station-probe' $Url 2>$null
             $length = (Get-Item $file).Length
             if ($length -eq 0) { return $null }
             $stream = [IO.File]::OpenRead($file)
