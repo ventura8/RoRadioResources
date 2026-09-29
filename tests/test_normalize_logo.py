@@ -77,6 +77,17 @@ class NormalizeLogoTest(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("not logo-shaped", result["reason"])
 
+    def test_a_huge_canvas_is_refused_before_it_is_decoded(self) -> None:
+        """An image whose header declares more pixels than the limit is not decoded at all."""
+        source = self.image("huge.png", (300, 300))
+        with (
+            mock.patch.object(normalize_logo, "MAX_SOURCE_PIXELS", 200 * 200),
+            mock.patch.object(Image.Image, "load", side_effect=AssertionError("decoded")),
+        ):
+            result = self.check(source)
+        self.assertFalse(result["ok"])
+        self.assertIn("too large to decode", result["reason"])
+
     def test_a_blank_image_is_not_a_logo(self) -> None:
         """One colour, or nothing visible at all."""
         plain = self.check(self.image("plain.png", (256, 256), two_colours=False), "a.png")

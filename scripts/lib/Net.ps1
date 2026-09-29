@@ -40,39 +40,49 @@ function Test-PublicUrl([string]$Url) {
 }
 
 # Downloads a url into a file, every redirect hop checked and pinned. Returns the url that answered 200, or $null
-# (a private destination, an HTTP error, more than $MaxBytes, nothing within $TimeoutSeconds).
-function Save-PublicFile([string]$Url, [string]$Path, [int]$TimeoutSeconds = 20, [long]$MaxBytes = 5MB) {
+# (a private destination, an HTTP error, more than $MaxBytes, nothing within $TimeoutSeconds), and then leaves no file.
+function Save-PublicFile([string]$Url, [string]$Path, [int]$TimeoutSeconds = 20, [long]$MaxBytes = 5MB, [int]$Retries = 0) {
     $current = $Url
     foreach ($hop in 0..5) {
         $pin = Get-PinnedTarget $current
-        if ($null -eq $pin) { return $null }
-        $line = & $script:Curl -s @pin -o $Path --max-time $TimeoutSeconds --max-filesize $MaxBytes -A $script:StationUserAgent -w '%{http_code}|%{redirect_url}' $current 2>$null
+        if ($null -eq $pin) { break }
+        $line = & $script:Curl -s @pin -o $Path --max-time $TimeoutSeconds --max-filesize $MaxBytes --retry $Retries -A $script:StationUserAgent -w '%{http_code}|%{redirect_url}' $current 2>$null
+        $exit = $LASTEXITCODE
         $parts = "$line".Split('|')
-        if ($parts[0] -eq '200') { return $current }
-        if ($parts[0] -notmatch '^3\d\d$' -or $parts.Count -lt 2 -or -not $parts[1]) { return $null }
+        # curl reports a transfer it cut short through its exit code (63: more than --max-filesize, 28: too slow),
+        # while -w still prints the 200 it started with: what it wrote is not the file (Copilot, RoRadioResources#2).
+        if ($exit -eq 0 -and $parts[0] -eq '200') { return $current }
+        if ($exit -ne 0 -or $parts[0] -notmatch '^3\d\d$' -or $parts.Count -lt 2 -or -not $parts[1]) { break }
         $current = $parts[1]
     }
 
+    Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
     $null
 }
 
-# A web page's text; '' (with a warning) when it cannot be read.
-function Get-Text([string]$Url) {
+# A page's text through Save-PublicFile (checked, pinned, capped), or $null.
+function Get-PublicText([string]$Url, [long]$MaxBytes = 10MB, [int]$TimeoutSeconds = 30, [int]$Retries = 0) {
+    $file = [IO.Path]::GetTempFileName()
     try {
-        $content = (Invoke-WebRequest -Uri $Url -UserAgent $script:StationUserAgent -TimeoutSec 30 -MaximumRetryCount 2).Content
-        # A playlist (.pls, audio/x-scpls) is not a text content type to PowerShell: it comes back as bytes.
-        if ($content -is [byte[]]) { [Text.Encoding]::UTF8.GetString($content) } else { $content }
-    } catch {
-        Write-Warning "Could not read ${Url}: $($_.Exception.Message)"
-        ''
+        if (Save-PublicFile $Url $file -TimeoutSeconds $TimeoutSeconds -MaxBytes $MaxBytes -Retries $Retries) { [IO.File]::ReadAllText($file) } else { $null }
+    } finally {
+        Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
     }
+}
+
+# A web page's text; '' (with a warning) when it cannot be read. Two retries: directories answer slowly at times.
+function Get-Text([string]$Url) {
+    $text = Get-PublicText $Url -Retries 2
+    if ($null -eq $text) {
+        Write-Warning "Could not read $Url"
+        return ''
+    }
+    $text
 }
 
 # A lookup that is allowed to find nothing (a status page most servers do not have): no retries, no warning.
 function Get-OptionalJson([string]$Url) {
-    try {
-        (Invoke-WebRequest -Uri $Url -UserAgent $script:StationUserAgent -TimeoutSec 10).Content | ConvertFrom-Json
-    } catch {
-        $null
-    }
+    $text = Get-PublicText $Url -MaxBytes 2MB -TimeoutSeconds 10
+    if (-not $text) { return $null }
+    try { $text | ConvertFrom-Json } catch { $null }
 }
