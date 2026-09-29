@@ -1,0 +1,87 @@
+name: Refresh station urls
+
+# Broadcasters move their streams without notice. Once a week this probes every station, finds a verified
+# current url for the broken ones (scripts/Update-StationUrls.ps1), opens a pull request with the report and
+# merges it, so GitHub Pages serves the fixed list to every RoRadio install within minutes.
+on:
+  workflow_dispatch:
+    inputs:
+      merge:
+        description: Merge the pull request when the fix is small enough
+        type: boolean
+        default: true
+  schedule:
+    - cron: '17 4 * * 1'  # Mondays 04:17 UTC
+
+permissions:
+  contents: read
+
+concurrency:
+  group: refresh-stations
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write       # push the refresh branch and merge it
+      pull-requests: write  # open and merge the pull request
+      pages: write          # request a Pages build after the merge
+      actions: write        # re-enable this workflow so GitHub does not disable it after 60 quiet days
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      BRANCH: automation/station-refresh
+      # More fixes than this in one run means the runner's network, not the stations, is the problem
+      # (a US runner blocked by Romanian geo-restrictions): the pull request stays open for a human.
+      MAX_AUTO_MERGE: '15'
+      MERGE: ${{ github.event_name == 'schedule' || inputs.merge }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Probe the stations and fix the broken urls
+        shell: pwsh
+        run: ./scripts/Update-StationUrls.ps1 -ReportPath "$env:RUNNER_TEMP/report.md" | Out-Null
+
+      - name: Open and merge the pull request
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/report.md"
+          cat "$report" >> "$GITHUB_STEP_SUMMARY"
+          if git diff --quiet -- RadioStationsData.json; then
+            echo "No url changed." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          changed=$(git diff --numstat -- RadioStationsData.json | cut -f1)
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -C "$BRANCH"
+          git commit -q -m "Refresh $changed station url(s)" -- RadioStationsData.json
+          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GH_REPO}.git" "HEAD:refs/heads/$BRANCH"
+
+          title="Refresh $changed station url(s) ($(date -u +%F))"
+          if gh pr view "$BRANCH" --json state --jq .state 2>/dev/null | grep -qx OPEN; then
+            gh pr edit "$BRANCH" --title "$title" --body-file "$report"
+          else
+            gh pr create --base master --head "$BRANCH" --title "$title" --body-file "$report"
+          fi
+
+          if [ "$MERGE" != 'true' ]; then
+            echo "Merge not requested: the pull request stays open." >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$changed" -gt "$MAX_AUTO_MERGE" ]; then
+            note="$changed urls changed, more than $MAX_AUTO_MERGE: not merged automatically."
+            gh pr comment "$BRANCH" --body "$note Check them from Romania before merging."
+          else
+            gh pr merge "$BRANCH" --squash --delete-branch
+            gh api -X POST "repos/$GH_REPO/pages/builds" --silent || echo "::warning::Could not request a Pages build."
+          fi
+
+      - name: Keep the schedule alive
+        if: always()
+        shell: bash
+        run: gh api -X PUT "repos/$GH_REPO/actions/workflows/refresh-stations.yml/enable" --silent

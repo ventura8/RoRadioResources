@@ -40,7 +40,7 @@
       {
         "GUID": "9e9708b8-01cf-4053-b4ef-cb8232725245",
         "Title": "Magic FM",
-        "Url": "http://live.magicfm.ro:9128/magicfm.aacp",
+        "Url": "https://live.magicfm.ro/magicfm.aacp",
         "ImageUrl": "MagicFm.png",
         "Description": "always great music"
       },
@@ -53,7 +53,7 @@
       {
         "GUID": "d946c209-aadf-4c76-b9bd-e87b280e5377",
         "Title": "Național FM",
-        "Url": "http://live.nationalfm.ro:8001/",
+        "Url": "https://asculta.nationalfm.ro:9102/nfm2",
         "ImageUrl": "NationalFm.png"
       },
       {
@@ -197,7 +197,7 @@
       {
         "GUID": "221dc454-d464-441d-ba32-fb0be58e81fc",
         "Title": "Radio Prahova",
-        "Url": "https://streamx.rph.ro:8100/relay",
+        "Url": "https://r2.mediastreaming.ro/listen/rph/relay",
         "ImageUrl": "radioprahova.png"
       },
       {
@@ -221,7 +221,7 @@
       {
         "GUID": "71482e9f-abe2-4fbc-b1bd-c488190ccd01",
         "Title": "Radio Sud Constanța",
-        "Url": "http://asculta.radiosudconstanta.com:8000/;",
+        "Url": "http://asculta.radiosudconstanta.com:8750/stream",
         "ImageUrl": "radio-sud-constanta.png"
       },
       {
@@ -336,7 +336,7 @@
       {
         "GUID": "f0bd52d5-e78c-41c5-bc6a-482f0ccb380d",
         "Title": "N-Joy Radio",
-        "Url": "http://live.btvradio.bg/njoy.mp3",
+        "Url": "https://cdn.btv.bg/radio/njoy.mp3",
         "ImageUrl": "Njoy-bg.png"
       },
       {
@@ -360,7 +360,7 @@
       {
         "GUID": "a4d81887-9b8c-4999-9a4e-36428f58ca81",
         "Title": "Realitatea FM",
-        "Url": "http://195.42.138.43/liveaudio/liveaudio.stream/playlist.m3u8",
+        "Url": "https://shout.realitatea.net:8001/mixt",
         "ImageUrl": "RealitateaFM.jpg"
       },
       {
@@ -698,7 +698,7 @@
       {
         "GUID": "1940549b-2dcd-4f23-8640-08b725af99f9",
         "Title": "Radio Etno Vest",
-        "Url": "http://89.39.189.75:8500/;"
+        "Url": "http://ssl.radios.show:8020/;"
       },
       {
         "GUID": "ff84bf8c-2ce2-4de3-b099-fb0abbb1207e",
