@@ -44,7 +44,8 @@ jobs:
 
       - name: Probe the stations and fix the broken urls
         shell: pwsh
-        run: ./scripts/Update-StationUrls.ps1 -ReportPath "$env:RUNNER_TEMP/report.md" | Out-Null
+        # Only outright dead streams: from a US runner an HTTP error can be geo-blocking (see the script's help).
+        run: ./scripts/Update-StationUrls.ps1 -ReplaceOnlyDead -ReportPath "$env:RUNNER_TEMP/report.md" | Out-Null
 
       - name: Open and merge the pull request
         shell: bash

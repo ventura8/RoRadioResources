@@ -41,6 +41,13 @@
 .PARAMETER RetryDelaySeconds
     How long to wait before probing the failures a second time.
 
+.PARAMETER ReplaceOnlyDead
+    Replace only streams that are `dead` (no connection, nothing within the timeout). An HTTP error or a
+    non-audio answer can be the network the probe runs from, not the stream: the first weekly run (2026-09-29,
+    from a US runner) got HTTP 404 from Europa FM, which plays fine in Romania, and would have swapped it for a
+    48k stream. Those stations are listed under "Needs review from Romania" with the candidate found. The weekly
+    workflow passes this; a run from Romania can leave it off.
+
 .OUTPUTS
     One object per station that failed both probes: Title, Guid, OldUrl, OldVerdict, NewUrl, Source.
 #>
@@ -51,7 +58,8 @@ param(
     [string[]]$Title,
     [int]$TimeoutSeconds = 20,
     [int]$ThrottleLimit = 16,
-    [int]$RetryDelaySeconds = 60
+    [int]$RetryDelaySeconds = 60,
+    [switch]$ReplaceOnlyDead
 )
 
 $ErrorActionPreference = 'Stop'
@@ -175,12 +183,14 @@ $results = foreach ($station in $failing) {
         }
     }
 
+    $held = $newUrl -and $ReplaceOnlyDead -and $station.Verdict -ne 'dead'
     [pscustomobject]@{
         Title      = $station.Title
         Guid       = $station.Guid
         OldUrl     = $station.Url
         OldVerdict = $station.Verdict
-        NewUrl     = $newUrl
+        NewUrl     = if ($held) { $null } else { $newUrl }
+        Suggested  = if ($held) { $newUrl } else { $null }
         Source     = $source
         Tried      = $unique.Count
     }
@@ -216,7 +226,16 @@ if ($fixed) {
     foreach ($fix in $fixed) { $lines.Add("| $($fix.Title) | $($fix.OldVerdict) | ``$($fix.OldUrl)`` | ``$($fix.NewUrl)`` | $($fix.Source) |") }
     $lines.Add('')
 }
-$unresolved = @($results | Where-Object { -not $_.NewUrl })
+$review = @($results | Where-Object Suggested)
+if ($review) {
+    $lines.Add('## Needs review from Romania (not an outright failure; url kept)')
+    $lines.Add('')
+    $lines.Add('| Station | Verdict here | Url | Candidate | Found on |')
+    $lines.Add('| :--- | :--- | :--- | :--- | :--- |')
+    foreach ($item in $review) { $lines.Add("| $($item.Title) | $($item.OldVerdict) | ``$($item.OldUrl)`` | ``$($item.Suggested)`` | $($item.Source) |") }
+    $lines.Add('')
+}
+$unresolved = @($results | Where-Object { -not $_.NewUrl -and -not $_.Suggested })
 if ($unresolved) {
     $lines.Add('## Unresolved (url kept; the owner decides)')
     $lines.Add('')

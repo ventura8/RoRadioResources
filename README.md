@@ -43,11 +43,16 @@ Both need PowerShell 7 and curl.
 
 1. Probes every station, and the failures again a minute later, so a blip is not taken for a move.
 2. For each station that failed twice, collects candidates from its page on
-   [myradioonline.ro](https://myradioonline.ro/) and from radio-browser.info (exact name only), probes them,
-   and takes the first one that is alive. A station without one keeps its url and is listed as unresolved.
-3. Commits the changed urls to `automation/station-refresh`, opens (or updates) a pull request whose body is the
+   [myradioonline.ro](https://myradioonline.ro/) and from radio-browser.info (same name, Romanian or Moldovan,
+   homepage or stream host carrying the station's name), probes them, and takes the first one that is alive.
+   A station without one keeps its url and is listed as unresolved.
+3. Replaces only streams that are **dead** (no connection at all). The runners are in the United States: an HTTP
+   error or a non-audio answer from there can be Romanian geo-blocking, not a moved stream (the first run, on
+   2026-09-29, got HTTP 404 from Europa FM, which plays fine in Romania). Those stations are listed under "Needs
+   review from Romania" with the candidate it found; check them with
+   `./scripts/Update-StationUrls.ps1 -Title '<station>'` from here.
+4. Commits the changed urls to `automation/station-refresh`, opens (or updates) a pull request whose body is the
    report, squash-merges it, and asks Pages to rebuild.
 
-It does **not** merge when more than 15 urls changed at once: the runners are in the United States, and a wave
-of failures is more likely Romanian geo-blocking seen from there than fifteen stations moving in one week. That
-pull request stays open for someone to check from Romania. Unresolved stations are in every run's summary.
+It does **not** merge when more than 15 urls changed at once: a wave of that size is more likely the runner's
+network than fifteen stations moving in one week. That pull request stays open for someone to check from Romania.
