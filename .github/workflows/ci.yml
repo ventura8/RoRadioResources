@@ -1,0 +1,91 @@
+name: CI
+
+# Every pull request and every push to master: every linter at its strictest (scripts/ci/Invoke-Lint.ps1) and the
+# tests (scripts/ci/Invoke-Tests.ps1), among them the station list's integrity: unique GUIDs, titles and urls, no url
+# inside another, a file for every logo named with its case. The same two scripts run on a developer machine.
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint (PowerShell, Python, YAML, workflows, Markdown, spelling, whitespace, secrets, suppressions)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0  # gitleaks reads the whole history
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.13'
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: '24'
+
+      - name: Install the linters (pinned)
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          GITLEAKS_VERSION: 8.30.1
+          EDITORCONFIG_CHECKER_VERSION: 4.0.2
+        # No token in this step, and no package lifecycle scripts: a pull request controls package.json and could
+        # otherwise run code with the token (CodeRabbit, RoRadioResources#2). editorconfig-checker's npm wrapper
+        # would fetch its binary through the rate-limited API, so the binary comes from its release like the others.
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet -r scripts/ci/requirements.txt
+          npm ci --prefix scripts/ci --ignore-scripts --no-audit --no-fund
+          mkdir -p "$RUNNER_TEMP/bin"
+          actionlint="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          gitleaks="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/$actionlint" \
+            | tar -xz -C "$RUNNER_TEMP/bin" actionlint
+          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/$gitleaks" \
+            | tar -xz -C "$RUNNER_TEMP/bin" gitleaks
+          checker="https://github.com/editorconfig-checker/editorconfig-checker/releases/download"
+          curl -fsSL "$checker/v${EDITORCONFIG_CHECKER_VERSION}/editorconfig-checker-linux-amd64.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP/bin" editorconfig-checker
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Install PSScriptAnalyzer (pinned)
+        shell: pwsh
+        run: Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser -Force
+
+      - name: Lint
+        shell: pwsh
+        run: ./scripts/ci/Invoke-Lint.ps1 -Python python
+
+  test:
+    name: Tests (station list integrity, script helpers, logo checks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.13'
+
+      - name: Install Pillow and Pester (pinned)
+        shell: pwsh
+        run: |
+          python -m pip install --quiet -r scripts/ci/requirements.txt
+          Install-Module Pester -RequiredVersion 6.2.0 -Scope CurrentUser -Force -SkipPublisherCheck
+
+      - name: Test
+        shell: pwsh
+        run: ./scripts/ci/Invoke-Tests.ps1 -Python python

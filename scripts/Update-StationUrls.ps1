@@ -13,7 +13,14 @@
               the player's src/url attribute (its ?time= cache-buster removed)
            b. radio-browser.info, only entries whose name is exactly the station's title, whose country is
               Romania or Moldova, and whose homepage or stream host carries the station's name
-      4. Probe the candidates. The first one that is alive replaces the url. Nothing is written on a guess:
+           c. the old url's own server: its Icecast (status-json.xsl) or Shoutcast (statistics?json=1) status page,
+              on the old port and on 8000, mounts whose name or url carry the station's name
+           d. the Shoutcast directory (entries whose name contains the title) and radio.net (the exact title, in
+              Romania or Moldova): suggestions only, never written - a name is not proof (2026-09-29)
+         a, b and c are strong; d is weak. Old Shoutcast 1 servers answer "ICY 200 OK", which the probe reads
+         since 2026-09-29 (before that, playing stations were reported dead).
+      4. Probe the candidates. The first strong one that is alive replaces the url; a weak one only goes to
+         "Needs review". Nothing is written on a guess:
          a station with no live candidate keeps its url and is listed as unresolved. A candidate that is,
          contains or is contained in another station's url is dropped: RoRadio's unit tests require unique urls,
          and two stations on one stream means the broadcaster merged them, which is the owner's decision.
@@ -67,43 +74,82 @@ if (-not $Catalog) { $Catalog = Join-Path (Split-Path $PSScriptRoot -Parent) 'Ra
 $Catalog = (Resolve-Path $Catalog).Path
 $probeScript = Join-Path $PSScriptRoot 'Test-StationStreams.ps1'
 $probeSettings = @{ TimeoutSeconds = $TimeoutSeconds; ThrottleLimit = $ThrottleLimit }
-$userAgent = 'RoRadio-station-refresh (+https://github.com/ventura8/RoRadioResources)'
 $scratch = Join-Path ([IO.Path]::GetTempPath()) "roradio-refresh-$PID"
-New-Item -ItemType Directory -Force -Path $scratch | Out-Null
-
-function ConvertTo-PlainTitle([string]$Text) {
-    $decomposed = $Text.Normalize([Text.NormalizationForm]::FormD)
-    $kept = $decomposed.ToCharArray() | Where-Object { [Globalization.CharUnicodeInfo]::GetUnicodeCategory($_) -ne 'NonSpacingMark' }
-    (-join $kept).ToLowerInvariant().Trim()
-}
-
-function ConvertTo-Slug([string]$Text) {
-    ((ConvertTo-PlainTitle $Text) -replace "['’]", '' -replace '[^a-z0-9]+', '-').Trim('-')
-}
-
-# What of a station's name must show up in a host name for that host to be the station's own: the whole name
-# run together ("radionoise", "romanfm") and each distinctive word of four letters or more ("noise", "aquila").
-function Get-NameMark([string]$Title) {
-    $generic = 'radio', 'online', 'romania', 'music', 'muzica', 'live', 'stream', 'best', 'hits', 'station'
-    $words = @((ConvertTo-PlainTitle $Title) -split '[^a-z0-9]+' | Where-Object { $_ })
-    @(-join $words) + @($words | Where-Object { $_.Length -ge 4 -and $generic -notcontains $_ }) | Select-Object -Unique
-}
+# Scratch files are written even under -WhatIf, which only guards the catalogue (a dry run failed without them).
+New-Item -ItemType Directory -Force -Path $scratch -WhatIf:$false | Out-Null
+. (Join-Path $PSScriptRoot 'lib/Net.ps1')
+. (Join-Path $PSScriptRoot 'lib/Names.ps1')
 
 # Probes an arbitrary list of { Title, Url, Guid } through a throw-away catalogue, so the verdicts come from
 # exactly the same code as the catalogue-wide probe.
 function Invoke-StreamProbe([object[]]$Entries, [string]$Name) {
     $path = Join-Path $scratch "$Name.json"
     $list = @($Entries | ForEach-Object { [ordered]@{ GUID = $_.Guid; Title = $_.Title; Url = $_.Url } })
-    ConvertTo-Json -InputObject @([ordered]@{ Name = $Name; List = $list }) -Depth 5 | Set-Content -Path $path -Encoding utf8
+    ConvertTo-Json -InputObject @([ordered]@{ Name = $Name; List = $list }) -Depth 5 | Set-Content -Path $path -Encoding utf8 -WhatIf:$false
     @(& $probeScript -Catalog $path @probeSettings)
 }
 
-function Get-Text([string]$Url) {
+# c. The old server itself. A station that moved its mount or port on the same Icecast / Shoutcast server lists
+#    its current mounts on the server's status page (Radio Caprice's channels moved from ports 9085/9029/9135 to
+#    mounts on :8000, 2026-09-29). Each mount is matched on its own name and path, never the host. A mark shared
+#    by several mounts is the brand every channel carries ("caprice", "jazz") and tells them apart from nothing:
+#    only marks that match exactly one mount count. One match is the station (strong); several are channels the
+#    marks cannot separate, and go to review (CodeRabbit, RoRadioResources#2).
+function Get-SameServerCandidate([string]$OldUrl, [string[]]$Marks) {
+    try { $old = [Uri]$OldUrl } catch { return }
+    $bases = @("$($old.Scheme)://$($old.Host):$($old.Port)")
+    if ($old.Port -ne 8000) { $bases += "http://$($old.Host):8000" }
+    $mounts = @(foreach ($base in $bases) {
+        $icecast = Get-OptionalJson "$base/status-json.xsl"
+        foreach ($source in @($icecast.icestats.source)) {
+            if ($source.listenurl) {
+                [pscustomobject]@{ Url = $source.listenurl; Text = "$($source.server_name) $(Get-UrlPath $source.listenurl)"; Source = "same server, Icecast status ($base)" }
+            }
+        }
+
+        $shoutcast = Get-OptionalJson "$base/statistics?json=1"
+        foreach ($stream in @($shoutcast.streams)) {
+            if ($stream.streampath) {
+                [pscustomobject]@{ Url = "$base$($stream.streampath)"; Text = "$($stream.servertitle) $($stream.streampath)"; Source = "same server, Shoutcast status ($base)" }
+            }
+        }
+    })
+
+    $specific = @($Marks | Where-Object { $mark = $_; @($mounts | Where-Object { Test-NameMark @($mark) $_.Text }).Count -eq 1 })
+    $found = @($mounts | Where-Object { $specific -and (Test-NameMark $specific $_.Text) })
+    foreach ($mount in $found) {
+        [pscustomobject]@{ Url = $mount.Url; Source = $mount.Source; Strong = $found.Count -eq 1 }
+    }
+}
+
+# d. The Shoutcast directory: most Romanian manele web radios are listed there and nowhere else (Dip Music, Radio
+#    Amma, 2026-09-29). It has no country, so a name match is only a suggestion for the owner.
+function Get-ShoutcastCandidate([string]$Title) {
+    $plainTitle = ConvertTo-PlainTitle $Title
     try {
-        (Invoke-WebRequest -Uri $Url -UserAgent $userAgent -TimeoutSec 30 -MaximumRetryCount 2).Content
+        $found = Invoke-RestMethod -Method Post -Uri 'https://directory.shoutcast.com/Search/UpdateSearch' -Body @{ query = $Title } -UserAgent $StationUserAgent -TimeoutSec 20
     } catch {
-        Write-Warning "Could not read ${Url}: $($_.Exception.Message)"
-        ''
+        return
+    }
+
+    foreach ($entry in @($found | Where-Object { (ConvertTo-PlainTitle $_.Name).Contains($plainTitle) } | Select-Object -First 3)) {
+        $playlist = Get-Text "https://yp.shoutcast.com/sbin/tunein-station.pls?id=$($entry.ID)"
+        if ($playlist -match '(?m)^File1=(\S+)') {
+            [pscustomobject]@{ Url = $Matches[1]; Source = "Shoutcast directory: $($entry.Name) (id $($entry.ID))"; Strong = $false }
+        }
+    }
+}
+
+# e. radio.net: the exact name, in Romania or Moldova. Its search is fuzzy and its stream hosts are often CDNs
+#    without the station's name, so this too is only a suggestion.
+function Get-RadioNetCandidate([string]$Title) {
+    $plainTitle = ConvertTo-PlainTitle $Title
+    $found = Get-OptionalJson "https://prod.radio-api.net/stations/search?count=10&query=$([Uri]::EscapeDataString($Title))"
+    foreach ($entry in @($found.playables)) {
+        if ((ConvertTo-PlainTitle $entry.name) -ne $plainTitle -or $entry.country -notin 'Romania', 'Moldova') { continue }
+        foreach ($stream in @($entry.streams | Select-Object -First 1)) {
+            [pscustomobject]@{ Url = $stream.url; Source = "radio.net ($($entry.id))"; Strong = $false }
+        }
     }
 }
 
@@ -119,30 +165,27 @@ if ($Title) {
 $firstPass = Invoke-StreamProbe $toProbe 'all'
 $failing = @($firstPass | Where-Object Verdict -ne 'alive')
 if ($failing) {
-    Write-Host "$($failing.Count) failing; probing them again in $RetryDelaySeconds s."
+    Write-Information "$($failing.Count) failing; probing them again in $RetryDelaySeconds s." -InformationAction Continue
     Start-Sleep -Seconds $RetryDelaySeconds
     $failing = @(Invoke-StreamProbe $failing 'retry' | Where-Object Verdict -ne 'alive')
 }
-Write-Host "$($failing.Count) station(s) failed both probes."
+Write-Information "$($failing.Count) station(s) failed both probes." -InformationAction Continue
 
 # 3: candidates.
 $slugs = @()
 if ($failing) {
-    $sitemap = Get-Text 'https://myradioonline.ro/sitemap.xml'
-    $slugs = @([regex]::Matches($sitemap, '<loc>https://myradioonline\.ro/([a-z0-9-]+)</loc>') | ForEach-Object { $_.Groups[1].Value })
-    Write-Host "myradioonline.ro lists $($slugs.Count) stations."
+    $slugs = Get-MyRadioOnlineSitemap
+    Write-Information "myradioonline.ro lists $($slugs.Count) stations." -InformationAction Continue
 }
 
 $notStream = '\.(png|jpe?g|webp|gif|svg|ico|css|js|json|html?)(\?|$)|google|facebook|apple\.com|twitter|instagram|youtube|myradioonline|schema\.org|w3\.org'
 $results = foreach ($station in $failing) {
     $candidates = [Collections.Generic.List[object]]::new()
-    $slug = ConvertTo-Slug $station.Title
-    $pageSlugs = @($slug, ($slug -replace '^radio-', ''), "radio-$slug") | Select-Object -Unique | Where-Object { $slugs -contains $_ }
-    foreach ($pageSlug in $pageSlugs) {
+    foreach ($pageSlug in Get-MyRadioOnlineSlug $station.Title $slugs) {
         $page = Get-Text "https://myradioonline.ro/$pageSlug"
         foreach ($match in [regex]::Matches($page, '(?:src|url)="(https?://[^"]+)"')) {
             $url = [Net.WebUtility]::HtmlDecode($match.Groups[1].Value) -replace '[?&]time=\d+$', ''
-            if ($url -notmatch $notStream) { $candidates.Add([pscustomobject]@{ Url = $url; Source = "myradioonline.ro/$pageSlug" }) }
+            if ($url -notmatch $notStream) { $candidates.Add([pscustomobject]@{ Url = $url; Source = "myradioonline.ro/$pageSlug"; Strong = $true }) }
         }
     }
 
@@ -156,34 +199,46 @@ $results = foreach ($station in $failing) {
         foreach ($entry in ($directory | ConvertFrom-Json)) {
             if ((ConvertTo-PlainTitle $entry.name) -ne $plainTitle -or -not $entry.url_resolved) { continue }
             if ($entry.countrycode -notin 'RO', 'MD') { continue }
-            $hosts = @($entry.homepage, $entry.url_resolved) | Where-Object { $_ } | ForEach-Object { try { ([Uri]$_).Host.ToLowerInvariant() } catch { '' } }
+            $hosts = @($entry.homepage, $entry.url_resolved) | Where-Object { $_ } | ForEach-Object { Get-UrlHost $_ }
             if (-not ($marks | Where-Object { $mark = $_; $hosts | Where-Object { $_.Replace('-', '').Contains($mark) } })) { continue }
-            $candidates.Add([pscustomobject]@{ Url = $entry.url_resolved; Source = "radio-browser.info ($($entry.homepage))" })
+            $candidates.Add([pscustomobject]@{ Url = $entry.url_resolved; Source = "radio-browser.info ($($entry.homepage))"; Strong = $true })
         }
+    }
+
+    foreach ($candidate in @(Get-SameServerCandidate $station.Url $marks) + @(Get-ShoutcastCandidate $station.Title) + @(Get-RadioNetCandidate $station.Title)) {
+        if ($candidate) { $candidates.Add($candidate) }
     }
 
     # RoRadio's unit tests require every url to be unique and none to contain another: a candidate that is
     # another station's stream means the broadcaster merged the two channels, which is the owner's call.
-    $others = @($stations | Where-Object Guid -ne $station.Guid | ForEach-Object Url)
+    # A script block, not `ForEach-Object Url`: under -WhatIf the member form only reports what it would do and
+    # returns nothing, which switched this check off in dry runs.
+    $others = @($stations | Where-Object Guid -ne $station.Guid | ForEach-Object { $_.Url })
     $unique = @($candidates |
         Where-Object { $url = $_.Url; $url -ne $station.Url -and -not ($others | Where-Object { $_.Contains($url) -or $url.Contains($_) }) } |
         Group-Object Url | ForEach-Object { $_.Group[0] })
+    # The first live strong candidate replaces the url; a live weak one (a name match in a directory without a
+    # country) is only suggested: the same name is often another station (round one, 2026-09-29).
     $newUrl = $null
     $source = $null
+    $weakOnly = $false
     if ($unique) {
         $entries = for ($i = 0; $i -lt $unique.Count; $i++) {
             [pscustomobject]@{ Title = "candidate $i"; Url = $unique[$i].Url; Guid = "$i" }
         }
         $verdicts = Invoke-StreamProbe $entries "candidates-$($station.Guid)"
-        for ($i = 0; $i -lt $unique.Count -and -not $newUrl; $i++) {
-            if (($verdicts | Where-Object Guid -eq "$i").Verdict -eq 'alive') {
-                $newUrl = $unique[$i].Url
-                $source = $unique[$i].Source
-            }
+        $alive = @(for ($i = 0; $i -lt $unique.Count; $i++) {
+            if (($verdicts | Where-Object Guid -eq "$i").Verdict -eq 'alive') { $unique[$i] }
+        })
+        $best = @($alive | Where-Object Strong) + @($alive | Where-Object { -not $_.Strong }) | Select-Object -First 1
+        if ($best) {
+            $newUrl = $best.Url
+            $source = $best.Source
+            $weakOnly = -not $best.Strong
         }
     }
 
-    $held = $newUrl -and $ReplaceOnlyDead -and $station.Verdict -ne 'dead'
+    $held = $newUrl -and ($weakOnly -or ($ReplaceOnlyDead -and $station.Verdict -ne 'dead'))
     [pscustomobject]@{
         Title      = $station.Title
         Guid       = $station.Guid
@@ -214,7 +269,14 @@ if ($fixed -and $PSCmdlet.ShouldProcess($Catalog, "Update $($fixed.Count) statio
     [IO.File]::WriteAllText($Catalog, $text, [Text.UTF8Encoding]::new($hasBom))
 }
 
-# 5: the report.
+# 5: the report. It becomes the pull request body and docs/releases/<date>-refresh.md, so what can be a link is one.
+function Format-Source([string]$Source) {
+    if ($Source -match '^myradioonline\.ro/\S+$') { return "[$Source](https://$Source)" }
+    if ($Source -match '^radio-browser\.info \((https?://[^)]+)\)$') { return "radio-browser.info ([$($Matches[1])]($($Matches[1])))" }
+    if ($Source -match '^radio\.net \(([^)]+)\)$') { return "[radio.net ($($Matches[1]))](https://www.radio.net/s/$($Matches[1]))" }
+    $Source
+}
+
 $lines = [Collections.Generic.List[string]]::new()
 $lines.Add("Probed $(@($toProbe).Count) stations; $($results.Count) failed twice; $($fixed.Count) fixed.")
 $lines.Add('')
@@ -223,16 +285,16 @@ if ($fixed) {
     $lines.Add('')
     $lines.Add('| Station | Was | Old url | New url | Found on |')
     $lines.Add('| :--- | :--- | :--- | :--- | :--- |')
-    foreach ($fix in $fixed) { $lines.Add("| $($fix.Title) | $($fix.OldVerdict) | ``$($fix.OldUrl)`` | ``$($fix.NewUrl)`` | $($fix.Source) |") }
+    foreach ($fix in $fixed) { $lines.Add("| $($fix.Title) | $($fix.OldVerdict) | ``$($fix.OldUrl)`` | ``$($fix.NewUrl)`` | $(Format-Source $fix.Source) |") }
     $lines.Add('')
 }
 $review = @($results | Where-Object Suggested)
 if ($review) {
-    $lines.Add('## Needs review from Romania (not an outright failure; url kept)')
+    $lines.Add('## Needs review (url kept): not an outright failure from here, or found only by name in a directory')
     $lines.Add('')
     $lines.Add('| Station | Verdict here | Url | Candidate | Found on |')
     $lines.Add('| :--- | :--- | :--- | :--- | :--- |')
-    foreach ($item in $review) { $lines.Add("| $($item.Title) | $($item.OldVerdict) | ``$($item.OldUrl)`` | ``$($item.Suggested)`` | $($item.Source) |") }
+    foreach ($item in $review) { $lines.Add("| $($item.Title) | $($item.OldVerdict) | ``$($item.OldUrl)`` | ``$($item.Suggested)`` | $(Format-Source $item.Source) |") }
     $lines.Add('')
 }
 $unresolved = @($results | Where-Object { -not $_.NewUrl -and -not $_.Suggested })
@@ -245,7 +307,7 @@ if ($unresolved) {
     $lines.Add('')
 }
 $report = $lines -join "`n"
-if ($ReportPath) { Set-Content -Path $ReportPath -Value $report -Encoding utf8 }
-Write-Host $report
+if ($ReportPath) { Set-Content -Path $ReportPath -Value $report -Encoding utf8 -WhatIf:$false }
+Write-Information $report -InformationAction Continue
 Remove-Item -Recurse -Force $scratch -ErrorAction SilentlyContinue
 $results

@@ -1,0 +1,11 @@
+{
+  // markdownlint-cli2 for every Markdown file: the README and the release notes under docs/releases.
+  "globs": ["**/*.md", "!scripts/ci/node_modules/**"],
+  "config": {
+    "default": true,
+    // Line length: the release notes hold long tables of urls; wrapping them breaks the tables.
+    "MD013": false,
+    // Inline HTML: the release notes show each logo with <img width="64">, which Markdown cannot size.
+    "MD033": false
+  }
+}
