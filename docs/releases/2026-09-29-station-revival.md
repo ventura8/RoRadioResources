@@ -161,7 +161,7 @@ Nothing plays at the old url and no current stream was found after two rounds of
 | :--- | :--- |
 | Radio Transilvania Aleșd | Its town page plays the Oradea stream, which is listed as Radio Transilvania Oradea. |
 | Radio Transilvania Turda | Its town page plays the Cluj stream, which is listed as Radio Transilvania Cluj. |
-| Play Radio 90's | The same feed as Play Radio Hit 90s. |
+| Play Radio 90's | The same feed as Play 90's. |
 
 ### The same title as another station
 
