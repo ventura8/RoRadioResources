@@ -37,15 +37,16 @@ jobs:
 
       - name: Install the linters (pinned)
         env:
-          # editorconfig-checker's npm package fetches its binary through the GitHub API: the shared runner addresses
-          # hit the anonymous rate limit.
-          GITHUB_TOKEN: ${{ github.token }}
           ACTIONLINT_VERSION: 1.7.12
           GITLEAKS_VERSION: 8.30.1
+          EDITORCONFIG_CHECKER_VERSION: 4.0.2
+        # No token in this step, and no package lifecycle scripts: a pull request controls package.json and could
+        # otherwise run code with the token (CodeRabbit, RoRadioResources#2). editorconfig-checker's npm wrapper
+        # would fetch its binary through the rate-limited API, so the binary comes from its release like the others.
         run: |
           set -euo pipefail
           python -m pip install --quiet -r scripts/ci/requirements.txt
-          npm ci --prefix scripts/ci --no-audit --no-fund
+          npm ci --prefix scripts/ci --ignore-scripts --no-audit --no-fund
           mkdir -p "$RUNNER_TEMP/bin"
           actionlint="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
           gitleaks="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
@@ -53,6 +54,9 @@ jobs:
             | tar -xz -C "$RUNNER_TEMP/bin" actionlint
           curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/$gitleaks" \
             | tar -xz -C "$RUNNER_TEMP/bin" gitleaks
+          checker="https://github.com/editorconfig-checker/editorconfig-checker/releases/download"
+          curl -fsSL "$checker/v${EDITORCONFIG_CHECKER_VERSION}/editorconfig-checker-linux-amd64.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP/bin" editorconfig-checker
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
 
       - name: Install PSScriptAnalyzer (pinned)

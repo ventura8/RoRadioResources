@@ -41,11 +41,24 @@ Describe 'RadioStationsData.json' {
         Get-Duplicate @($stations | ForEach-Object { $_.GUID.ToLowerInvariant() }) | Should -BeNullOrEmpty
     }
 
-    It 'gives every station a title and an http(s) url' {
+    It 'gives every station a title and an absolute http(s) url with a host and a valid port' {
+        # Parsed, not pattern-matched: "http://stream.example:abc/live" starts like a url and is none (CodeRabbit,
+        # RoRadioResources#2).
         $bad = @($stations | Where-Object {
-            [string]::IsNullOrWhiteSpace($_.Title) -or $_.Url -notmatch '^https?://\S+$'
+            $uri = $null
+            [string]::IsNullOrWhiteSpace($_.Title) -or $_.Url -match '\s' -or
+                -not [Uri]::TryCreate($_.Url, [UriKind]::Absolute, [ref]$uri) -or
+                $uri.Scheme -notin 'http', 'https' -or [string]::IsNullOrEmpty($uri.Host)
         } | ForEach-Object { "$($_.GUID): '$($_.Title)' '$($_.Url)'" })
         $bad | Should -BeNullOrEmpty
+    }
+
+    It 'refuses what only looks like a url (the check above, on known bad values)' {
+        foreach ($url in 'http://stream.example:abc/live', 'ftp://stream.example/live', 'stream.example/live', 'http:///live') {
+            $uri = $null
+            $valid = [Uri]::TryCreate($url, [UriKind]::Absolute, [ref]$uri) -and $uri.Scheme -in 'http', 'https' -and $uri.Host
+            $valid | Should -BeFalse -Because "'$url' is not a stream url"
+        }
     }
 
     It 'never gives two stations the same title (the apps and their UI tests find a station by it)' {

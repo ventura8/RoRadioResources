@@ -57,6 +57,12 @@ function Get-NodeTool([string]$Name) {
     $candidates | Select-Object -First 1
 }
 
+# A tool on PATH (the CI installs pinned release binaries there), else its npm wrapper from scripts/ci.
+function Get-Tool([string]$Name) {
+    $installed = Get-Command $Name -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($installed) { $installed.Source } else { Get-NodeTool $Name }
+}
+
 Push-Location $root
 try {
     Invoke-Check 'PSScriptAnalyzer' {
@@ -73,7 +79,7 @@ try {
     Invoke-Check 'zizmor (workflow security)' { & zizmor --persona regular --min-severity low .github/workflows | Out-Host }
     Invoke-Check 'markdownlint' { & (Get-NodeTool 'markdownlint-cli2') | Out-Host }
     Invoke-Check 'cspell' { & (Get-NodeTool 'cspell') --no-progress --config cspell.json '**' | Out-Host }
-    Invoke-Check 'editorconfig-checker' { & (Get-NodeTool 'editorconfig-checker') | Out-Host }
+    Invoke-Check 'editorconfig-checker' { & (Get-Tool 'editorconfig-checker') | Out-Host }
     Invoke-Check 'gitleaks (working tree)' { & gitleaks dir --redact --no-banner . | Out-Host }
     Invoke-Check 'gitleaks (history)' { & gitleaks git --redact --no-banner . | Out-Host }
     Invoke-Check 'inline suppression ban' {

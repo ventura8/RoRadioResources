@@ -109,25 +109,15 @@ $results = $stations | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
         [pscustomobject]@{ Code = '000'; ContentType = ''; Connect = 0; FirstByte = 0; Bytes = 0; Final = $current }
     }
 
-    # A playlist's text and the url it came from (relative entries resolve against that), redirects checked.
+    # A playlist's text and the url it came from (relative entries resolve against that): checked, pinned and
+    # capped like every download (Save-PublicFile); a playlist cut short or answered with an error has no text.
     function Get-Body([string]$Url) {
         $file = [IO.Path]::GetTempFileName()
         try {
-            $current = $Url
-            foreach ($hop in 0..5) {
-                $pin = Get-PinnedTarget $current
-                if ($null -eq $pin) { break }
-                $line = & $curl -s @pin -o $file --max-time $timeout --max-filesize 1048576 -A 'RoRadio-station-probe' -w '%{http_code}|%{redirect_url}' $current 2>$null
-                $parts = "$line".Split('|')
-                if ($parts[0] -notmatch '^3\d\d$' -or $parts.Count -lt 2 -or -not $parts[1]) {
-                    return [pscustomobject]@{ Body = [IO.File]::ReadAllText($file); Final = $current }
-                }
-                $current = $parts[1]
-            }
-
-            [pscustomobject]@{ Body = ''; Final = $current }
+            $final = Save-PublicFile $Url $file -TimeoutSeconds $timeout -MaxBytes 1MB
+            if ($final) { [pscustomobject]@{ Body = [IO.File]::ReadAllText($file); Final = $final } } else { [pscustomobject]@{ Body = ''; Final = $Url } }
         } finally {
-            Remove-Item $file -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
         }
     }
 

@@ -139,9 +139,14 @@ $results = foreach ($station in $missing) {
 
     $byUrl = Get-OptionalJson "https://de1.api.radio-browser.info/json/stations/byurl?url=$([Uri]::EscapeDataString($station.Url))"
     $byName = Get-OptionalJson "https://de1.api.radio-browser.info/json/stations/search?hidebroken=true&limit=50&name=$([Uri]::EscapeDataString($station.Title))"
+    # The same rule as Update-StationUrls.ps1: the exact name, Romanian or Moldovan, and a host carrying the name.
+    # The entry's hosts are read before the marks are walked: inside the inner block $_ is the mark (CodeRabbit,
+    # RoRadioResources#2 - reading $_.homepage there matched no by-name entry at all).
     $entries = @(@($byUrl) | Where-Object { $_ }) + @(@($byName) | Where-Object {
-        $_ -and (ConvertTo-PlainTitle $_.name) -eq $plainTitle -and $_.countrycode -in 'RO', 'MD' -and
-            ($marks | Where-Object { $mark = $_; @($_.homepage, $_.url_resolved) | Where-Object { $_ -and (Get-UrlHost $_).Replace('-', '').Contains($mark) } })
+        $entry = $_
+        $hosts = @($entry.homepage, $entry.url_resolved) | Where-Object { $_ } | ForEach-Object { (Get-UrlHost $_).Replace('-', '') }
+        $entry -and (ConvertTo-PlainTitle $entry.name) -eq $plainTitle -and $entry.countrycode -in 'RO', 'MD' -and
+            ($marks | Where-Object { $mark = $_; $hosts | Where-Object { $_.Contains($mark) } })
     })
     foreach ($entry in ($entries | Group-Object stationuuid | ForEach-Object { $_.Group[0] })) {
         if ($entry.favicon) { $candidates.Add((ConvertTo-Candidate -Url $entry.favicon -Source "radio-browser.info favicon ($($entry.name))" -Strong $true)) }
