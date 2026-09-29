@@ -1042,11 +1042,6 @@
         "Url": "http://live.radiogangsta.ro:8800/;"
       },
       {
-        "GUID": "8e1410a6-f235-4a20-919d-7b40e191e6a4",
-        "Title": "Radio Hit Fm",
-        "Url": "http://asculta.radiohitfm.ro:8340/;"
-      },
-      {
         "GUID": "97896ce6-4154-40ae-84bc-f114f060043f",
         "Title": "Radio Impact",
         "Url": "https://asculta.radioimpact.net:8108/stream"
@@ -1087,11 +1082,6 @@
         "Url": "https://asculta.radiodinamic.ro:8030/stream"
       },
       {
-        "GUID": "aae9807e-b93d-4fb9-9564-9706f0f89c57",
-        "Title": "Radio Funky",
-        "Url": "http://popular.radiofunky.ro:8888/;"
-      },
-      {
         "GUID": "aa2a1130-36f5-4dcd-9855-f629e71b0cef",
         "Title": "Radio Taraf",
         "Url": "http://asculta.radiotaraf.ro:7100/;",
@@ -1130,11 +1120,6 @@
         "Title": "Dark Edge Radio",
         "Url": "http://stream.darkedge.ro:8000/",
         "ImageUrl": "dark-edge-radio.jpg"
-      },
-      {
-        "GUID": "646765ae-1eab-468e-831c-c49d86a21a26",
-        "Title": "Gherla FM",
-        "Url": "http://89.39.189.70:8000/"
       },
       {
         "GUID": "66837e1e-413b-486a-aef5-b895379d5c22",
@@ -1344,11 +1329,6 @@
         "GUID": "aaac8821-bcc2-45ca-aaf8-878e778165df",
         "Title": "Radio SunLove",
         "Url": "http://live.radiosun.ro/sunlove"
-      },
-      {
-        "GUID": "8fd99b56-080c-4cb9-9e6a-eda8b09a031d",
-        "Title": "Radio Taraf",
-        "Url": "http://live.radiotaraf.ro:8181/;"
       },
       {
         "GUID": "3425fbb3-e430-4744-ac67-88a92c030200",
