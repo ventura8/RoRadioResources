@@ -6,7 +6,7 @@
         "GUID": "55c502e9-f2cc-451e-b0bd-93cce55e0288",
         "Title": "Radio Zu",
         "Url": "https://ivm.antenaplay.ro/liveaudio/radiozu/playlist.m3u8",
-        "ImageUrl": "Radiozu.png",
+        "ImageUrl": "RadioZu.png",
         "Description": "Hiturile se ascultă la Zu"
       },
       {
@@ -169,13 +169,13 @@
         "GUID": "94a6e00f-88b2-4594-98d4-80c53f371e3e",
         "Title": "Radio Băilesti",
         "Url": "https://asculta.radiobailesti.ro/bailestifm",
-        "ImageUrl": "RadioBailesti.png"
+        "ImageUrl": "radioBailesti.png"
       },
       {
         "GUID": "95dbe3ee-1714-4419-99e6-eb4f574db1a3",
         "Title": "Radio Fix",
         "Url": "http://89.137.76.149:8000/stream",
-        "ImageUrl": "RadioFix.jpg"
+        "ImageUrl": "radiofix.jpg"
       },
       {
         "GUID": "1723f3cb-0ee6-46a4-ac14-a06d302a5af5",
