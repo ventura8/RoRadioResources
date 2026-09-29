@@ -1,0 +1,13 @@
+{
+  "Exclude": [
+    "scripts/ci/node_modules/",
+    "package-lock\\.json$",
+    "\\.png$",
+    "\\.jpe?g$",
+    "\\.git/"
+  ],
+  "Disable": {
+    "MaxLineLength": true,
+    "IndentSize": true
+  }
+}

@@ -8,7 +8,13 @@ The station list of [RoRadio](https://github.com/ventura8/RoRadio), in one place
 | `RadioLogos/` | The station logos, one file per `ImageUrl` (the name exactly, case included: Pages is case-sensitive). PNG preferred, at most 400 px on the longest side, a few tens of KB. |
 | `scripts/Test-StationStreams.ps1` | Probes the streams and says which are `alive`, `dead`, `http-NNN` or `no-audio`. |
 | `scripts/Update-StationUrls.ps1` | Finds a verified current url for every broken station and writes it into the list. |
-| `.github/workflows/refresh-stations.yml` | Runs the refresh every Monday, opens a pull request with the report and merges it. |
+| `scripts/Update-StationLogos.ps1` | Finds a logo for every station without one, checks it and adds it to `RadioLogos/` and the list. |
+| `scripts/New-RefreshNote.ps1` | Writes a weekly refresh's release note from the two reports. |
+| `scripts/lib/` | What the scripts share: checked and pinned requests (`Net.ps1`), name matching (`Names.ps1`), the logo check (`normalize_logo.py`, Pillow). |
+| `docs/releases/` | One release note per change to the list: what changed, where each url or logo was found, the logos themselves. |
+| `tests/` | The list's integrity and the scripts' helpers (Pester), the logo check (Python `unittest`). |
+| `.github/workflows/ci.yml` | Every linter and every test on each pull request and push to `master`. |
+| `.github/workflows/refresh-stations.yml` | Runs the refresh every Monday, opens a pull request with the release note and merges it. |
 
 ## Who reads the list
 
@@ -27,7 +33,11 @@ The station list of [RoRadio](https://github.com/ventura8/RoRadio), in one place
 ## Rules for editing the list
 
 - A station's `GUID` never changes: listeners' favorites refer to it. Fix a station by changing its `Url`.
+- GUIDs, titles and urls are unique, and no url contains another one (`tests/Catalogue.Tests.ps1` fails otherwise;
+  the apps find a station by its title and favor one entry per stream).
 - Never write a url that `Test-StationStreams.ps1` has not reported `alive`.
+- Every change to the list gets a release note in `docs/releases/` (`<date>-<subject>.md`): what changed and why,
+  where each url or logo was found, with the logos shown. The pull request's body is the same text.
 - A station with no working stream anywhere is not deleted automatically: removing it drops it from listeners'
   favorites, so that is the owner's decision.
 - Keep the encoding (UTF-8 with BOM) and the line endings, so a fix is a one-line diff.
@@ -39,9 +49,32 @@ The station list of [RoRadio](https://github.com/ventura8/RoRadio), in one place
 ./scripts/Test-StationStreams.ps1 -Title 'Europa FM', 'Radio Zu'
 ./scripts/Update-StationUrls.ps1 -WhatIf        # report only
 ./scripts/Update-StationUrls.ps1 -ReportPath report.md
+./scripts/Update-StationLogos.ps1 -WhatIf -ReportPath logos.md
 ```
 
-Both need PowerShell 7 and curl.
+They need PowerShell 7 and curl; the logo script also Python 3 with Pillow (`python -m pip install -r scripts/ci/requirements.txt`).
+
+## Checks (CI and local)
+
+`.github/workflows/ci.yml` runs on every pull request and every push to `master`, through the same two scripts a
+developer runs:
+
+```powershell
+./scripts/ci/Invoke-Lint.ps1    # every linter at its strictest, no inline suppressions
+./scripts/ci/Invoke-Tests.ps1   # the list's integrity, the helpers, the logo check
+```
+
+The linters are PSScriptAnalyzer (every rule, every severity), ruff (every rule, lint and format), yamllint
+(strict), actionlint, zizmor, markdownlint, cspell, editorconfig-checker and gitleaks (working tree and history).
+A finding is fixed in the file; a comment or attribute that silences a linter fails the run. Two paths are left
+out of spelling on purpose: `RadioStationsData.json` and `docs/releases/` are station names, not English.
+
+One-time setup: `python -m pip install -r scripts/ci/requirements.txt`, `npm ci --prefix scripts/ci`,
+`Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser`,
+`Install-Module Pester -RequiredVersion 6.2.0 -Scope CurrentUser -SkipPublisherCheck`, and actionlint and
+gitleaks (`winget install rhysd.actionlint Gitleaks.Gitleaks`). Dependabot proposes updates to the pinned
+versions. A pull request the weekly workflow opens starts no CI (GitHub's rule for its own token), so the workflow
+runs the tests itself before it commits.
 
 What the manual revival of 2026-09-29 (137 failing stations, two rounds) taught, beyond what the scripts do:
 
@@ -83,8 +116,21 @@ What the manual revival of 2026-09-29 (137 failing stations, two rounds) taught,
    2026-09-29, got HTTP 404 from Europa FM, which plays fine in Romania). Those stations are listed under "Needs
    review from Romania" with the candidate it found; check them with
    `./scripts/Update-StationUrls.ps1 -Title '<station>'` from here.
-4. Commits the changed urls to `automation/station-refresh`, opens (or updates) a pull request whose body is the
-   report, squash-merges it, and asks Pages to rebuild.
+4. Finds a logo for each station without one (`Update-StationLogos.ps1`), when the repository variable
+   `REFRESH_LOGOS` is `true`: from radio-browser.info (the entry with the station's stream, or its name in Romania
+   or Moldova with the station's name in its host), the icons its homepage declares, and myradioonline.ro (only
+   when that page plays from the station's own host; otherwise a suggestion). A logo must be an image of at least
+   128 px, logo-shaped and not blank; the same image for several stations is a placeholder and is not used. It is
+   written as `<slug>.png`, at most 400 px. An existing logo is never replaced or renamed by the workflow.
+5. Runs the tests (`scripts/ci/Invoke-Tests.ps1`), writes the release note `docs/releases/<date>-refresh.md`,
+   commits the list, the logos and the note to `automation/station-refresh`, opens (or updates) a pull request
+   whose body is the note (logos shown from that commit), squash-merges it, and asks Pages to rebuild.
 
-It does **not** merge when more than 15 urls changed at once: a wave of that size is more likely the runner's
-network than fifteen stations moving in one week. That pull request stays open for someone to check from Romania.
+It does **not** merge when more than 15 urls or 20 logos changed at once: a wave of urls that size is more likely
+the runner's network than fifteen stations moving in one week, and that many logos is worth a look first. That
+pull request stays open for someone to check.
+
+**`REFRESH_LOGOS` stays unset until the app releases that load logos from Pages are out** (RoRadio after 2.0.1 on
+Windows, after 1.6.x on Xbox). The released apps look for a logo only in their own package: a station that gets a
+new logo file shows an empty tile there instead of the default icon. Once those releases have reached listeners,
+set it under Settings > Secrets and variables > Actions > Variables.

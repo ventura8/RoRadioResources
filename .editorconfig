@@ -1,0 +1,22 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{yml,yaml,json,jsonc}]
+indent_size = 2
+
+[*.md]
+indent_size = 2
+
+# The station list keeps the format it has had since 2018 (UTF-8 with a byte order mark), so a url fix is one line.
+[RadioStationsData.json]
+charset = utf-8-bom
+
+[*.{ps1,psd1}]
+charset = utf-8-bom

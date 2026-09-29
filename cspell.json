@@ -1,0 +1,23 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "dictionaries": ["en_US", "companies", "softwareTerms", "powershell", "python", "npm", "roradio"],
+  "dictionaryDefinitions": [{ "name": "roradio", "path": "./scripts/ci/words.txt", "addWords": true }],
+  "useGitignore": true,
+  "ignorePaths": [
+    "RadioStationsData.json",
+    "docs/releases/**",
+    "RadioLogos/**",
+    "index.html",
+    "**/node_modules/**",
+    "**/package-lock.json",
+    "scripts/ci/words.txt",
+    ".git/**"
+  ],
+  "ignoreRegExpList": [
+    "/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi",
+    "/[0-9a-f]{40}/g",
+    "/https?:\\/\\/[^\\s\"'<>)]+/g",
+    "/`[^`\\n]+`/g"
+  ]
+}

@@ -1,0 +1,14 @@
+# Every ruff rule, the strictest setting; only the rules that contradict another enabled rule or the formatter are
+# left out (ruff names these pairs itself): D203/D211 and D212/D213 pick one docstring layout each, and COM812/ISC001
+# fight `ruff format`.
+line-length = 120
+target-version = "py312"
+
+[lint]
+select = ["ALL"]
+ignore = ["D203", "D213", "COM812", "ISC001"]
+
+[lint.per-file-ignores]
+# The tests are unittest tests (the standard library, nothing to install): they use its assert methods, which
+# ruff's pytest-style rules would turn into bare asserts, and those in turn break S101.
+"tests/*.py" = ["PT009", "PT027"]

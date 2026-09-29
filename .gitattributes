@@ -1,0 +1,7 @@
+# LF in every checkout, Windows included (.editorconfig checks it): the weekly refresh edits the station list on
+# Linux, and a CRLF copy on a Windows machine turned every line of a hand fix into a diff.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary

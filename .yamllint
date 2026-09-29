@@ -1,0 +1,16 @@
+extends: default
+
+ignore: |
+  scripts/ci/node_modules
+
+rules:
+  line-length:
+    # Pinned `uses: owner/action@sha  # vX.Y.Z` lines run past 120 characters and cannot be wrapped without losing
+    # the pin; anything longer than 140 is still reported (and --strict makes a warning fail).
+    max: 140
+  truthy:
+    # GitHub Actions uses the bare `on:` key.
+    check-keys: false
+  document-start: disable
+  comments:
+    min-spaces-from-content: 1
