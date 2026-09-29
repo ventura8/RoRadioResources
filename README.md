@@ -37,15 +37,37 @@ The station list of [RoRadio](https://github.com/ventura8/RoRadio), in one place
 
 Both need PowerShell 7 and curl.
 
+What the manual revival of 2026-09-29 (137 failing stations, two rounds) taught, beyond what the scripts do:
+
+- Old Shoutcast 1 servers answer `ICY 200 OK`; current curl reads that only with `--http0.9`. The probe retries
+  that way since then - before, Pure Jazz Radio, Radio SasNet, Europa FM's old mount and the Radio Caprice
+  channels were reported dead while they played.
+- Where streams were found: the broadcaster's own player page (most), myradioonline.ro, the Shoutcast directory
+  (`POST https://directory.shoutcast.com/Search/UpdateSearch`, then `yp.shoutcast.com/sbin/tunein-station.pls?id=`),
+  the old server's status page (Radio Transilvania moved every town to `stream2.radiotransilvania.ro`), radio.garden
+  (needs a browser User-Agent, `Accept: application/json` and its Referer), the TuneIn OPML API
+  (`opml.radiotime.com/Search.ashx`, `Tune.ashx?id=`), Zeno's per-station API (`zeno.fm/api/stations/<slug>/`,
+  field `streamURL`) and the Wayback Machine for a dead site's player config (https only; http is rate-limited).
+  fmstream.org answers 429 after about five quick queries.
+- A logo, a frequency, a town or the `icy-name` header ties a stream to the station; a name alone does not.
+- About a third of the long-dead stations are gone for good (domain expired, 410 Gone, taken over by another
+  station): those stay for the owner to remove, never deleted by a script.
+
 ## The weekly refresh
 
 `refresh-stations.yml` (Mondays 04:17 UTC, or **Run workflow** by hand):
 
 1. Probes every station, and the failures again a minute later, so a blip is not taken for a move.
-2. For each station that failed twice, collects candidates from its page on
-   [myradioonline.ro](https://myradioonline.ro/) and from radio-browser.info (same name, Romanian or Moldovan,
-   homepage or stream host carrying the station's name), probes them, and takes the first one that is alive.
-   A station without one keeps its url and is listed as unresolved.
+2. For each station that failed twice, collects candidates and probes them:
+   - **strong** (the first live one replaces the url): its page on [myradioonline.ro](https://myradioonline.ro/);
+     radio-browser.info (same name, Romanian or Moldovan, homepage or stream host carrying the station's name);
+     the old server's own status page (Icecast `status-json.xsl`, Shoutcast `statistics?json=1`, on the old port
+     and on 8000), mounts carrying the station's name - a station that moved its mount on the same server;
+   - **weak** (a live one is only suggested, under "Needs review"): the Shoutcast directory (entries whose name
+     contains the title; most Romanian manele web radios are listed only there) and radio.net (the exact name, in
+     Romania or Moldova). A name is not proof: round one found same-name stations in Spain, Switzerland, a game.
+
+   A station without a candidate keeps its url and is listed as unresolved.
 3. Replaces only streams that are **dead** (no connection at all). The runners are in the United States: an HTTP
    error or a non-audio answer from there can be Romanian geo-blocking, not a moved stream (the first run, on
    2026-09-29, got HTTP 404 from Europa FM, which plays fine in Romania). Those stations are listed under "Needs

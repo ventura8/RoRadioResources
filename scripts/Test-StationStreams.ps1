@@ -9,7 +9,9 @@
     Used by RoRadio's fix-failing-stations skill and by Update-StationUrls.ps1 (the weekly refresh workflow).
 
     Uses curl, not HttpClient: many Romanian stations still run Shoutcast servers that answer "ICY 200 OK"
-    instead of an HTTP status line, which HttpClient rejects and curl accepts. An HLS playlist (.m3u8) is
+    instead of an HTTP status line, which HttpClient rejects. Current curl rejects it too unless asked for
+    HTTP/0.9, so a server that sent nothing to the plain request is asked again that way and its ICY status
+    line is read from the body (Invoke-IcyProbe; the app itself plays these streams). An HLS playlist (.m3u8) is
     followed to its first variant and first segment, because a playlist that answers says nothing about
     whether the audio behind it does.
 
@@ -97,8 +99,48 @@ $results = $stations | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
         & $curl -s -L --max-time $timeout -A 'RoRadio-station-probe' $Url 2>$null | Out-String
     }
 
+    # Shoutcast 1 servers answer "ICY 200 OK" instead of an HTTP status line. curl 7.66 and later read that only
+    # as HTTP/0.9 when --http0.9 is given, and even then report no status and no content type: the plain probe
+    # sees nothing and would call a playing station dead (Pure Jazz Radio, Dip Music, 2026-09-29). Such a server
+    # is asked again that way, for a few seconds (it ignores the byte range and streams on), and the ICY status
+    # line and headers are read from the start of what it sent.
+    function Invoke-IcyProbe([string]$Url) {
+        $file = [IO.Path]::GetTempFileName()
+        try {
+            $null = & $curl -s --http0.9 -o $file --max-time ([Math]::Min($timeout, 6)) -A 'RoRadio-station-probe' $Url 2>$null
+            $length = (Get-Item $file).Length
+            if ($length -eq 0) { return $null }
+            $stream = [IO.File]::OpenRead($file)
+            try {
+                $head = [byte[]]::new([Math]::Min($length, 4096))
+                $null = $stream.Read($head, 0, $head.Length)
+            } finally {
+                $stream.Dispose()
+            }
+
+            $text = [Text.Encoding]::ASCII.GetString($head)
+            if ($text -notmatch '^ICY (\d{3})') { return $null }
+            $code = $Matches[1]
+            $end = $text.IndexOf("`r`n`r`n", [StringComparison]::Ordinal)
+            $headers = if ($end -ge 0) { $text.Substring(0, $end) } else { $text }
+            [pscustomobject]@{
+                Code        = $code
+                ContentType = if ($headers -match '(?im)^content-type:\s*(\S+)') { $Matches[1] } else { 'audio/mpeg' }
+                Connect     = 0
+                FirstByte   = 0
+                Bytes       = if ($end -ge 0) { $length - $end - 4 } else { 0 }
+            }
+        } finally {
+            Remove-Item $file -ErrorAction SilentlyContinue
+        }
+    }
+
     $station = $_
     $probe = Invoke-Probe $station.Url
+    if ($probe.Code -in '000', '' -and $probe.Bytes -eq 0 -and ($icy = Invoke-IcyProbe $station.Url)) {
+        $probe = $icy
+    }
+
     $checked = $station.Url
 
     # An HLS playlist answering proves little: follow it to the first variant and the first segment.
