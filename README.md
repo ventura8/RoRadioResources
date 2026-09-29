@@ -48,7 +48,11 @@ What the manual revival of 2026-09-29 (137 failing stations, two rounds) taught,
   (needs a browser User-Agent, `Accept: application/json` and its Referer), the TuneIn OPML API
   (`opml.radiotime.com/Search.ashx`, `Tune.ashx?id=`), Zeno's per-station API (`zeno.fm/api/stations/<slug>/`,
   field `streamURL`) and the Wayback Machine for a dead site's player config (https only; http is rate-limited).
-  fmstream.org answers 429 after about five quick queries.
+  A bare-IP url names nobody: the Wayback index of that `host:port` (`web.archive.org/cdx/search/cdx?url=<ip:port>*`)
+  usually has the old Shoutcast status page, which does (Radio RVE was RVE Suceava). The m3u playlists in
+  `junguler/m3u-radio-music-playlists` on GitHub name old IP urls too; liveradious.com carries `data-stream-url`;
+  an empty `streams` list from instant.audio (`api.instant.audio/data/streams/82/<slug>`) is a quick sign a station
+  is gone. fmstream.org answers 429 after about five quick queries.
 - A logo, a frequency, a town or the `icy-name` header ties a stream to the station; a name alone does not.
 - About a third of the long-dead stations are gone for good (domain expired, 410 Gone, taken over by another
   station): those stay for the owner to remove, never deleted by a script.
