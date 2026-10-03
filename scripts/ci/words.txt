@@ -3,7 +3,9 @@ Amma
 colours
 Constan
 countrycode
+favourites
 fmstream
+gamertag
 getchannel
 getcolors
 getextrema
@@ -23,6 +25,7 @@ muzica
 myradioonline
 playables
 pscustomobject
+Qwant
 radioaquila
 radioaquilaonline
 radionoise
@@ -40,6 +43,7 @@ starttransfer
 stationuuid
 streampath
 Suceava
+synchronisation
 Timişoara
 Timișoara
 Transilvania

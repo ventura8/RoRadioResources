@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RoRadio privacy policy</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      margin: 0 auto;
+      padding: 24px 16px 64px;
+      max-width: 44rem;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      line-height: 1.6;
+    }
+    h1 { margin-bottom: 0.2em; }
+    .updated { color: GrayText; margin-top: 0; }
+    h2 { margin-top: 2em; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid GrayText; padding: 6px 8px; text-align: left; vertical-align: top; }
+    code { font-family: Consolas, "Cascadia Mono", monospace; }
+    .note { border-left: 4px solid Highlight; padding: 8px 12px; background: rgb(128 128 128 / 12%); }
+  </style>
+</head>
+
+<body>
+  <h1>RoRadio privacy policy</h1>
+  <p class="updated">Last updated 3 October 2026. Applies to RoRadio for Windows (2.x) and RoRadio for Xbox and
+    Windows 10 (1.x), published in the Microsoft Store.</p>
+
+  <p>RoRadio plays public internet radio streams. It has no account of its own, shows no advertising and contains no
+    third-party advertising or tracking SDKs. This policy says exactly what leaves your device, why, and how to turn
+    it off.</p>
+  <p>Like any internet radio, playing a station connects your device to that station's own server (and, for the
+    station list and logos, to GitHub Pages): those servers see your IP address and the station you asked for, under
+    their own policies. Casting to a TV or speaker on your home network sends the station's address and title to that
+    device only.</p>
+
+  <h2>What RoRadio never collects</h2>
+  <ul>
+    <li>Your name, e-mail address, gamertag, machine name or Windows user name, and your Microsoft account details
+      (cloud sync, below, reads your account identifier on your device and stores only a one-way hash of it).</li>
+    <li>Your location.</li>
+    <li>Your IP address as part of diagnostics (the diagnostics service is configured with personally identifiable
+      information disabled).</li>
+    <li>What you type: search text is never sent, only how many characters it had and how many results it found.</li>
+    <li>The names and addresses of stations <em>you</em> added — unless you turn that on yourself (see
+      <a href="#your-stations">Stations you add</a>).</li>
+  </ul>
+
+  <h2>Diagnostics (on by default, can be turned off)</h2>
+  <p>To find crashes and stations that stopped working, RoRadio sends technical reports to
+    <strong>Sentry</strong> (Functional Software, Inc., trading as Sentry), which processes them on RoRadio's behalf.
+    Transmission is over HTTPS. Each report carries:</p>
+  <table>
+    <tr>
+      <th>Data</th>
+      <th>Why</th>
+    </tr>
+    <tr>
+      <td>A random installation identifier (a GUID created on first run, stored on your device)</td>
+      <td>To tell "one listener hit this 50 times" from "50 listeners hit this once", and to count how many
+        installations run without a crash</td>
+    </tr>
+    <tr>
+      <td>App version and package architecture; Windows version, device family (desktop or Xbox) and device model</td>
+      <td>To know which release and which systems a fault affects</td>
+    </tr>
+    <tr>
+      <td>Error type, message and stack trace when something fails</td>
+      <td>To fix the defect</td>
+    </tr>
+    <tr>
+      <td>Playback quality: the station's identifier and stream format, whether playback started, how long it took to
+        start, why it failed, how long you listened</td>
+      <td>To repair or remove stations whose streams no longer work, and to keep start-up fast</td>
+    </tr>
+    <tr>
+      <td>Feature use: which pages are opened, whether favourites, search, the language picker and the controller are
+        used (as counts, never as content)</td>
+      <td>To decide what to improve and what to retire</td>
+    </tr>
+  </table>
+  <p>The installation identifier does not name you, but it does single out a device, so this policy treats it as
+    personal data. The lawful basis is our legitimate interest in a working, secure app; you can object at any time by
+    switching diagnostics off.</p>
+  <p class="note"><strong>How to turn it off:</strong> Settings &rsaquo; <em>Send anonymous diagnostics</em>. With it
+    off, RoRadio starts no diagnostics session at all — nothing is queued, buffered or sent, including crash reports —
+    and switching it off ends the session already running.</p>
+
+  <h2 id="your-stations">Stations you add</h2>
+  <p>A station you add yourself can be a private or personal address, so its details stay on your device. Playback
+    quality for it is counted anonymously (the app records only that the station was one of your own, with no name,
+    address or description).</p>
+  <p>If you would like broken streams among your own stations to be diagnosed, Settings &rsaquo; <em>Include my
+      stations' details</em> (off by default) adds their name and address to those reports. Turning it back off stops
+    it immediately.</p>
+
+  <h2>Album art and song titles</h2>
+  <p>While a station plays, it broadcasts the current song's title. To show cover art, RoRadio looks that title up —
+    first in its own cache (MongoDB Atlas), then at Qwant and Google Programmable Search. Those services receive the
+    song title and the usual technical data of a web request, such as your IP address, under their own privacy
+    policies; they do not receive your installation identifier. Song titles are not attached to diagnostics.</p>
+
+  <h2>Cloud sync (off until you sign in)</h2>
+  <p>If you turn on user data synchronisation, RoRadio signs you in with the Microsoft account already on your device
+    and stores your favourites, your added stations and your settings in MongoDB Atlas so another device can restore
+    them. The stored record is keyed by a one-way hash of your account identifier: RoRadio does not store your
+    account name, e-mail address or any token. Turn the setting off to stop syncing; what was already stored stays
+    in Atlas until you ask for it to be deleted at the contact address below.</p>
+
+  <h2>Storage on your device</h2>
+  <p>Favourites, added stations and settings are kept in the app's own storage (on versions of Windows that still
+    roam app data, also in your roaming profile; Windows 11 no longer roams it), not on our servers, unless you turn on
+    cloud sync. Uninstalling RoRadio removes them.</p>
+
+  <h2>Children</h2>
+  <p>RoRadio is a general-audience app and does not knowingly collect data from children.</p>
+
+  <h2>Retention and your rights</h2>
+  <p>Diagnostics are kept for as long as Sentry's plan retains them (a matter of weeks to months) and then deleted
+    automatically. Switching <em>Send anonymous diagnostics</em> off is the immediate way to object: the app sends
+    no new reports from that moment, and what was already sent is deleted on that schedule. You may also ask for
+    access, deletion or restriction by writing to the contact address below. The reports carry only a random
+    installation identifier, which the app does not show, so we cannot always tell your reports from other people's;
+    with the app version and roughly when you used it we will look, and where we cannot isolate your reports we can
+    delete the whole group of reports they belong to. You can complain to your national data-protection authority as
+    well.</p>
+
+  <h2>Changes</h2>
+  <p>This page is the current policy; the date at the top says when it last changed. A change that widens what is
+    collected will be announced in the release notes of the version that introduces it.</p>
+
+  <h2>Contact</h2>
+  <p>RoRadio is published by <strong>77bits</strong>. Privacy enquiries: <a
+      href="mailto:alexandrescu.sergiu@gmail.com">alexandrescu.sergiu@gmail.com</a>.</p>
+</body>
+
+</html>
