@@ -32,10 +32,15 @@
   <p>RoRadio plays public internet radio streams. It has no account of its own, shows no advertising and contains no
     third-party advertising or tracking SDKs. This policy says exactly what leaves your device, why, and how to turn
     it off.</p>
+  <p>Like any internet radio, playing a station connects your device to that station's own server (and, for the
+    station list and logos, to GitHub Pages): those servers see your IP address and the station you asked for, under
+    their own policies. Casting to a TV or speaker on your home network sends the station's address and title to that
+    device only.</p>
 
   <h2>What RoRadio never collects</h2>
   <ul>
-    <li>Your name, e-mail address, Microsoft account details, gamertag, machine name or Windows user name.</li>
+    <li>Your name, e-mail address, gamertag, machine name or Windows user name, and your Microsoft account details
+      (cloud sync, below, reads your account identifier on your device and stores only a one-way hash of it).</li>
     <li>Your location.</li>
     <li>Your IP address as part of diagnostics (the diagnostics service is configured with personally identifiable
       information disabled).</li>
@@ -102,7 +107,8 @@
   <p>If you turn on user data synchronisation, RoRadio signs you in with the Microsoft account already on your device
     and stores your favourites, your added stations and your settings in MongoDB Atlas so another device can restore
     them. The stored record is keyed by a one-way hash of your account identifier: RoRadio does not store your
-    account name, e-mail address or any token. Turn the setting off to stop syncing.</p>
+    account name, e-mail address or any token. Turn the setting off to stop syncing; what was already stored stays
+    in Atlas until you ask for it to be deleted at the contact address below.</p>
 
   <h2>Storage on your device</h2>
   <p>Favourites, added stations and settings are kept in the app's own storage (on versions of Windows that still
