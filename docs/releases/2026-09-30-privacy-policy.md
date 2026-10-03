@@ -26,6 +26,6 @@ The page promises nothing the apps do not ship: it describes those two settings 
 
 ## Owner actions
 
-1. Done 2026-10-02: the contact is alexandrescu.sergiu@gmail.com, the owner's choice.
+1. Done 2026-10-02: the contact is <mailto:alexandrescu.sergiu@gmail.com>, the owner's choice.
 2. Paste `https://ventura8.github.io/RoRadioResources/privacy.html` into Partner Center > Properties > Privacy
    policy URL for the RoRadio product.
