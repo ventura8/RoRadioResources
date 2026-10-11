@@ -25,6 +25,8 @@ maxcolors
 mpegurl
 muzica
 myradioonline
+opset
+opsetid
 playables
 pscustomobject
 Qwant
