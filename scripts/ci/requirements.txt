@@ -1,4 +1,6 @@
 # Python tools of the CI and of the weekly refresh, pinned; Dependabot proposes updates.
+numpy==2.5.4
+onnx==1.23.2
 pillow==12.3.0
 ruff==0.16.9
 yamllint==1.38.0

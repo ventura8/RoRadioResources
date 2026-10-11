@@ -26,7 +26,7 @@
 
 <body>
   <h1>RoRadio privacy policy</h1>
-  <p class="updated">Last updated 3 October 2026. Applies to RoRadio for Windows (2.x) and RoRadio for Xbox and
+  <p class="updated">Last updated 11 October 2026. Applies to RoRadio for Windows (2.x) and RoRadio for Xbox and
     Windows 10 (1.x), published in the Microsoft Store.</p>
 
   <p>RoRadio plays public internet radio streams. It has no account of its own, shows no advertising and contains no
@@ -109,6 +109,18 @@
     them. The stored record is keyed by a one-way hash of your account identifier: RoRadio does not store your
     account name, e-mail address or any token. Turn the setting off to stop syncing; what was already stored stays
     in Atlas until you ask for it to be deleted at the contact address below.</p>
+
+  <h2>Live captions (2.x, experimental, off until you turn them on)</h2>
+  <p>Captions are made on your PC by a speech model running on its graphics card or processor. The station's audio
+    and the recognised text never leave the device and are not stored: they are not sent to us, to the model's
+    publisher or to diagnostics. While captions are on, the app opens a second connection to the station you are
+    playing, so its server sees one more connection from your IP address.</p>
+  <p>The first time you turn captions on, RoRadio asks before downloading the model you chose (several hundred
+    megabytes to a few gigabytes) from Hugging Face, GitHub and this site. Those hosts see your IP address and which
+    file was requested, under their own policies; the download carries no installation identifier. The model stays
+    on your device until you remove it in Settings &rsaquo; Downloaded caption models &rsaquo; Delete, or uninstall
+    RoRadio. Diagnostics may count how captions are used (which model, whether it ran on the graphics card, how long
+    recognition took), never what was said.</p>
 
   <h2>Storage on your device</h2>
   <p>Favourites, added stations and settings are kept in the app's own storage (on versions of Windows that still

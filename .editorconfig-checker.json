@@ -4,6 +4,7 @@
     "package-lock\\.json$",
     "\\.png$",
     "\\.jpe?g$",
+    "\\.onnx$",
     "\\.git/"
   ],
   "Disable": {

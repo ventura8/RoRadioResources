@@ -1,4 +1,5 @@
 Alexandrescu
+allowzero
 Amma
 colours
 Constan
@@ -11,6 +12,7 @@ getcolors
 getextrema
 icecast
 icestats
+istupakov
 itemprop
 kolozsvari
 Kolozsvári
@@ -23,6 +25,8 @@ maxcolors
 mpegurl
 muzica
 myradioonline
+opset
+opsetid
 playables
 pscustomobject
 Qwant
@@ -30,6 +34,7 @@ radioaquila
 radioaquilaonline
 radionoise
 Rádió
+recognised
 Referer
 rhysd
 romanfm
