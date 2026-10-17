@@ -653,12 +653,6 @@
         "ImageUrl": "radio-liberty-popular.png"
       },
       {
-        "GUID": "80644d61-f94c-4a61-a21f-33b026b3124f",
-        "Title": "Radio Luceafar",
-        "Url": "http://live.radioluceafar.com:8000/;",
-        "ImageUrl": "radio-luceafar.png"
-      },
-      {
         "GUID": "1f51d395-0ad4-4614-919a-b482d474de26",
         "Title": "Radio Petrecaretzu",
         "Url": "http://radiopetrecaretzu.zapto.org:8383/",
