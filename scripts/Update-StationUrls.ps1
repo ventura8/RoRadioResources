@@ -274,7 +274,10 @@ function Format-Source([string]$Source) {
     if ($Source -match '^myradioonline\.ro/\S+$') { return "[$Source](https://$Source)" }
     if ($Source -match '^radio-browser\.info \((https?://[^)]+)\)$') { return "radio-browser.info ([$($Matches[1])]($($Matches[1])))" }
     if ($Source -match '^radio\.net \(([^)]+)\)$') { return "[radio.net ($($Matches[1]))](https://www.radio.net/s/$($Matches[1]))" }
-    $Source
+    if ($Source -match '^(same server, (?:Icecast|Shoutcast) status) \((https?://[^)]+)\)$') { return "$($Matches[1]) ([$($Matches[2])]($($Matches[2])))" }
+    # Anything else (a directory entry's own name) is quoted: a name ending in a "www." address was a bare url,
+    # which markdownlint (MD034) refuses, and the 2026-10-19 note turned the repository's lint red.
+    '`' + $Source.Replace('`', "'") + '`'
 }
 
 $lines = [Collections.Generic.List[string]]::new()
