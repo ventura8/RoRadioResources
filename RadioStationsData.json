@@ -625,7 +625,7 @@
       {
         "GUID": "0786222a-a52d-4fd8-a6de-1e751ac1cb86",
         "Title": "Radio Etno Mania",
-        "Url": "https://live.radioetnomania.com:9300/stream",
+        "Url": "http://live.radioetnomania.com:9300/stream",
         "ImageUrl": "radio-etno-mania.png"
       },
       {
@@ -1040,7 +1040,7 @@
       {
         "GUID": "0d2953f4-20d7-462d-b604-5ce3b01cc878",
         "Title": "Fun fm",
-        "Url": "https://online.funfm.ro:8001/funfm.mp3",
+        "Url": "http://online.funfm.ro:8000/funfm.mp3",
         "ImageUrl": "fun-fm.png"
       },
       {
