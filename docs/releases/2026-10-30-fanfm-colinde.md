@@ -1,8 +1,9 @@
 # Radio FanFM-RO Colinde, 2026-10-30
 
 A new station in the list, asked for by the owner: Radio FanFM-RO's Christmas carols channel, next to Radio FanFM-RO
-in Party. Every RoRadio app downloads the list from GitHub Pages, so it reaches listeners without an app update; the
-logo comes from Pages too until the apps bundle it.
+in Party. Every RoRadio app downloads the list from GitHub Pages, so it reaches listeners without an app update. The
+current apps load its logo from Pages until they bundle it; apps 2.0.1 and 1.6.x only know their bundled logos and
+show this station without one until they update.
 
 | Station | Category | Url | Logo |
 | :--- | :--- | :--- | :--- |
