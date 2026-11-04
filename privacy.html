@@ -26,8 +26,9 @@
 
 <body>
   <h1>RoRadio privacy policy</h1>
-  <p class="updated">Last updated 31 October 2026. Applies to RoRadio for Windows (2.x) and RoRadio for Xbox and
-    Windows 10 (1.x), published in the Microsoft Store.</p>
+  <p class="updated">Last updated 4 November 2026. Applies to RoRadio for Windows (2.x) and RoRadio for Xbox and
+    Windows 10 (1.x) in the Microsoft Store, RoRadio for Android on Google Play, and RoRadio for Linux in the Snap
+    Store and as a package.</p>
 
   <p>RoRadio plays public internet radio streams. It has no account of its own, shows no advertising and contains no
     third-party advertising or tracking SDKs. This policy says exactly what leaves your device, why, and how to turn
@@ -39,7 +40,7 @@
 
   <h2>What RoRadio never collects</h2>
   <ul>
-    <li>Your name, e-mail address, gamertag, machine name or Windows user name, and your Microsoft account details
+    <li>Your name, e-mail address, gamertag, machine name or user name, and your Microsoft account details
       (cloud sync, below, reads your account identifier on your device and stores only a one-way hash of it).</li>
     <li>Your location.</li>
     <li>Your IP address as part of diagnostics (the diagnostics service is configured with personally identifiable
@@ -64,7 +65,8 @@
         installations run without a crash</td>
     </tr>
     <tr>
-      <td>App version and package architecture; Windows version, device family (desktop or Xbox) and device model</td>
+      <td>App version and package architecture; operating system and its version, device family (such as desktop, Xbox,
+        phone or tablet) and device model</td>
       <td>To know which release and which systems a fault affects</td>
     </tr>
     <tr>
@@ -108,7 +110,7 @@
     song title and the usual technical data of a web request, such as your IP address, under their own privacy
     policies; they do not receive your installation identifier. Song titles are not attached to diagnostics.</p>
 
-  <h2>Cloud sync (off until you sign in)</h2>
+  <h2>Cloud sync (Windows and Xbox only, off until you sign in)</h2>
   <p>If you turn on user data synchronisation, RoRadio signs you in with the Microsoft account already on your device
     and stores your favourites, your added stations and your settings in MongoDB Atlas so another device can restore
     them. The stored record is keyed by a one-way hash of your account identifier: RoRadio does not store your
@@ -116,7 +118,7 @@
     in Atlas until you ask for it to be deleted at the contact address below.</p>
 
   <h2>Live captions (2.x, experimental, off until you turn them on)</h2>
-  <p>Captions are made on your PC by a speech model running on its graphics card or processor. The station's audio
+  <p>Captions are made on your device by a speech model running on its graphics card or processor. The station's audio
     and the recognised text never leave the device and are not stored: they are not sent to us, to the model's
     publisher or to diagnostics. While captions are on, the app opens a second connection to the station you are
     playing, so its server sees one more connection from your IP address.</p>
