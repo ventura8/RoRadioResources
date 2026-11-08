@@ -234,7 +234,7 @@
       {
         "GUID": "000f1d65-ce78-41e4-90ca-ddb5b1daa23d",
         "Title": "Paprika Rádió",
-        "Url": "http://stream1.paprikaradio.ro:8000/;",
+        "Url": "https://stream1.paprikaradio.ro/stream?sid=1",
         "ImageUrl": "paprika-radio-hu.png"
       },
       {
@@ -590,7 +590,7 @@
       {
         "GUID": "c246d808-9760-4015-94ac-2f9d49e254de",
         "Title": "Dance Effect Radio",
-        "Url": "https://asculta.danceeffect.ro:9443/;",
+        "Url": "http://asculta.danceeffect.ro:3333/;",
         "ImageUrl": "dance-effect-radio.png"
       },
       {
@@ -794,7 +794,7 @@
       {
         "GUID": "5b22549c-a0e3-4a23-ab56-8974d06ab3bd",
         "Title": "Deep House Energy",
-        "Url": "https://fra-pioneer01.dedicateware.com:3410/stream",
+        "Url": "https://fra-pioneer01.dedicateware.com:2930/stream",
         "ImageUrl": "energy-fm-house.png"
       }
     ]
@@ -811,7 +811,7 @@
       {
         "GUID": "677eda5c-4672-4ec9-9b3d-365acd0ae3a2",
         "Title": "Radio Caprice Dream Trance",
-        "Url": "http://79.120.39.202:9029/",
+        "Url": "http://79.120.39.202:8000/dreamtrance",
         "ImageUrl": "radio-caprice-dream-trance.png"
       },
       {
@@ -1362,7 +1362,7 @@
       {
         "GUID": "eca5b4d3-5722-4b3d-93bf-3f00cfc8d021",
         "Title": "Radio Noise",
-        "Url": "http://live.radionoise.ro:9100/;",
+        "Url": "https://live.radionoise.ro:9100/stream",
         "ImageUrl": "radio-noise.png"
       },
       {
