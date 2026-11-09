@@ -234,7 +234,7 @@
       {
         "GUID": "000f1d65-ce78-41e4-90ca-ddb5b1daa23d",
         "Title": "Paprika Rádió",
-        "Url": "https://stream1.paprikaradio.ro/stream?sid=1",
+        "Url": "http://stream1.paprikaradio.ro:8000/;stream",
         "ImageUrl": "paprika-radio-hu.png"
       },
       {
