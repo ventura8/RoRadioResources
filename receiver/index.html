@@ -10,6 +10,8 @@
         year - and the live captions, each on its own line. The app sends a song change as a QUEUE_UPDATE of the item
         playing (Google's own receiver ignores those); the interceptor below applies it here, and to the senders'
         notifications through setMediaInformation. The caption comes as the item's customData (a string).
+        The cover fills the safe area's height on the left (the station's logo takes its place when the song has no
+        cover), the station's logo heads the song's column, and the text is sized for a room away from the TV.
         Layout rules (Cast design guidelines): everything inside a 5 % safe area, text at least 24 px at 720p, white on
         a dark scrim over the blurred cover, a fixed grid so no element can grow into another, long text clamped with an
         ellipsis. Audio-only devices draw nothing and play the audio.
@@ -79,24 +81,58 @@
                 "captions captions";
             column-gap: var(--gap);
             row-gap: var(--gap);
-            align-items: center;
+            /* The cover and the song from the same top: the station's logo level with the cover's top edge. */
+            align-items: start;
+        }
+
+        /* No caption band: no gap for it either, or a full-height cover ran past the safe area (2560 x 1080). */
+        body:not(.captioned) main {
+            row-gap: 0;
+        }
+
+        /*
+         * The cover is the screen's picture: the safe area's whole height beside the song, less the captions' band while
+         * one shows (body.captioned), and never more than half the width, so the song keeps its column.
+         */
+        body {
+            --cover: min(90vh, 48vw);
+        }
+
+        /* 90 % less a two-line caption band (2 x 6 vmin + padding) and the gap: the cover never reaches it. */
+        body.captioned {
+            --cover: min(70vh, 48vw);
         }
 
         #cover {
             grid-area: cover;
-            width: min(42vmin, 44vw);
+            width: var(--cover);
             aspect-ratio: 1;
             border-radius: clamp(12px, 2vmin, 28px);
             object-fit: cover;
             background: rgb(255 255 255 / 8%);
             box-shadow: 0 2vmin 6vmin rgb(0 0 0 / 55%);
+            /* No animation of its size: shrinking as a caption band appeared, it covered the band for 300 ms. */
         }
 
+        /* No cover for the song: the station's own logo in its place, whole, on white. */
+        #cover.logo {
+            object-fit: contain;
+            padding: 4vmin;
+            background: #ffffff;
+        }
+
+        /*
+         * Filled from the top, as tall as its text needs up to the whole row: on a 4:3 or near-square screen the cover
+         * (half the width) is shorter than the logo and a two-line title, and the song goes on below its bottom edge.
+         */
         #song {
             grid-area: song;
             min-width: 0;
+            max-height: 100%;
+            overflow: hidden;
             display: grid;
-            row-gap: clamp(6px, 1.2vmin, 16px);
+            align-content: start;
+            row-gap: clamp(8px, 1.6vmin, 22px);
         }
 
         #song > * {
@@ -108,9 +144,10 @@
         }
 
         #title {
-            font-size: clamp(28px, 6.2vmin, 88px);
+            font-size: clamp(32px, 11vmin, 160px);
             font-weight: 700;
-            line-height: 1.15;
+            line-height: 1.1;
+            letter-spacing: -0.01em;
             white-space: normal;
             display: -webkit-box;
             -webkit-box-orient: vertical;
@@ -118,44 +155,51 @@
         }
 
         #artist {
-            font-size: clamp(24px, 4.4vmin, 60px);
+            font-size: clamp(26px, 7vmin, 100px);
             font-weight: 500;
             line-height: 1.2;
         }
 
-        #album,
-        #year {
-            font-size: clamp(24px, 3.4vmin, 44px);
+        /* The album and its year on one line: "Deliria · 2015". */
+        #release {
+            font-size: clamp(24px, 5.5vmin, 80px);
             color: var(--muted);
             line-height: 1.25;
         }
 
+        #album:not(:empty) + #year:not(:empty)::before {
+            content: " \00b7  ";
+        }
+
         #station {
-            margin-top: clamp(8px, 2vmin, 28px);
             display: flex;
             align-items: center;
-            column-gap: clamp(8px, 1.4vmin, 18px);
             min-width: 0;
+            margin-bottom: clamp(4px, 1vmin, 14px);
         }
 
         #station img {
-            width: clamp(36px, 6vmin, 72px);
-            height: clamp(36px, 6vmin, 72px);
+            /* As big as the column takes with a two-line title and a two-line caption (owner: the station's icon big too). */
+            width: clamp(72px, 22vmin, 300px);
+            height: clamp(72px, 22vmin, 300px);
             flex: none;
-            border-radius: 25%;
+            border-radius: 22%;
             object-fit: contain;
+            /* In vmin: a padding in % is a share of the column's width, which left no room for the logo. */
+            padding: clamp(4px, 1vmin, 14px);
             background: #ffffff;
+            box-shadow: 0 1vmin 3vmin rgb(0 0 0 / 45%);
         }
 
         #captions {
             grid-area: captions;
             justify-self: center;
-            max-width: min(100%, 72ch);
+            max-width: 100%;
             margin: 0;
-            padding: clamp(10px, 1.6vmin, 22px) clamp(16px, 2.6vmin, 36px);
+            padding: clamp(10px, 1.6vmin, 22px) clamp(18px, 3vmin, 42px);
             border-radius: clamp(10px, 1.6vmin, 20px);
             background: rgb(0 0 0 / 70%);
-            font-size: clamp(24px, 3.8vmin, 52px);
+            font-size: clamp(26px, 4.6vmin, 64px);
             line-height: 1.3;
             text-align: center;
         }
@@ -169,8 +213,8 @@
         }
 
         #captions.empty,
-        #album:empty,
-        #year:empty,
+        /* By class, set by show(): a selector a receiver's browser does not know (:has) would drop the whole rule. */
+        #release.empty,
         #station.empty {
             display: none;
         }
@@ -220,8 +264,15 @@
                 text-align: center;
             }
 
-            #cover {
-                width: min(60vw, 40vh);
+            /* The cover, the logo, a two-line title and a two-line caption, stacked within the height (800 x 1280). */
+            body,
+            body.captioned {
+                --cover: min(84vw, 36vh);
+            }
+
+            #station img {
+                width: clamp(56px, 12vmin, 160px);
+                height: clamp(56px, 12vmin, 160px);
             }
 
             #station {
@@ -247,11 +298,10 @@
     <main>
         <img id="cover" alt="">
         <section id="song" aria-live="polite">
+            <div id="station" class="empty"><img alt=""></div>
             <h1 id="title"></h1>
             <h2 id="artist"></h2>
-            <p id="album"></p>
-            <p id="year"></p>
-            <div id="station" class="empty"><img alt=""></div>
+            <p id="release"><span id="album"></span><span id="year"></span></p>
         </section>
         <div id="captions" class="empty" aria-live="polite"><span id="captionText"></span></div>
     </main>
@@ -310,13 +360,18 @@
             byId('artist').textContent = metadata.artist || metadata.subtitle || '';
             byId('album').textContent = metadata.albumName || '';
             byId('year').textContent = yearOf(metadata.releaseDate);
+            byId('release').classList.toggle('empty', !metadata.albumName && !yearOf(metadata.releaseDate));
             const caption = typeof media.customData === 'string' ? media.customData : '';
             byId('captionText').textContent = caption;
             byId('captions').classList.toggle('empty', !caption);
+            document.body.classList.toggle('captioned', Boolean(caption));
 
+            // The app sends [cover, station logo] when the song has a cover, and [station logo] alone when it has none:
+            // the logo then takes the cover's place, whole, and is not shown twice.
             const images = metadata.images || [];
             const cover = images[0] && images[0].url;
             const logo = images[1] && images[1].url;
+            byId('cover').classList.toggle('logo', Boolean(cover) && !logo);
             const backdrop = byId('backdrop');
             const showBackdrop = (url) => {
                 // No picture for this song (none sent, or it did not load): no backdrop from the last one.
