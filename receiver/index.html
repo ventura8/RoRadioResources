@@ -18,7 +18,8 @@
     <style>
         :root {
             color-scheme: dark;
-            --safe: 5vmin;
+            --safe-x: 5vw;
+            --safe-y: 5vh;
             --gap: clamp(16px, 3.5vmin, 48px);
             --text: #ffffff;
             --muted: rgb(255 255 255 / 78%);
@@ -69,7 +70,7 @@
 
         main {
             position: fixed;
-            inset: var(--safe);
+            inset: var(--safe-y) var(--safe-x);
             display: grid;
             grid-template-columns: minmax(0, auto) minmax(0, 1fr);
             grid-template-rows: minmax(0, 1fr) auto;
@@ -266,8 +267,12 @@
             return typeof date === 'string' ? date.slice(0, 4) : '';
         }
 
-        /** Sets an image's source once it has loaded, so a broken url never shows a broken picture. */
+        /**
+         * Sets an image's source once it has loaded, so a broken url never shows a broken picture. Only the newest
+         * request for an image applies: a slow old cover never replaces a newer one, nor brings back a removed one.
+         */
         function showImage(image, url, onShown) {
+            const request = (image.dataset.request = String(Number(image.dataset.request || 0) + 1));
             if (!url) {
                 image.removeAttribute('src');
                 return;
@@ -275,9 +280,24 @@
 
             const probe = new Image();
             probe.onload = () => {
+                if (image.dataset.request !== request) {
+                    return;
+                }
+
                 image.src = url;
                 if (onShown) {
                     onShown(url);
+                }
+            };
+            probe.onerror = () => {
+                // A picture that does not load: none, rather than the last song's.
+                if (image.dataset.request !== request) {
+                    return;
+                }
+
+                image.removeAttribute('src');
+                if (onShown) {
+                    onShown(null);
                 }
             };
             probe.src = url;
@@ -297,10 +317,17 @@
             const images = metadata.images || [];
             const cover = images[0] && images[0].url;
             const logo = images[1] && images[1].url;
-            showImage(byId('cover'), cover, (url) => {
-                byId('backdrop').style.backgroundImage = `url("${url}")`;
-                byId('backdrop').classList.add('shown');
-            });
+            const backdrop = byId('backdrop');
+            const showBackdrop = (url) => {
+                // No picture for this song (none sent, or it did not load): no backdrop from the last one.
+                backdrop.style.backgroundImage = url ? `url("${url}")` : '';
+                backdrop.classList.toggle('shown', Boolean(url));
+            };
+            if (!cover) {
+                showBackdrop(null);
+            }
+
+            showImage(byId('cover'), cover, showBackdrop);
             const station = byId('station');
             station.classList.toggle('empty', !logo);
             showImage(station.querySelector('img'), logo);
@@ -326,7 +353,8 @@
                 show(media);
                 const playing = player.getMediaInformation();
                 if (playing) {
-                    playing.metadata = Object.assign(playing.metadata || {}, media.metadata);
+                    // The new song's metadata whole: an album or a year the new song has none of must not stay.
+                    playing.metadata = media.metadata;
                     playing.customData = media.customData;
                     player.setMediaInformation(playing, true);
                 }
