@@ -81,7 +81,13 @@
                 "captions captions";
             column-gap: var(--gap);
             row-gap: var(--gap);
-            align-items: center;
+            /* The cover and the song from the same top: the station's logo level with the cover's top edge. */
+            align-items: start;
+        }
+
+        /* No caption band: no gap for it either, or a full-height cover ran past the safe area (2560 x 1080). */
+        body:not(.captioned) main {
+            row-gap: 0;
         }
 
         /*
@@ -105,7 +111,7 @@
             object-fit: cover;
             background: rgb(255 255 255 / 8%);
             box-shadow: 0 2vmin 6vmin rgb(0 0 0 / 55%);
-            transition: width 300ms ease;
+            /* No animation of its size: shrinking as a caption band appeared, it covered the band for 300 ms. */
         }
 
         /* No cover for the song: the station's own logo in its place, whole, on white. */
@@ -115,11 +121,14 @@
             background: #ffffff;
         }
 
-        /* As tall as the cover and filled from its top: the station's logo always level with the cover's top edge. */
+        /*
+         * Filled from the top, as tall as its text needs up to the whole row: on a 4:3 or near-square screen the cover
+         * (half the width) is shorter than the logo and a two-line title, and the song goes on below its bottom edge.
+         */
         #song {
             grid-area: song;
             min-width: 0;
-            height: var(--cover);
+            max-height: 100%;
             overflow: hidden;
             display: grid;
             align-content: start;
@@ -204,7 +213,8 @@
         }
 
         #captions.empty,
-        #release:has(#album:empty):has(#year:empty),
+        /* By class, set by show(): a selector a receiver's browser does not know (:has) would drop the whole rule. */
+        #release.empty,
         #station.empty {
             display: none;
         }
@@ -258,11 +268,6 @@
             body,
             body.captioned {
                 --cover: min(84vw, 36vh);
-            }
-
-            /* Stacked under the cover: the song's own height. */
-            #song {
-                height: auto;
             }
 
             #station img {
@@ -355,6 +360,7 @@
             byId('artist').textContent = metadata.artist || metadata.subtitle || '';
             byId('album').textContent = metadata.albumName || '';
             byId('year').textContent = yearOf(metadata.releaseDate);
+            byId('release').classList.toggle('empty', !metadata.albumName && !yearOf(metadata.releaseDate));
             const caption = typeof media.customData === 'string' ? media.customData : '';
             byId('captionText').textContent = caption;
             byId('captions').classList.toggle('empty', !caption);
