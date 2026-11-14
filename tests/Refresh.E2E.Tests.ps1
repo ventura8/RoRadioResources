@@ -123,7 +123,8 @@ for name, colour, size in [("blue", "#1060c0", 256), ("green", "#10a040", 256), 
         ShoutcastPlaylistUrl  = $base
         RadioNetUrl           = $base
     }
-    $script:fast = @{ TimeoutSeconds = 5; RetryDelaySeconds = 0; ThrottleLimit = 8 }
+    # The fake list is mostly broken on purpose: the network guard (more than half failing) is tested on its own.
+    $script:fast = @{ TimeoutSeconds = 5; RetryDelaySeconds = 0; ThrottleLimit = 8; MaxFailureRatio = 1 }
 
     # Runs a script and returns its output and its information stream (the report it prints) apart.
     function Invoke-Quiet([string]$Script, [hashtable]$Arguments) {
@@ -315,13 +316,12 @@ Describe 'The dry run, a source that is down, and a run with nothing to fix' {
         Get-Content $odd -Raw | Should -Be $json
     }
 
-    It 'writes nothing when the result would change more than the fixed urls' {
-        $twice = Join-Path $work 'twice.json'
-        $guid = [Guid]::NewGuid().ToString()
-        $json = "[{`"Name`": `"Test`", `"List`": [{`"GUID`": `"$guid`", `"Title`": `"Radio Beta`", `"Url`": `"http://127.0.0.1:1/x`"}, {`"GUID`": `"$guid`", `"Title`": `"Radio Alpha`", `"Url`": `"$base/stream/alpha`"}]}]"
-        [IO.File]::WriteAllText($twice, $json)
-        { Invoke-Quiet 'Update-StationUrls.ps1' (@{ Catalog = $twice } + $sources + $fast) } | Should -Throw '*nothing was written*'
-        Get-Content $twice -Raw | Should -Be $json
+    It 'checks that a written list changes nothing but the fixed urls' {
+        . (Join-Path $scripts 'lib/Catalog.ps1')
+        $text = '[{"Name": "T", "List": [{"GUID": "a", "Title": "A", "Url": "http://new"}, {"GUID": "b", "Title": "B", "Url": "http://b"}]}]'
+        $before = @(Read-StationList '[{"Name": "T", "List": [{"GUID": "a", "Title": "A", "Url": "http://old"}, {"GUID": "b", "Title": "B", "Url": "http://b"}]}]')
+        { Assert-OnlyUrlChange $before $text @([pscustomobject]@{ Guid = 'a'; NewUrl = 'http://new' }) } | Should -Not -Throw
+        { Assert-OnlyUrlChange $before $text @() } | Should -Throw '*nothing was written*'
     }
 }
 
@@ -489,6 +489,7 @@ Describe 'Publishing the refresh (Publish-Refresh.ps1: the release note, the pul
             git -C $folder add -A
             git -C $folder -c user.name=test -c user.email=test@example.com commit -q -m 'start'
             git -C $folder remote add origin $remote
+            git -C $folder push -q origin master 2>$null
             Add-Content -Path (Join-Path $folder 'RadioStationsData.json') -Value ' '
             [pscustomobject]@{ Folder = $folder; Remote = $remote; Temp = (New-Item -ItemType Directory -Path (Join-Path $work "$Name-temp")).FullName; Summary = Join-Path $work "$Name-summary.md" }
         }
@@ -498,7 +499,7 @@ Describe 'Publishing the refresh (Publish-Refresh.ps1: the release note, the pul
             $common = @{
                 UrlReport = $urlReport; LogoReport = $logoReport; Date = '2026-11-16'; RunUrl = 'https://github.com/ventura8/RoRadioResources/actions/runs/1'
                 Repository = 'ventura8/RoRadioResources'; RepositoryPath = $Checkout.Folder; Remote = $Checkout.Remote
-                SummaryPath = $Checkout.Summary; TempFolder = $Checkout.Temp; Gh = $fakeGh
+                SummaryPath = $Checkout.Summary; TempFolder = $Checkout.Temp; Gh = $fakeGh; RetryDelaySeconds = 0
             }
             foreach ($name in $Arguments.Keys) { $common[$name] = $Arguments[$name] }
             & (Join-Path $scripts 'Publish-Refresh.ps1') @common 6>$null
@@ -507,18 +508,18 @@ Describe 'Publishing the refresh (Publish-Refresh.ps1: the release note, the pul
     }
 
     AfterEach {
-        foreach ($name in 'FAKE_GH_LOG', 'FAKE_GH_PR_STATE', 'FAKE_GH_ISSUES', 'FAKE_GH_API_EXIT', 'FAKE_GH_FAIL') { Set-Item "env:$name" $null }
+        foreach ($name in 'FAKE_GH_LOG', 'FAKE_GH_PR_STATE', 'FAKE_GH_ISSUES', 'FAKE_GH_API_EXIT', 'FAKE_GH_FAIL', 'FAKE_GH_CHECKS', 'FAKE_GH_AUTH_EXIT', 'FAKE_GH_FLAKY') { Set-Item "env:$name" $null }
     }
 
     It 'commits the list, the logos and the note, pushes, opens the pull request, merges it and asks Pages to rebuild' {
         $checkout = Initialize-Checkout 'merge'
         $log = Invoke-Publish $checkout @{ UrlCount = 1; LogoCount = 1; Merge = $true }
-        $log | Should -Contain ('pr create --base master --head automation/station-refresh --title Refresh 1 station url(s) and 1 logo(s) (2026-11-16) --body-file ' + (Join-Path $checkout.Temp 'refresh-body.md') + $repo)
+        $log | Should -Contain ('pr create --base master --head automation/station-refresh --title Refresh 1 station url(s), 1 logo(s), 0 station(s) retired, restored or rechecked (2026-11-16) --body-file ' + (Join-Path $checkout.Temp 'refresh-body.md') + $repo)
         $log | Should -Contain "pr merge automation/station-refresh --squash --delete-branch$repo"
         $log | Should -Contain 'api -X POST repos/ventura8/RoRadioResources/pages/builds --silent'
         $files = @(git --git-dir $checkout.Remote ls-tree -r --name-only automation/station-refresh)
         $files | Should -Contain 'docs/releases/2026-11-16-refresh.md'
-        git --git-dir $checkout.Remote log -1 --format=%s automation/station-refresh | Should -Be 'Refresh 1 station url(s) and 1 logo(s) (2026-11-16)'
+        git --git-dir $checkout.Remote log -1 --format=%s automation/station-refresh | Should -Be 'Refresh 1 station url(s), 1 logo(s), 0 station(s) retired, restored or rechecked (2026-11-16)'
         $sha = git --git-dir $checkout.Remote rev-parse automation/station-refresh
         $body = Get-Content (Join-Path $checkout.Temp 'refresh-body.md') -Raw
         $body | Should -Match ([regex]::Escape("https://raw.githubusercontent.com/ventura8/RoRadioResources/$sha/RadioLogos/radio-fav.png"))
@@ -557,7 +558,7 @@ Describe 'Publishing the refresh (Publish-Refresh.ps1: the release note, the pul
         $checkout = Initialize-Checkout 'auto'
         $log = Invoke-Publish $checkout @{ UrlCount = 1; LogoCount = 0; Merge = $true; AutoMerge = $true }
         $log | Should -Contain "pr merge automation/station-refresh --auto --squash --delete-branch$repo"
-        ($log | Where-Object { $_ -like 'api *' }) | Should -BeNullOrEmpty -Because 'Pages rebuilds from the merge itself'
+        ($log | Where-Object { $_ -like 'api -X *' }) | Should -BeNullOrEmpty -Because 'Pages rebuilds from the merge itself'
         Get-Content $checkout.Summary -Raw | Should -Match 'Auto-merge is on'
     }
 
@@ -587,15 +588,90 @@ Describe 'Publishing the refresh (Publish-Refresh.ps1: the release note, the pul
         $checkout = Initialize-Checkout 'token'
         $env:GH_TOKEN = 'test-token'
         try {
-            $common = @{ UrlReport = $urlReport; RepositoryPath = $checkout.Folder; Repository = 'ventura8/no-such-repository'; Gh = $fakeGh; UrlCount = 1; SummaryPath = '' }
+            $common = @{ UrlReport = $urlReport; RepositoryPath = $checkout.Folder; Repository = 'ventura8/no-such-repository'; Gh = $fakeGh; UrlCount = 1; SummaryPath = ''; RetryDelaySeconds = 0 }
             $env:FAKE_GH_LOG = Join-Path $checkout.Temp 'gh.log'
-            # No network: git refuses https before it connects.
+            # No network: git refuses https before it connects (tried three times, like a network that is down).
             $env:GIT_ALLOW_PROTOCOL = 'file'
-            { & (Join-Path $scripts 'Publish-Refresh.ps1') @common 6>$null 2>$null } | Should -Throw 'git push -q failed (exit *'
+            { & (Join-Path $scripts 'Publish-Refresh.ps1') @common 6>$null 2>$null 3>$null } | Should -Throw 'git fetch -q failed (exit *'
         } finally {
             $env:GH_TOKEN = $null
             $env:GIT_ALLOW_PROTOCOL = $null
         }
+    }
+
+    It 'closes a refresh pull request an earlier run left open when this run changes nothing' {
+        $checkout = Initialize-Checkout 'stale'
+        Set-Content -Path $urlReport -Encoding utf8 -Value 'Probed 3 stations; 0 failed twice; 0 fixed.'
+        $env:FAKE_GH_PR_STATE = 'OPEN'
+        $log = Invoke-Publish $checkout @{ UrlCount = 0; LogoCount = 0; StationCount = 0 }
+        ($log | Where-Object { $_ -like 'pr close automation/station-refresh --delete-branch --comment *' }) | Should -Not -BeNullOrEmpty
+        Get-Content $checkout.Summary -Raw | Should -Match 'Closed the refresh pull request'
+    }
+
+    It 'reports its own pull request failing CI in the issue, and pushes the new run to the same pull request' {
+        $checkout = Initialize-Checkout 'red'
+        $env:FAKE_GH_PR_STATE = 'OPEN'
+        $env:FAKE_GH_CHECKS = '[{"name": "Tests", "bucket": "fail"}, {"name": "Lint", "bucket": "pass"}]'
+        $log = Invoke-Publish $checkout @{ UrlCount = 1; LogoCount = 0; Merge = $true; AutoMerge = $true }
+        Get-Content (Join-Path $checkout.Temp 'refresh-issue.md') -Raw | Should -Match "own pull request fails CI[\s\S]*Tests"
+        ($log | Where-Object { $_ -like 'pr create *' }) | Should -BeNullOrEmpty -Because 'no second pull request piles up'
+        ($log | Where-Object { $_ -like 'pr edit automation/station-refresh *' }) | Should -Not -BeNullOrEmpty
+    }
+
+    It 'stops with the reason when the token cannot read the repository' {
+        $checkout = Initialize-Checkout 'expired'
+        $env:FAKE_GH_AUTH_EXIT = '1'
+        { Invoke-Publish $checkout @{ UrlCount = 1 } } | Should -Throw '*cannot read ventura8/RoRadioResources*REFRESH_TOKEN*'
+    }
+
+    It 'tries a gh command again when the API fails once' {
+        $checkout = Initialize-Checkout 'flaky'
+        $env:FAKE_GH_FLAKY = 'issue list'
+        $log = Invoke-Publish $checkout @{ UrlCount = 0; WarningAction = 'SilentlyContinue' }
+        @($log | Where-Object { $_ -like 'issue list *' }).Count | Should -Be 2
+    }
+
+    It 'puts its commit on top of a master that moved, and says so when master changed the same lines' {
+        $checkout = Initialize-Checkout 'moved'
+        git -C $checkout.Folder push -q origin master
+        $other = Join-Path $work 'moved-other'
+        git clone -q $checkout.Remote $other
+        Set-Content -Path (Join-Path $other 'README.md') -Value 'moved'
+        git -C $other add -A
+        git -C $other -c user.name=test -c user.email=test@example.com commit -q -m 'master moved'
+        git -C $other push -q origin master
+        Invoke-Publish $checkout @{ UrlCount = 1 } | Out-Null
+        git --git-dir $checkout.Remote merge-base --is-ancestor master automation/station-refresh
+        $LASTEXITCODE | Should -Be 0 -Because 'the refresh commit sits on the newest master'
+
+        $conflict = Initialize-Checkout 'conflict'
+        git -C $conflict.Folder stash -q
+        git -C $conflict.Folder push -q origin master
+        $clone = Join-Path $work 'conflict-other'
+        git clone -q $conflict.Remote $clone
+        Add-Content -Path (Join-Path $clone 'RadioStationsData.json') -Value 'other'
+        git -C $clone -c user.name=test -c user.email=test@example.com commit -q -am 'same lines'
+        git -C $clone push -q origin master
+        git -C $conflict.Folder stash pop -q
+        Invoke-Publish $conflict @{ UrlCount = 1 } | Out-Null
+        Get-Content $conflict.Summary -Raw | Should -Match 'may need a rebase'
+    }
+
+    It 'commits RetiredStations.json, and puts the trend of the last runs in the issue' {
+        $checkout = Initialize-Checkout 'trend'
+        Set-Content -Path $urlReport -Encoding utf8 -Value @('Probed 3 stations; 1 failed twice; 0 fixed.', '', '## Retired (dead)', '', '| Station |', '| :--- |', '| Radio Iota |')
+        Set-Content -Path (Join-Path $checkout.Folder 'RetiredStations.json') -Value '[]'
+        $metrics = Join-Path $checkout.Temp 'runs.jsonl'
+        Set-Content -Path $metrics -Encoding utf8 -Value @(
+            '{"Date":"2026-11-09","Probed":229,"Failing":9,"Fixed":1,"Unresolved":7,"Retired":0,"Restored":0,"Retries":2,"Stages":{"urls":600},"Sources":{"myradioonline":{"Queries":9,"Hits":1,"Milliseconds":900}}}'
+            'not json'
+            '{"Date":"2026-11-16","Probed":229,"Failing":8,"Fixed":0,"Unresolved":7,"Retired":1,"Restored":0,"Retries":0,"Stages":{"urls":540},"Sources":{"myradioonline":{"Queries":8,"Hits":0,"Milliseconds":800}}}')
+        Invoke-Publish $checkout @{ StationCount = 1; MetricsPath = $metrics } | Out-Null
+        @(git --git-dir $checkout.Remote ls-tree -r --name-only automation/station-refresh) | Should -Contain 'RetiredStations.json'
+        $issue = Get-Content (Join-Path $checkout.Temp 'refresh-issue.md') -Raw
+        $issue | Should -Match '## Trend'
+        $issue | Should -Match '\| 2026-11-16 \| 229 \| 8 \| 0 \| 7 \| 1 \| 0 \| 0 \| 9 \|'
+        $issue | Should -Match '\| myradioonline \| 17 \| 1 \| 6% \| 100 \|'
     }
 }
 

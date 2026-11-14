@@ -1,0 +1,52 @@
+[
+  {
+    "GUID": "9909e9cd-9046-47ba-bfb8-c18bfdfcce23",
+    "Title": "Atlas FM",
+    "Url": "http://5.2.168.50:8000/",
+    "Category": "Other",
+    "Logo": "AtlasFM.jpg (removed with the station; in git history before #42)",
+    "FirstFailed": "2026-09-29",
+    "Retired": "2026-11-14",
+    "LastChecked": "2026-11-14",
+    "Checks": 0,
+    "NextCheck": "2026-12-14",
+    "Evidence": "Removed by hand (#42). Dead in every probe since 2026-09-29; atlasfm.ro no longer resolves (its last Wayback capture, March 2026, is a parked page); in no directory (radio-browser.info, Shoutcast, TuneIn)."
+  },
+  {
+    "GUID": "6a2d918b-21d3-4196-b125-fb9db4cc9deb",
+    "Title": "Hot 107.1 FM",
+    "Url": "http://192.99.34.205:8607/stream",
+    "Category": "Hip hop",
+    "FirstFailed": "2026-09-29",
+    "Retired": "2026-11-14",
+    "LastChecked": "2026-11-14",
+    "Checks": 0,
+    "NextCheck": "2026-12-14",
+    "Evidence": "Removed by hand (#42). Dead since 2026-09-29; the last server the Shoutcast directory named (94.130.162.80:8607) answers 401 \"resource currently unavailable\"; the station left the directory; never identified (no site)."
+  },
+  {
+    "GUID": "b13eafe3-6b8f-486c-bf83-2d4bdab4b4b2",
+    "Title": "Radio Amma",
+    "Url": "http://54.39.28.158:8024/stream",
+    "Category": "Other",
+    "FirstFailed": "2026-09-29",
+    "Retired": "2026-11-14",
+    "LastChecked": "2026-11-14",
+    "Checks": 0,
+    "NextCheck": "2026-12-14",
+    "Evidence": "Removed by hand (#42). The server refuses connections; Shoutcast directory id 99627489 is delisted (empty playlist); radioammamanele.ro does not resolve; in no directory."
+  },
+  {
+    "GUID": "40c7aec6-8f72-41e9-90a6-5ac382b3374d",
+    "Title": "Radio Intexfm",
+    "Url": "http://149.202.158.82:9788/;",
+    "Category": "Dance",
+    "Logo": "radio-intexfm.png (removed with the station; in git history before #42)",
+    "FirstFailed": "2026-09-29",
+    "Retired": "2026-11-14",
+    "LastChecked": "2026-11-14",
+    "Checks": 0,
+    "NextCheck": "2026-12-14",
+    "Evidence": "Removed by hand (#42). Dead since 2026-09-29; radiointexfm.ro no longer resolves; its player host (carina.streamerr.co/AudioPlayer/radiointexfmromania, from a 2024 Wayback capture) answers \"Service not found\"; in no directory."
+  }
+]

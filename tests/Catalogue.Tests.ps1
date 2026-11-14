@@ -86,6 +86,18 @@ Describe 'RadioStationsData.json' {
     }
 }
 
+Describe 'RetiredStations.json' {
+    It 'has what a recheck needs for every retired station, and none of them is in the list' {
+        $retired = @(Get-Content (Join-Path (Split-Path $PSScriptRoot -Parent) 'RetiredStations.json') -Raw | ConvertFrom-Json)
+        $bad = @($retired | Where-Object {
+            -not $_.GUID -or -not $_.Title -or -not $_.Url -or -not $_.Category -or $_.NextCheck -notmatch '^\d{4}-\d{2}-\d{2}$'
+        } | ForEach-Object { "$($_.Title): '$($_.GUID)'" })
+        $bad | Should -BeNullOrEmpty
+        $listed = @($stations | ForEach-Object { $_.GUID.ToLowerInvariant() })
+        @($retired | Where-Object { $listed -contains "$($_.GUID)".ToLowerInvariant() } | ForEach-Object { $_.Title }) | Should -BeNullOrEmpty
+    }
+}
+
 Describe 'RadioLogos' {
     It 'has the file every ImageUrl names, with the same case (GitHub Pages is case-sensitive)' {
         $missing = @($stations | Where-Object { $_.ImageUrl -and $logoNames -cnotcontains $_.ImageUrl } | ForEach-Object { "$($_.Title): $($_.ImageUrl)" })
@@ -97,8 +109,9 @@ Describe 'RadioLogos' {
         $bad | Should -BeNullOrEmpty
     }
 
-    It 'keeps no file that no station uses' {
-        $used = @($stations | ForEach-Object { $_.ImageUrl } | Where-Object { $_ })
+    It 'keeps no file that no station uses (a retired station keeps its logo, for when it comes back)' {
+        $retired = @(Get-Content (Join-Path (Split-Path $PSScriptRoot -Parent) 'RetiredStations.json') -Raw | ConvertFrom-Json)
+        $used = @(@($stations) + $retired | ForEach-Object { $_.ImageUrl } | Where-Object { $_ })
         @($logoNames | Where-Object { $used -cnotcontains $_ }) | Should -BeNullOrEmpty
     }
 

@@ -1,12 +1,13 @@
 name: Refresh station urls and logos
 
-# Broadcasters move their streams and change their logos without notice. Once a week this probes every station,
-# finds a verified current url for the broken ones (scripts/Update-StationUrls.ps1) and a logo for the stations
-# without one (scripts/Update-StationLogos.ps1), checks the list (scripts/ci/Invoke-Tests.ps1), then
-# scripts/Publish-Refresh.ps1 writes the release note docs/releases/<date>-refresh.md, opens a pull request with it
-# and merges it, so GitHub Pages serves the fixed list and logos to every RoRadio install within minutes, and keeps
-# the issue "Stations the weekly refresh could not fix" current. The whole flow runs end to end against a fake
-# station server in tests/Refresh.E2E.Tests.ps1.
+# Broadcasters move their streams and change their logos without notice. Once a week scripts/Invoke-Refresh.ps1
+# probes every station, finds a verified current url for the broken ones, retires the stations gone for 30 days and
+# restores retired ones that play again, finds logos, runs the tests, then opens a pull request with the release note
+# docs/releases/<date>-refresh.md and merges it, so GitHub Pages serves the list to every RoRadio install within
+# minutes; it keeps the issue "Stations the weekly refresh could not fix" current, reports every failure to Sentry
+# and keeps its own data (failing dates, metrics) on the refresh-data branch. A run that fails is retried every day
+# until one succeeds. The whole flow runs end to end against fakes in tests/Refresh.E2E.Tests.ps1 and
+# tests/Resilience.E2E.Tests.ps1.
 on:
   workflow_dispatch:
     inputs:
@@ -19,7 +20,8 @@ on:
         type: boolean
         default: false
   schedule:
-    - cron: '17 4 * * 1'  # Mondays 04:17 UTC
+    - cron: '17 4 * * 1'    # Mondays 04:17 UTC: the weekly refresh
+    - cron: '47 5 * * 2-6'  # Tuesday to Saturday: the retry, which runs only when no refresh succeeded this week
 
 permissions:
   contents: read
@@ -32,89 +34,83 @@ jobs:
   refresh:
     name: Refresh the station urls and logos
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     permissions:
-      contents: write       # push the refresh branch and merge it
+      contents: write       # push the refresh branch and the refresh-data branch, merge
       pull-requests: write  # open and merge the pull request
       issues: write         # keep the issue of the stations it could not fix current
       pages: write          # request a Pages build after the merge
-      actions: write        # re-enable this workflow so GitHub does not disable it after 60 quiet days
-    # The write token (GH_TOKEN) is given only to the two steps that push, merge and re-enable: the probing steps run
-    # the station scripts against untrusted broadcaster servers and need no token.
+      actions: write        # read earlier runs (the retry); re-enable this workflow after 60 quiet days
+    # A token is given only to the steps that need one: the search runs the station scripts against untrusted
+    # broadcaster servers and gets none.
     env:
       GH_REPO: ${{ github.repository }}
       DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
 
+      - name: Is there work (the retry runs only when no refresh succeeded this week, by the recorded runs)
+        id: due
+        shell: pwsh
+        env:
+          RETRY: ${{ github.event.schedule == '47 5 * * 2-6' }}
+        run: ./scripts/Invoke-Refresh.ps1 -Stage Due -RetryOnly:($env:RETRY -eq 'true') -OutputPath $env:GITHUB_OUTPUT
+
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        if: steps.due.outputs.due == 'true'
         with:
           python-version: '3.13'
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        if: steps.due.outputs.due == 'true'
         with:
           node-version: '24'
 
       - name: Install the Python tools and Pester (pinned)
+        if: steps.due.outputs.due == 'true'
         shell: pwsh
+        timeout-minutes: 10
         run: |
           python -m pip install --quiet -r scripts/ci/requirements.txt
           Install-Module Pester -RequiredVersion 6.2.0 -Scope CurrentUser -Force -SkipPublisherCheck
 
-      - name: Probe the stations and fix the broken urls
-        id: urls
+      - name: Search (probe, fix urls, retire and restore, logos, tests)
+        if: steps.due.outputs.due == 'true'
         shell: pwsh
+        timeout-minutes: 75
         # Only outright dead streams: from a US runner an HTTP error can be geo-blocking (see the script's help).
-        run: |
-          $dryRun = $env:DRY_RUN -eq 'true'
-          $results = ./scripts/Update-StationUrls.ps1 -ReplaceOnlyDead -ReportPath "$env:RUNNER_TEMP/urls.md" -WhatIf:$dryRun
-          "count=$(@($results | Where-Object NewUrl).Count)" >> $env:GITHUB_OUTPUT
-
-      - name: Find logos for the stations without one
-        id: logos
         # Released apps older than the Pages logo fallback (RoRadio 2.0.1, 1.6.x) look for a logo only in their own
-        # package and show an empty tile for one they do not bundle, so this step waits for the repository variable
-        # REFRESH_LOGOS, set to 'true' once the releases that load such logos from Pages are out (README).
-        if: vars.REFRESH_LOGOS == 'true'
-        shell: pwsh
+        # package, so logos wait for the repository variable REFRESH_LOGOS (README).
+        env:
+          LOGOS: ${{ vars.REFRESH_LOGOS == 'true' }}
         run: |
-          $dryRun = $env:DRY_RUN -eq 'true'
-          $results = ./scripts/Update-StationLogos.ps1 -Python python -ReportPath "$env:RUNNER_TEMP/logos.md" -WhatIf:$dryRun
-          "count=$(@($results | Where-Object File).Count)" >> $env:GITHUB_OUTPUT
-
-      - name: Dry run report
-        if: env.DRY_RUN == 'true'
-        shell: pwsh
-        run: |
+          ./scripts/Invoke-Refresh.ps1 -Stage Search -ReplaceOnlyDead -Logos:($env:LOGOS -eq 'true') `
+            -DryRun:($env:DRY_RUN -eq 'true') -Python python -RunUrl $env:RUN_URL
           Get-Content "$env:RUNNER_TEMP/urls.md" | Add-Content $env:GITHUB_STEP_SUMMARY
-          if (Test-Path "$env:RUNNER_TEMP/logos.md") { Get-Content "$env:RUNNER_TEMP/logos.md" | Add-Content $env:GITHUB_STEP_SUMMARY }
 
-      - name: Check the list before committing (a pull request opened by this workflow starts no CI)
-        if: env.DRY_RUN != 'true'
+      - name: Publish (the note, the pull request, the issue, the data)
+        # Also after a failed or cancelled search: then it publishes nothing and only saves the run's record (a
+        # failed run, with its stage and reason), so the metrics show failed attempts too.
+        if: always() && steps.due.outputs.due == 'true' && env.DRY_RUN != 'true'
         shell: pwsh
-        run: ./scripts/ci/Invoke-Tests.ps1 -Python python
-
-      - name: Write the release note, open and merge the pull request, update the issue
-        if: env.DRY_RUN != 'true'
-        shell: pwsh
+        timeout-minutes: 20
         # master's branch protection requires the Lint and Tests checks. A branch pushed with GITHUB_TOKEN starts no
         # workflow, so those checks would never report on the refresh's pull request. With the REFRESH_TOKEN secret
         # (a fine-grained token of this repository: Contents, Pull requests and Issues read and write) the push
         # starts CI and the pull request merges itself through auto-merge once Lint and Tests pass. Without the
-        # secret it falls back to GITHUB_TOKEN and an immediate merge, which only works while master is unprotected.
+        # secret, or when it has expired, the workflow's own token publishes (FALLBACK_TOKEN) and the run says so.
         env:
           GH_TOKEN: ${{ secrets.REFRESH_TOKEN || github.token }}
+          FALLBACK_TOKEN: ${{ github.token }}
           AUTO_MERGE: ${{ secrets.REFRESH_TOKEN != '' }}
-          URLS: ${{ steps.urls.outputs.count }}
-          LOGOS: ${{ steps.logos.outputs.count || '0' }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           MERGE: ${{ github.event_name == 'schedule' || inputs.merge }}
         run: |
-          ./scripts/Publish-Refresh.ps1 -UrlReport "$env:RUNNER_TEMP/urls.md" -LogoReport "$env:RUNNER_TEMP/logos.md" `
-            -UrlCount $env:URLS -LogoCount $env:LOGOS -Merge:($env:MERGE -eq 'true') `
-            -AutoMerge:($env:AUTO_MERGE -eq 'true') -RunUrl $env:RUN_URL
+          ./scripts/Invoke-Refresh.ps1 -Stage Publish -Merge:($env:MERGE -eq 'true') -AutoMerge:($env:AUTO_MERGE -eq 'true') `
+            -RunUrl $env:RUN_URL
 
       - name: Keep the schedule alive
         if: always()
