@@ -1,19 +1,22 @@
 // Copyright 2026 Sergiu Alexandrescu
-// The song's texts fitted to the song's column on the cast screen (owner, 2026-11-14): the title, the artist and the
-// album take up to two lines each and shrink in steps, down to 24 px at 1080p, before an ellipsis; the year has a line
-// of its own under the album, and joins the album's line ("Deliria · 2015") only when the column has no room for it.
+// The song's texts fitted to the song's column on the cast screen. Owner, 2026-11-14: never cut a text and never an
+// ellipsis; the title, the artist and the album always show in full. Every text wraps over as many lines as it
+// needs; when they do not all fit the column (above the station's line, and above a touch display's system bar), in
+// this order: the live caption yields its band, the year joins the album's line ("Deliria · 2015"), the texts shrink
+// in steps to 24 px at 1080p, and then, only when that is the only way, to 16 px at 1080p.
 // Loaded by receiver/index.html before receiver.js.
 (function fit() {
 'use strict';
 
 const byId = (id) => document.getElementById(id);
 
-/** A text shrinks by this much a step, down to 24 px at 1080p (10-foot UI), before its second line is cut. */
+/** A text shrinks by this much a step. */
 const FIT_STEP = 0.9;
+/** The 10-foot size a text keeps while it fits, and the floor it may go to when nothing else fits (at 1080p). */
 const READABLE_AT_1080P = 24;
+const FLOOR_AT_1080P = 16;
 const FULL_HD_HEIGHT = 1080;
-const FITTED = ['title', 'artist', 'release'];
-const TOO_TALL = 2.5;
+const FITTED = ['title', 'artist', 'release', 'yearLine'];
 const HALF_PIXEL = 0.5;
 
 /** The song's release year ("2015"), or '' for none. */
@@ -33,24 +36,16 @@ function shrink(element, minimum) {
 }
 
 /**
- * Up to two lines for a text (the styles clamp it at two): it keeps its full size while it fits, and shrinks in
- * steps to the readable minimum while it needs more; only then does its second line end in an ellipsis.
+ * Whether the texts do not fit: the song's column overflows, a text reaches into the station's line under it, or
+ * the caption band passes the bottom of the page's safe area.
  */
-function fitText(element, minimum) {
-    element.style.fontSize = '';
-    // More than two lines: its full height passes two and a half lines (a line's glyphs may overhang it a little).
-    const tooTall = () => element.scrollHeight > TOO_TALL * parseFloat(getComputedStyle(element).lineHeight);
-    while (tooTall() && shrink(element, minimum)) {
-        // Shrunk one step; measured again.
-    }
-}
-
-/** Whether the song's texts need more than their column: past its bottom, or into the station's line under them. */
 function crowded(texts) {
     const song = byId('song');
     const station = byId('station');
     const line = station.classList.contains('empty') ? Infinity : station.getBoundingClientRect().top;
-    return song.scrollHeight > song.clientHeight + 1 || texts.some((element) => element.getBoundingClientRect().bottom > line + 1);
+    const main = byId('captions').parentElement;
+    const captionsOut = Boolean(main) && byId('captions').getBoundingClientRect().bottom > main.getBoundingClientRect().bottom + 1;
+    return song.scrollHeight > song.clientHeight + 1 || captionsOut || texts.some((element) => element.getBoundingClientRect().bottom > line + 1);
 }
 
 /**
@@ -65,25 +60,39 @@ function placeYear(joined) {
     byId('release').classList.toggle('empty', !byId('album').textContent && !byId('year').textContent);
 }
 
-/**
- * The song's texts fitted to their two lines, the year on its own line if there is room, then all together to the
- * song's column: while they pass the station's line at its bottom, all of them shrink a step.
- */
-function fitSong() {
-    const minimum = (READABLE_AT_1080P * window.innerHeight) / FULL_HD_HEIGHT;
-    const texts = [...FITTED, 'yearLine'].map(byId);
-    // The year's line from its full size too: a size shrunk on another screen stayed under the minimum here.
-    byId('yearLine').style.fontSize = '';
-    placeYear(false);
-    FITTED.forEach((id) => fitText(byId(id), minimum));
-    if (crowded(texts)) {
-        // No room for the year's own line: it joins the album's ("Deliria · 2015"), and the texts are fitted again.
-        placeYear(true);
-        FITTED.forEach((id) => fitText(byId(id), minimum));
-    }
+/** The live caption's band, or none: the caption is the first to give its room to the song. */
+function yieldCaption(yields) {
+    const caption = Boolean(byId('captionText').textContent);
+    document.body.classList.toggle('caption-yields', yields && caption);
+    document.body.classList.toggle('captioned', caption && !yields);
+}
 
+/** All the texts a step smaller while they do not fit, down to `minimum`. */
+function shrinkAll(texts, minimum) {
     while (crowded(texts) && texts.map((element) => shrink(element, minimum)).includes(true)) {
         // All of them shrunk a step; measured again.
+    }
+}
+
+/**
+ * The song's texts in full in the song's column: at their own size while they fit; else the caption yields, the
+ * year joins the album's line, and the texts shrink to 24 px at 1080p, then (the only way left) to 16 px at 1080p.
+ */
+function fitSong() {
+    const scale = window.innerHeight / FULL_HD_HEIGHT;
+    const texts = FITTED.map(byId);
+    texts.forEach((element) => {
+        element.style.fontSize = '';
+    });
+    yieldCaption(false);
+    placeYear(false);
+    const steps = [() => yieldCaption(true), () => placeYear(true), () => shrinkAll(texts, READABLE_AT_1080P * scale), () => shrinkAll(texts, FLOOR_AT_1080P * scale)];
+    for (const step of steps) {
+        if (!crowded(texts)) {
+            return;
+        }
+
+        step();
     }
 }
 

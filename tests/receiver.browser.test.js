@@ -559,7 +559,9 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
             const r = document.getElementById(id).getBoundingClientRect();
             return { id, height: r.height, bottom: r.bottom / innerHeight };
         }))()`);
-        for (const box of placed) {
+        // The caption is the first to give its room to the song, which is never cut: drawn, or yielded.
+        const yielded = await evaluate('document.body.classList.contains("caption-yields")');
+        for (const box of placed.filter((b) => !(yielded && b.id === 'captions'))) {
             assert.ok(box.height > 0, `${box.id} is drawn`);
             assert.ok(box.bottom <= 0.72, `${box.id} ends at ${(box.bottom * 100).toFixed(1)} % of the height, above the bar`);
         }
@@ -858,13 +860,16 @@ test('layout and accessibility in every state, at 1920 x 1080, on the tablet (25
         const box = (s) => document.querySelector(s).getBoundingClientRect();
         return { title: box('#title').top, cover: box('#cover').bottom, station: box('#station').bottom, song: box('#song').top };
     })()`;
-    // Each text's lines, font size, CSS full size and whether it is cut (more than its two lines).
+    // Each text's lines, font size, CSS full size and whether it is cut in any way: its own box overflows, a clamp
+    // or an ellipsis, or the song's column hides its end (owner: never cut, never an ellipsis).
     const lines = `(() => ['title', 'artist', 'release'].map((id) => {
         const e = document.getElementById(id);
         const s = getComputedStyle(e);
         const full = (() => { const k = e.style.fontSize; e.style.fontSize = ''; const f = parseFloat(getComputedStyle(e).fontSize); e.style.fontSize = k; return f; })();
-        // Cut: its full text passes two lines (glyphs overhanging a line by a few pixels are not a third line).
-        const cut = e.scrollHeight > 2.5 * parseFloat(s.lineHeight);
+        const column = document.getElementById('song').getBoundingClientRect();
+        const hides = s.overflow !== 'visible';
+        const cut = (hides && (e.scrollHeight > e.clientHeight + 1 || e.scrollWidth > e.clientWidth + 1)) || s.textOverflow === 'ellipsis'
+            || (s.webkitLineClamp && s.webkitLineClamp !== 'none') || e.getBoundingClientRect().bottom > column.bottom + 1;
         return { id, lines: Math.round(e.clientHeight / parseFloat(s.lineHeight)), size: parseFloat(s.fontSize), full, cut };
     }))()`;
     const backdropNow = 'document.getElementById("backdrop").style.backgroundImage';
@@ -910,7 +915,7 @@ test('layout and accessibility in every state, at 1920 x 1080, on the tablet (25
         await evaluate(intercept('LOAD', { media: song(veryLong, 'A band', { station: 'Pro FM' }, [logo('90er-stream'), logo('Profm')]) }));
         const title = (await evaluate(lines))[0];
         assert.ok(title.size < title.full, `the title shrank on the first load: ${JSON.stringify(title)}`);
-        assert.equal(title.lines, 2);
+        assert.equal(title.cut, false, JSON.stringify(title));
     });
 
     const yearState = `(() => ({
@@ -955,10 +960,10 @@ test('layout and accessibility in every state, at 1920 x 1080, on the tablet (25
     });
 
     for (const size of sizes) {
-        await t.test(`${size.name}: a short text is one line at full size; a long one takes two lines, smaller, before it is cut`, async () => {
+        await t.test(`${size.name}: a short text is one line at full size; long and extreme texts shrink and are never cut`, async () => {
             await resize(session, size.width, size.height);
             await evaluate(`document.body.classList.toggle('touch', ${size.touch})`);
-            const minimum = (24 * size.height) / 1080 - 0.5;
+            const floor = (16 * size.height) / 1080 - 0.5;
             await evaluate(intercept('LOAD', { media: song('Hello', 'Adele', { station: 'Pro FM', album: '25' }, [logo('90er-stream'), logo('Profm')]) }));
             await pause(300);
             for (const text of await evaluate(lines)) {
@@ -966,25 +971,24 @@ test('layout and accessibility in every state, at 1920 x 1080, on the tablet (25
                 assert.equal(text.size, text.full, `${text.id} keeps its full size`);
             }
 
+            // Long, then extreme: a 200-character title, a long band, a long album, and a caption. Every text in full.
             const medium = 'A title that needs two lines of room at its full size on this screen, or a little more';
-            await evaluate(intercept('LOAD', { media: song(medium, medium, { station: 'Pro FM', album: medium }, [logo('90er-stream'), logo('Profm')]) }));
-            await pause(300);
-            for (const text of await evaluate(lines)) {
-                assert.ok(text.lines <= 2, `${text.id}: ${JSON.stringify(text)}`);
-                assert.ok(text.size >= minimum, `${text.id} at ${text.size} px is readable`);
-                // Cut only once it is at the readable minimum.
-                assert.ok(!text.cut || text.size <= minimum + 1, `${text.id} shrinks before it is cut: ${JSON.stringify(text)}`);
-            }
+            const title = `${medium} ${medium} and twenty-eight more characters`.slice(0, 200);
+            const band = 'The Very Long Name Of A Band Featuring Several Singers And An Orchestra From Somewhere Far';
+            const album = 'An Album Whose Name Goes On And On: The Complete Recordings, Remastered, Deluxe Anniversary Edition';
+            for (const [name, artist, albumName, caption] of [[medium, medium, medium, ''], [title, band, album, `${medium} ${medium}`]]) {
+                const m = song(name, artist, { station: 'Pro FM', album: albumName, caption }, [logo('90er-stream'), logo('Profm')]);
+                m.metadata.releaseDate = '2015';
+                await evaluate(intercept('LOAD', { media: m }));
+                await pause(800);
+                for (const text of await evaluate(lines)) {
+                    assert.equal(text.cut, false, `${text.id} is shown in full: ${JSON.stringify(text)}`);
+                    assert.ok(text.size >= floor, `${text.id} at ${text.size} px is readable`);
+                }
 
-            const veryLong = `${medium} ${medium} ${medium} ${medium}`;
-            await evaluate(intercept('LOAD', { media: song(veryLong, veryLong, { station: 'Pro FM', album: veryLong }, [logo('90er-stream'), logo('Profm')]) }));
-            await pause(300);
-            for (const text of await evaluate(lines)) {
-                assert.equal(text.lines, 2, `${text.id}: ${JSON.stringify(text)}`);
-                assert.ok(text.size < text.full && text.size >= minimum, `${text.id} shrank to ${text.size} px, no less than the minimum`);
+                assert.equal(await evaluate('document.getElementById("title").textContent'), name);
+                assert.deepEqual(await problems(session, size), []);
             }
-
-            assert.deepEqual(await problems(session, size), []);
         });
 
         await t.test(`${size.name}: a fixed layout, the title where it was, the station's line level with the cover's bottom`, async () => {
