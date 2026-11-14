@@ -41,7 +41,7 @@
     ./scripts/e2e/Test-ReceiverOnTablet.ps1 -Device adb-3406105H801UJL-TonHNR._adb-tls-connect._tcp
 
 .EXAMPLE
-    ./scripts/e2e/Test-ReceiverOnTablet.ps1 -Device adb-52141HFAG0JYZ9-3pyAfV._adb-tls-connect._tcp -Address 192.168.1.107
+    ./scripts/e2e/Test-ReceiverOnTablet.ps1 -Device <the TV's adb serial> -Address 192.168.1.107 -NoTouch
 #>
 [CmdletBinding()]
 param(
