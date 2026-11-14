@@ -3,8 +3,13 @@ Alexandrescu
 allowzero
 Amma
 byurl
+FASTOCTREE
+fromarray
+getpixel
 IDAT
 IHDR
+linalg
+SRGB
 Paeth
 rects
 WCAG

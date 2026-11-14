@@ -845,6 +845,21 @@ test('layout and accessibility in every state, at 1920 x 1080, on the tablet (25
         });
     }
 
+    await t.test('a dark logo gets the light glow on the real canvas; Pro FM\'s white lettering does not', async () => {
+        await resize(session, 1920, 1080);
+        for (const [name, light] of [['24house', true], ['Profm', false]]) {
+            await evaluate(intercept('LOAD', { media: song(name, name, { station: name }, [logo(name)]) }));
+            await waitFor(
+                async () => (await evaluate('document.getElementById("cover").getAttribute("src")')) === logo(name),
+                `${name} as the cover`,
+                10000,
+            );
+            await pause(500);
+            assert.equal(await evaluate('document.getElementById("cover").classList.contains("light")'), light, name);
+            assert.deepEqual(await evaluate(PLATE('#cover')), NO_PLATE);
+        }
+    });
+
     await t.test('no error from our script in any state', () => {
         assert.deepEqual(session.errors, []);
     });

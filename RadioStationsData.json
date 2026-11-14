@@ -175,7 +175,7 @@
         "GUID": "95dbe3ee-1714-4419-99e6-eb4f574db1a3",
         "Title": "Radio Fix",
         "Url": "http://89.137.76.149:8000/stream",
-        "ImageUrl": "radiofix.jpg"
+        "ImageUrl": "radiofix.png"
       },
       {
         "GUID": "1723f3cb-0ee6-46a4-ac14-a06d302a5af5",
@@ -199,7 +199,7 @@
         "GUID": "86e0a7de-4224-4b67-9f30-c7de022fdef0",
         "Title": "Radio Top",
         "Url": "https://live.radiotop.ro/radio/8000/radio.mp3",
-        "ImageUrl": "radiotopsuceava.jpg"
+        "ImageUrl": "radiotopsuceava.png"
       },
       {
         "GUID": "76575127-2a78-413c-9187-c679240f5de3",
@@ -313,7 +313,7 @@
         "GUID": "baebef67-9acd-4317-a2b2-d932af78e6be",
         "Title": "Hit FM Alba",
         "Url": "https://radio.sonicpanel.ro:8082/stream",
-        "ImageUrl": "hit-fm-alba.jpg"
+        "ImageUrl": "hit-fm-alba.png"
       },
       {
         "GUID": "f0bd52d5-e78c-41c5-bc6a-482f0ccb380d",
@@ -343,7 +343,7 @@
         "GUID": "a4d81887-9b8c-4999-9a4e-36428f58ca81",
         "Title": "Realitatea FM",
         "Url": "https://shout.realitatea.net:8001/mixt",
-        "ImageUrl": "RealitateaFM.jpg"
+        "ImageUrl": "RealitateaFM.png"
       },
       {
         "GUID": "9a47e913-6a50-454e-b084-edb19cba326c",
@@ -667,7 +667,7 @@
         "GUID": "fdd53cb3-9f35-4b23-b6b8-833a10a83d8f",
         "Title": "Radio Mirajul Muzicii",
         "Url": "http://live.radiomiraj.ro:9952/",
-        "ImageUrl": "mirajulmuzicii.jpg"
+        "ImageUrl": "mirajulmuzicii.png"
       },
       {
         "GUID": "21631b8e-55bf-4b11-8a11-72d42a91ef71",
@@ -882,7 +882,7 @@
         "GUID": "2933ed5f-1449-42ad-b61e-a9c22701d2bf",
         "Title": "Radio Pro Music 90s",
         "Url": "https://playradiohit90-adradio.radioca.st/stream",
-        "ImageUrl": "play-radio-hit-90s.jpg"
+        "ImageUrl": "play-radio-hit-90s.png"
       },
       {
         "GUID": "d57ad3d7-ea07-4230-bfa1-d51da9abbe4a",
@@ -919,7 +919,7 @@
         "GUID": "b5f349ef-1762-48e7-9b58-7ad68d203430",
         "Title": "Radio 90 Hit",
         "Url": "https://live.90hit.ro:8000/radio.mp3",
-        "ImageUrl": "radio90hit.jpg"
+        "ImageUrl": "radio90hit.png"
       },
       {
         "GUID": "c15a354c-e7ab-47ec-bfb6-edf524954fc0",
@@ -954,7 +954,7 @@
         "GUID": "b212c271-6cb1-47fd-a9b3-292e09fdc4eb",
         "Title": "Radio GMusic Planet Funk",
         "Url": "https://play.webradio-hosting.com:8036/stream",
-        "ImageUrl": "gmusic-funk.jpg"
+        "ImageUrl": "gmusic-funk.png"
       },
       {
         "GUID": "2c8390d3-c6a6-42c0-ad79-f7f010f9a9d2",
@@ -966,7 +966,7 @@
         "GUID": "3c818bb2-512e-4555-9740-1a92bc9dc9a9",
         "Title": "Radio GMusic Soft",
         "Url": "https://s9.webradio-hosting.com/proxy/rgmsoft/stream",
-        "ImageUrl": "gmusic-soft.jpg"
+        "ImageUrl": "gmusic-soft.png"
       },
       {
         "GUID": "b608b5cf-08b0-42b1-9bda-2b547d73c30b",
@@ -978,7 +978,7 @@
         "GUID": "ad6a1eb9-8fa9-4a8d-9890-39f869d2b84e",
         "Title": "Radio GMusic Trap",
         "Url": "https://s9.webradio-hosting.com/proxy/rgmtrap/stream",
-        "ImageUrl": "gmusic-trap.jpg"
+        "ImageUrl": "gmusic-trap.png"
       },
       {
         "GUID": "879c9e21-24d9-427a-9eba-1fc2034a87c1",
@@ -1014,7 +1014,7 @@
         "GUID": "77224b56-1b53-4ed3-8113-bae23ff7b826",
         "Title": "star fm",
         "Url": "https://ssl.asculta.live:8310/;",
-        "ImageUrl": "starfm.jpg"
+        "ImageUrl": "starfm.png"
       },
       {
         "GUID": "fc2a5b8c-ffea-49f8-ae7b-476ae8900d72",
@@ -1138,7 +1138,7 @@
         "GUID": "ed6d3bd6-ae3e-405c-ac82-e1678630aaa5",
         "Title": "Radio Filadelfia Romania",
         "Url": "http://asculta.radiofiladelfia.ro:8080/stream/2/",
-        "ImageUrl": "Radio-Filadelfia.jpg"
+        "ImageUrl": "Radio-Filadelfia.png"
       },
       {
         "GUID": "45b6c6e5-bcce-4d3c-a12a-bb78cef17b35",
@@ -1156,13 +1156,13 @@
         "GUID": "66837e1e-413b-486a-aef5-b895379d5c22",
         "Title": "Metronom FM",
         "Url": "http://metronom-fm.ro:8000/stream.ogg",
-        "ImageUrl": "metronomfm.jpg"
+        "ImageUrl": "metronomfm.png"
       },
       {
         "GUID": "248fff49-f0ca-41b9-b974-02de15b7d14c",
         "Title": "Micul Samaritean FM",
         "Url": "https://online.miculsamaritean.com:8000/radio.mp3",
-        "ImageUrl": "micul-samaritean.jpg"
+        "ImageUrl": "micul-samaritean.png"
       },
       {
         "GUID": "45e1d455-6832-4f76-8103-7392aae4ee7f",
@@ -1174,7 +1174,7 @@
         "GUID": "5a6f6e9c-3f1a-4dc7-b328-66328412d20c",
         "Title": "Mária Rádió Erdély",
         "Url": "http://stream.mariaradio.ro:8000/MRE_LQ",
-        "ImageUrl": "mariaradio.jpg"
+        "ImageUrl": "mariaradio.png"
       },
       {
         "GUID": "6a2f33b1-e61a-4839-9843-6e7a70c7a08f",

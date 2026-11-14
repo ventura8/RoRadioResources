@@ -100,7 +100,16 @@ function element() {
 /** Loads the page in a fresh context, plays `messages` and returns what the page did. */
 function run(
     messages,
-    { touch = false, taps = [], playerState = 'PLAYING', pictures = 'load', coarse, capabilities, playingMedia } = {},
+    {
+        touch = false,
+        taps = [],
+        playerState = 'PLAYING',
+        pictures = 'load',
+        coarse,
+        capabilities,
+        playingMedia,
+        logoPixels = [255, 255, 255, 255],
+    } = {},
 ) {
     const elements = {};
     const stationImage = element();
@@ -173,7 +182,10 @@ function run(
                 if (pictures === 'load') {
                     probe.onload();
                 } else if (pictures === 'error') {
-                    probe.onerror();
+                    // The tone measure's probe has no error handler: a logo it cannot read stays as it is.
+                    if (probe.onerror) {
+                        probe.onerror();
+                    }
                 } else {
                     did.probes.push(probe);
                 }
@@ -203,7 +215,23 @@ function run(
             ...(coarse === undefined ? {} : { matchMedia: (query) => ({ matches: coarse && query === '(pointer: coarse)' }) }),
         },
         getComputedStyle: () => ({ color: 'rgb(255, 255, 255)' }),
-        document: { getElementById: (id) => (elements[id] ??= element()), body: element() },
+        document: {
+            getElementById: (id) => (elements[id] ??= element()),
+            body: element(),
+            // A canvas that reads back `logoPixels` (RGBA), or throws as a picture without CORS does.
+            createElement: () => ({
+                getContext: () => ({
+                    drawImage: () => undefined,
+                    getImageData: () => {
+                        if (logoPixels === 'tainted') {
+                            throw new Error('The canvas has been tainted by cross-origin data.');
+                        }
+
+                        return { data: logoPixels };
+                    },
+                }),
+            }),
+        },
         Image,
     };
     // The page's globals for one fresh load of the script. The clock moves on a second before each message and tap
@@ -483,6 +511,39 @@ test('test mode ({"rects": true}): the drawn boxes, their colours, the pixel rat
     assert.equal(run([load('')]).shown.rects, undefined);
 });
 
+/** RGBA pixels: `dark` dark opaque ones, `light` white opaque ones and `clear` see-through ones. */
+const pixels = (dark, light, clear) => [
+    ...Array(dark).fill([0, 20, 40, 255]).flat(),
+    ...Array(light).fill([255, 255, 255, 255]).flat(),
+    ...Array(clear).fill([0, 0, 0, 0]).flat(),
+];
+
+test('a dark logo (dark lettering on transparency) gets the light treatment; a light one does not', () => {
+    const images = ['https://x/cover.jpg', 'https://x/logo.png'];
+    assert.equal(run([loadWith(images, '')], { logoPixels: pixels(8, 2, 6) }).stationImage.classList.has('light'), true);
+    assert.equal(run([loadWith(images, '')], { logoPixels: pixels(2, 8, 6) }).stationImage.classList.has('light'), false);
+    // Nothing opaque, or a picture the canvas may not read (no CORS): readable as it is.
+    assert.equal(run([loadWith(images, '')], { logoPixels: pixels(0, 0, 6) }).stationImage.classList.has('light'), false);
+    assert.equal(run([loadWith(images, '')], { logoPixels: 'tainted' }).stationImage.classList.has('light'), false);
+});
+
+test('the logo in the cover\'s place is measured too; a song\'s cover never is', () => {
+    const asCover = run([loadWith(['https://x/logo.png'], '')], { logoPixels: pixels(9, 1, 0) });
+    assert.equal(asCover.elements.cover.classList.has('light'), true);
+    const song = run([loadWith(['https://x/cover.jpg', 'https://x/logo.png'], '')], { logoPixels: pixels(9, 1, 0) });
+    assert.equal(song.elements.cover.classList.has('light'), false);
+});
+
+test('a slow tone measure of an old logo never marks the new one', () => {
+    const did = run([loadWith(['https://x/c.jpg', 'https://x/old.png'], '')], { pictures: 'later', logoPixels: pixels(9, 1, 0) });
+    did.within((more) => more([loadWith(['https://x/c.jpg', 'https://x/new.png'], '')]));
+    for (const probe of did.probes.filter((p) => p.url === 'https://x/old.png')) {
+        did.within(() => probe.onload());
+    }
+
+    assert.equal(did.stationImage.classList.has('light'), false);
+});
+
 test('no song (the station alone): its name once, never repeated as the title or the artist', () => {
     const did = run([
         { type: 'LOAD', request: { media: { metadata: { title: 'Pro FM', artist: ' pro fm ', albumName: 'Pro FM' }, customData: JSON.stringify({ station: 'Pro FM' }) } } },
@@ -559,7 +620,7 @@ test('a cover that loads is the backdrop; one that fails leaves no picture and n
 test('a slow old picture never replaces a newer one, loaded or failed', () => {
     const did = run([loadWith(['https://x/old.jpg'], '')], { pictures: 'later' });
     did.within((more) => more([loadWith(['https://x/new.jpg'], '')]));
-    const [oldCover, newCover] = did.probes;
+    const [oldCover, newCover] = did.probes.filter((probe) => probe.crossOrigin === undefined);
     did.within(() => newCover.onload());
     did.within(() => oldCover.onload());
     did.within(() => oldCover.onerror());
