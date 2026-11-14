@@ -222,34 +222,39 @@ $station = @{
 
 Test-Step 'launch' { (Invoke-Cast 'launch').appId -eq 'F38F9694' }
 Test-Step 'load' { (Invoke-Cast 'load' $station).playerState -in @('PLAYING', 'BUFFERING') }
-Test-Step 'song' {
-    $song = $station.Clone()
-    $song.title = 'Test song'; $song.artist = 'Test artist'; $song.album = 'Test album'; $song.year = '2025'
-    # A picture GitHub Pages serves stands in for the song's cover: the check is that cover and logo both show.
-    $song.images = @("$pages/90er-stream.png", "$pages/Profm.png")
-    Invoke-Cast 'song' $song | Out-Null
-}
-# The app's cover colour theme on, then off: the receiver reports the colours it took, then none.
+# One song for the song and both theme steps: the theme steps once sent it without its album and year, and the
+# screenshot of 'theme on' looked as if the theme dropped them.
+$song = $station.Clone()
+$song.title = 'Test song'; $song.artist = 'Test artist'; $song.album = 'Test album'; $song.year = '2025'
+# A picture GitHub Pages serves stands in for the song's cover: the check is that cover and logo both show.
+$song.images = @("$pages/90er-stream.png", "$pages/Profm.png")
+Test-Step 'song' { Invoke-Cast 'song' $song | Out-Null }
+# The app's cover colour theme on, then off: the receiver reports the colours it took, then none, and the same texts
+# show both times.
 Test-Step 'theme on' {
-    $themed = $station.Clone()
-    $themed.title = 'Test song'; $themed.artist = 'Test artist'; $themed.images = @("$pages/90er-stream.png", "$pages/Profm.png")
+    $themed = $song.Clone()
     $themed.data = $station.data.Clone()
     $themed.data.theme = @{ accent = '#f0e040'; tint = '#4d4813' }
     Invoke-Cast 'song' $themed | Out-Null
     Start-Sleep -Seconds 2
-    (Invoke-Cast 'shown').theme.tint -eq '#4d4813'
+    $script:themedLayout = Invoke-Cast 'shown'
+    $script:themedLayout.theme.tint -eq '#4d4813'
 }
 Test-Step 'theme off' {
-    $plain = $station.Clone()
-    $plain.title = 'Test song'; $plain.artist = 'Test artist'; $plain.album = 'Test album'; $plain.year = '2025'
-    $plain.images = @("$pages/90er-stream.png", "$pages/Profm.png")
-    Invoke-Cast 'song' $plain | Out-Null
+    Invoke-Cast 'song' $song | Out-Null
     Start-Sleep -Seconds 2
     $script:layout = Invoke-Cast 'shown'
     $null -eq $script:layout.theme -and $script:layout.cover -and $script:layout.logo -and $script:layout.title -eq 'Test song'
 }
-# The screen as the page reports it (read in 'theme off'), on that step's screenshot.
+Test-Step 'theme keeps the texts' {
+    $on = @($script:themedLayout.rects.PSObject.Properties.Name | Sort-Object) -join ','
+    $off = @($script:layout.rects.PSObject.Properties.Name | Sort-Object) -join ','
+    Write-Information "    theme on: $on; theme off: $off" -InformationAction Continue
+    $on -eq $off -and $off -match 'release'
+}
+# The screen as the page reports it, on each theme step's screenshot.
 Test-Step 'layout on the screenshot' { Test-Layout $script:layout (Join-Path $OutDir 'theme-off.png') }
+Test-Step 'themed layout on the screenshot' { Test-Layout $script:themedLayout (Join-Path $OutDir 'theme-on.png') }
 # One press is exactly one step. A touch display's bar sends every press with one request id: previous after next,
 # and next again, must each still step.
 Test-Step 'next' { ((Invoke-Press 'next').steps -join ',') -eq 'next' }
