@@ -134,15 +134,30 @@ function chromePath() {
         '/usr/bin/chromium-browser',
         '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
     ];
+    // CHROME_PATH, when set, is the only Chrome: a wrong one fails rather than falling back to another install.
+    if (process.env.CHROME_PATH) {
+        return process.env.CHROME_PATH;
+    }
+
     const found = candidates.find((candidate) => candidate && fs.existsSync(candidate));
     assert.ok(found, 'Chrome is needed for the receiver page test: install it or set CHROME_PATH');
     return found;
 }
 
+/** `promise`, or a rejection naming `what` once `ms` have passed; the timer never outlives it. */
+function within(promise, ms, what) {
+    let timer;
+    const deadline = new Promise((resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(`Timed out waiting for ${what}`)), Math.max(ms, 0));
+    });
+    return Promise.race([promise, deadline]).finally(() => clearTimeout(timer));
+}
+
+/** Polls `condition` until it returns a truthy value; a condition that never settles still ends at the deadline. */
 async function waitFor(condition, what, timeout = 20000) {
     const end = Date.now() + timeout;
     for (;;) {
-        const value = await condition();
+        const value = await within(Promise.resolve().then(condition), end - Date.now(), what);
         if (value) {
             return value;
         }
@@ -155,11 +170,21 @@ async function waitFor(condition, what, timeout = 20000) {
     }
 }
 
-/** Headless Chrome and one DevTools connection to a fresh page target. */
+/** Headless Chrome and one DevTools connection to a fresh page target; on any failure nothing is left running. */
 async function launch() {
+    const executable = chromePath();
     const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'receiver-chrome-'));
+    let socket = null;
+    const pending = new Map();
+    let gone = null;
+    /** Every request still waiting for Chrome is rejected: none can hang once Chrome or its socket is gone. */
+    const fail = (reason) => {
+        gone = gone || reason;
+        pending.forEach(({ reject }) => reject(new Error(gone)));
+        pending.clear();
+    };
     const chrome = spawn(
-        chromePath(),
+        executable,
         [
             '--headless=new',
             '--remote-debugging-port=0',
@@ -173,18 +198,76 @@ async function launch() {
         ],
         { stdio: 'ignore' },
     );
-    const portFile = path.join(profile, 'DevToolsActivePort');
-    const port = await waitFor(() => fs.existsSync(portFile) && fs.readFileSync(portFile, 'utf8').split('\n')[0], 'Chrome');
-    const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-    const target = targets.find((t) => t.type === 'page');
-    const socket = new WebSocket(target.webSocketDebuggerUrl);
-    await new Promise((resolve, reject) => {
-        socket.onopen = resolve;
-        socket.onerror = reject;
+    const exited = new Promise((resolve) => {
+        const done = () => resolve();
+        chrome.once('exit', done);
+        // A spawn that fails (no such file) emits 'error' and never 'exit'.
+        chrome.once('error', done);
     });
-    let nextId = 0;
-    const pending = new Map();
+    let spawnError = null;
+    chrome.on('error', (e) => {
+        spawnError = e;
+        fail(`Chrome could not start: ${e.message}`);
+    });
+    chrome.on('exit', (code, signal) => fail(`Chrome exited (${signal || code})`));
+    const running = () => !spawnError && chrome.exitCode === null && chrome.signalCode === null;
+    const stop = async () => {
+        if (socket) {
+            socket.close();
+        }
+
+        if (running() && chrome.pid !== undefined) {
+            chrome.kill();
+        }
+
+        await within(exited, 10000, 'Chrome to exit').catch(() => undefined);
+        fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    };
+
     const listeners = [];
+    let nextId = 0;
+    const send = (method, params = {}) =>
+        new Promise((resolve, reject) => {
+            if (gone) {
+                reject(new Error(gone));
+                return;
+            }
+
+            nextId += 1;
+            pending.set(nextId, { resolve, reject });
+            socket.send(JSON.stringify({ id: nextId, method, params }));
+        });
+    try {
+        const portFile = path.join(profile, 'DevToolsActivePort');
+        const port = await waitFor(() => {
+            if (gone) {
+                throw new Error(gone);
+            }
+
+            return fs.existsSync(portFile) && fs.readFileSync(portFile, 'utf8').split('\n')[0].trim();
+        }, 'Chrome');
+        const targets = await within(
+            fetch(`http://127.0.0.1:${port}/json/list`).then((r) => r.json()),
+            10000,
+            'the DevTools target list',
+        );
+        const target = targets.find((t) => t.type === 'page');
+        assert.ok(target, 'Chrome has a page target');
+        socket = new WebSocket(target.webSocketDebuggerUrl);
+        socket.onclose = () => fail('the DevTools connection closed');
+        await within(
+            new Promise((resolve, reject) => {
+                socket.onopen = resolve;
+                socket.onerror = () => reject(new Error('the DevTools connection failed'));
+            }),
+            10000,
+            'the DevTools connection',
+        );
+    } catch (e) {
+        await stop();
+        throw e;
+    }
+
     socket.onmessage = (event) => {
         const message = JSON.parse(event.data);
         if (message.id && pending.has(message.id)) {
@@ -199,22 +282,10 @@ async function launch() {
             listeners.forEach((listener) => listener(message));
         }
     };
-    const send = (method, params = {}) =>
-        new Promise((resolve, reject) => {
-            nextId += 1;
-            pending.set(nextId, { resolve, reject });
-            socket.send(JSON.stringify({ id: nextId, method, params }));
-        });
     const close = async () => {
         // Browser.close ends every Chrome process; a kill of the first one alone left its children running.
-        await Promise.race([send('Browser.close').catch(() => undefined), new Promise((r) => setTimeout(r, 5000))]);
-        socket.close();
-        if (chrome.exitCode === null) {
-            chrome.kill();
-            await new Promise((resolve) => chrome.once('exit', resolve));
-        }
-
-        fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+        await within(send('Browser.close'), 5000, 'Browser.close').catch(() => undefined);
+        await stop();
     };
     return { send, listeners, close };
 }
@@ -225,7 +296,23 @@ async function launch() {
  */
 async function open(withPage = page) {
     const server = await serve(withPage);
-    const browser = await launch();
+    const closeServer = () =>
+        new Promise((resolve) => {
+            server.closeAllConnections();
+            server.close(() => resolve());
+        });
+    let browser;
+    try {
+        browser = await launch();
+    } catch (e) {
+        await closeServer();
+        throw e;
+    }
+
+    const close = async () => {
+        await browser.close();
+        await closeServer();
+    };
     const errors = [];
     const ownUrl = `http://127.0.0.1:${server.address().port}/receiver/`;
     browser.listeners.push((message) => {
@@ -248,19 +335,28 @@ async function open(withPage = page) {
 
         return result.result.value;
     };
-    await browser.send('Runtime.enable');
-    await browser.send('Page.enable');
-    await browser.send('Page.navigate', { url: ownUrl });
-    await waitFor(
-        () => evaluate('document.readyState === "complete" && Boolean(window.probe)').catch(() => false),
-        'the page',
-        30000,
-    );
-    const close = async () => {
-        await browser.close();
-        server.closeAllConnections();
-        server.close();
-    };
+    try {
+        await browser.send('Runtime.enable');
+        await browser.send('Page.enable');
+        await browser.send('Page.navigate', { url: ownUrl });
+        await waitFor(
+            () =>
+                evaluate('document.readyState === "complete" && Boolean(window.probe)').catch((e) => {
+                    // Chrome gone: no point polling until the deadline.
+                    if (/Chrome|DevTools/.test(e.message)) {
+                        throw e;
+                    }
+
+                    return false;
+                }),
+            'the page',
+            30000,
+        );
+    } catch (e) {
+        await close();
+        throw e;
+    }
+
     return { errors, evaluate, close, origin: `http://127.0.0.1:${server.address().port}` };
 }
 
@@ -311,6 +407,29 @@ const media = (origin, { title, artist, album, releaseDate, cover, logo, customD
 
 const loadRequest = (m) => ({ media: m });
 const updateRequest = (m) => ({ items: [{ media: m }] });
+
+test('a Chrome that cannot start fails at once and leaves nothing open', { timeout: 30000 }, async () => {
+    const resources = () => process.getActiveResourcesInfo().filter((r) => r !== 'TTYWrap' && r !== 'Timeout');
+    const before = resources();
+    const saved = process.env.CHROME_PATH;
+    process.env.CHROME_PATH = path.join(os.tmpdir(), 'no-such-chrome', 'chrome.exe');
+    const started = Date.now();
+    try {
+        await assert.rejects(open(), /Chrome could not start/);
+    } finally {
+        if (saved === undefined) {
+            delete process.env.CHROME_PATH;
+        } else {
+            process.env.CHROME_PATH = saved;
+        }
+    }
+
+    assert.ok(Date.now() - started < 10000, 'the failure is reported at once, not at a deadline');
+    // The server's socket and Chrome's process handle are released (a closed handle leaves Node's list a moment later).
+    const same = () => JSON.stringify(resources()) === JSON.stringify(before);
+    await waitFor(same, 'the server and Chrome handles to close', 2000).catch(() => undefined);
+    assert.deepEqual(resources(), before);
+});
 
 test('the receiver page in Chrome with the real Cast framework', { timeout: 300000 }, async (t) => {
     const session = await open();
