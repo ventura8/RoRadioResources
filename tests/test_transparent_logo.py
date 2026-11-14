@@ -7,17 +7,27 @@ artwork that covers its square (no solid background to remove); and a logo whose
 dark screen is one the receiver gives its light treatment, by the same measure (receiver.js).
 """
 
+import contextlib
 import importlib.util
+import io
+import json
 import re
+import runpy
+import shutil
+import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import numpy as np
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = ROOT / "scripts" / "lib" / "transparent_logo.py"
+USAGE = 2
 # scripts/lib is not a package on the path: the module is loaded from its file.
-SPEC = importlib.util.spec_from_file_location("transparent_logo", ROOT / "scripts" / "lib" / "transparent_logo.py")
+SPEC = importlib.util.spec_from_file_location("transparent_logo", SCRIPT)
 transparent_logo = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(transparent_logo)
 
@@ -81,6 +91,51 @@ class TransparentLogoTest(unittest.TestCase):
             for path in folder.iterdir():
                 path.unlink()
             folder.rmdir()
+
+
+class CommandLineTest(unittest.TestCase):
+    """The command line: one JSON line per logo, the usage without one, a large result kept small."""
+
+    def setUp(self) -> None:
+        """Give each test its own folder."""
+        self.folder = Path(tempfile.mkdtemp())
+
+    def tearDown(self) -> None:
+        """Remove the test's folder."""
+        shutil.rmtree(self.folder)
+
+    def test_one_json_line_per_logo_and_the_usage_without_one(self) -> None:
+        """Each logo's result on stdout; no logo is exit code 2 with the usage."""
+        logo = self.folder / "plate.png"
+        square((255, 255, 255, 255), mark=(200, 0, 0, 255)).save(logo)
+        output = io.StringIO()
+        with mock.patch.object(sys, "argv", [str(SCRIPT), str(logo)]), contextlib.redirect_stdout(output):
+            self.assertEqual(transparent_logo.main(), 0)
+        self.assertEqual(json.loads(output.getvalue())["result"], "transparent")
+        with mock.patch.object(sys, "argv", [str(SCRIPT)]), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(transparent_logo.main(), USAGE)
+
+    def test_run_as_a_script_it_exits_with_main_s_code(self) -> None:
+        """`python transparent_logo.py` exits with what main() returns."""
+        with (
+            mock.patch.object(sys, "argv", [str(SCRIPT)]),
+            contextlib.redirect_stderr(io.StringIO()),
+            self.assertRaises(SystemExit) as raised,
+        ):
+            runpy.run_path(str(SCRIPT), run_name="__main__")
+        self.assertEqual(raised.exception.code, USAGE)
+
+    def test_a_result_over_the_size_cap_is_written_with_256_colours(self) -> None:
+        """A photographic logo stays under the cap every app downloads."""
+        logo = self.folder / "photo.png"
+        noise = np.random.default_rng(2).integers(0, 255, (400, 400, 3), dtype=np.uint8)
+        image = Image.new("RGBA", (440, 440), (255, 255, 255, 255))
+        image.paste(Image.fromarray(noise, "RGB"), (20, 20))
+        image.save(logo)
+        with mock.patch.object(transparent_logo, "MAX_BYTES", 1000):
+            self.assertEqual(transparent_logo.convert(logo)["result"], "transparent")
+        with Image.open(logo) as written:
+            self.assertEqual(written.mode, "P")
 
 
 class ReceiverLogosTest(unittest.TestCase):
