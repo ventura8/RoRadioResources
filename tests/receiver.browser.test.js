@@ -126,6 +126,7 @@ const ownFiles = {
     '/receiver/logo-tone.js': 'text/javascript; charset=utf-8',
     '/receiver/theme.js': 'text/javascript; charset=utf-8',
     '/receiver/layout-report.js': 'text/javascript; charset=utf-8',
+    '/receiver/fit.js': 'text/javascript; charset=utf-8',
     '/receiver/icon.png': 'image/png',
 };
 
@@ -415,7 +416,8 @@ const SCREEN = `(() => {
         title: text('title'),
         artist: text('artist'),
         album: text('album'),
-        year: text('year'),
+        // On its own line under the album, or joined to the album's line when space is tight.
+        year: text('yearLine') || text('year'),
         caption: text('captionText'),
         captionShown: shown('captions'),
         stationName: text('stationName'),
@@ -516,6 +518,10 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
         assert.equal(screen.idleVisible, true);
         assert.equal(screen.mainVisible, false);
         assert.equal(await evaluate('document.querySelector("#idle p").textContent'), 'Ready to play');
+        // One logo, the app's icon: no "RoRadio" wordmark under it (owner, 2026-11-14). The icon is the heading, named.
+        assert.equal(await evaluate('document.querySelector("#idle h1").textContent.trim()'), '');
+        assert.equal(await evaluate('document.querySelector("#idle h1 img").alt'), 'RoRadio');
+        assert.equal(await evaluate('document.querySelectorAll("#idle img").length'), 1);
     });
 
     await t.test('the idle screen shows the app icon, which loads (no 404)', async () => {
@@ -906,6 +912,34 @@ test('layout and accessibility in every state, at 1920 x 1080, on the tablet (25
         assert.ok(title.size < title.full, `the title shrank on the first load: ${JSON.stringify(title)}`);
         assert.equal(title.lines, 2);
     });
+
+    const yearState = `(() => ({
+        alone: document.getElementById('yearLine').textContent,
+        joined: document.getElementById('year').textContent,
+        shown: document.getElementById('yearLine').checkVisibility(),
+    }))()`;
+    for (const size of sizes) {
+        await t.test(`${size.name}: the year on its own line when there is room; on the album's line only when space is tight`, async () => {
+            await resize(session, size.width, size.height);
+            await evaluate(`document.body.classList.toggle('touch', ${size.touch})`);
+            const short = { media: song('Hello', 'Adele', { station: 'Pro FM', album: '25' }, [logo('90er-stream'), logo('Profm')]) };
+            short.media.metadata.releaseDate = '2015';
+            await evaluate(intercept('LOAD', short));
+            await pause(800);
+            assert.deepEqual(await evaluate(yearState), { alone: '2015', joined: '', shown: true });
+            assert.deepEqual(await problems(session, size), []);
+
+            const words = 'A title that needs two lines of room at its full size on this screen, or a little more than that';
+            const tight = { media: song(words, words, { station: 'Pro FM', album: words, caption: `${words} ${words}` }, [logo('90er-stream'), logo('Profm')]) };
+            tight.media.metadata.releaseDate = '2015';
+            await evaluate(intercept('LOAD', tight));
+            await pause(800);
+            const state = await evaluate(yearState);
+            // Tight: joined to the album's line ("… · 2015"), or alone only where the column still had room.
+            assert.ok(state.joined === '2015' || (state.alone === '2015' && state.shown), JSON.stringify(state));
+            assert.deepEqual(await problems(session, size), []);
+        });
+    }
 
     for (const size of sizes) {
         await t.test(`${size.name}: a short text is one line at full size; a long one takes two lines, smaller, before it is cut`, async () => {

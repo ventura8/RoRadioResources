@@ -6,7 +6,7 @@
 'use strict';
 
 /** The leaves an on-device test measures on the device's own screenshot. */
-const LEAVES = ['cover', 'stationName', 'title', 'artist', 'release', 'captionText'];
+const LEAVES = ['cover', 'stationName', 'title', 'artist', 'release', 'yearLine', 'captionText'];
 
 /**
  * Each visible leaf's box (CSS px, [left, top, right, bottom]), its text colour, the device pixel ratio and the

@@ -14,6 +14,7 @@ const script = path.join(__dirname, '..', 'receiver', 'receiver.js');
 const logoTone = path.join(__dirname, '..', 'receiver', 'logo-tone.js');
 const themeScript = path.join(__dirname, '..', 'receiver', 'theme.js');
 const layoutScript = path.join(__dirname, '..', 'receiver', 'layout-report.js');
+const fitScript = path.join(__dirname, '..', 'receiver', 'fit.js');
 const html = fs.readFileSync(path.join(__dirname, '..', 'receiver', 'index.html'), 'utf8');
 assert.ok(html.includes('<script src="receiver.js"></script>'), 'receiver/index.html loads receiver.js');
 assert.ok(
@@ -293,6 +294,8 @@ function run(
         require(themeScript);
         delete require.cache[layoutScript];
         require(layoutScript);
+        delete require.cache[fitScript];
+        require(fitScript);
         delete require.cache[script];
         require(script);
         play(messages, interceptors, did);
@@ -731,8 +734,25 @@ test('the song name, subtitle, album and year are used when the main fields are 
     assert.equal(did.title, 'Name');
     assert.equal(did.elements.artist.textContent, 'Sub');
     assert.equal(did.elements.album.textContent, 'Album');
-    assert.equal(did.elements.year.textContent, '2015');
+    // The year on its own line under the album while there is room (owner, 2026-11-14).
+    assert.equal(did.elements.year.textContent, '');
+    assert.equal(did.elements.yearLine.textContent, '2015');
+    assert.equal(did.elements.yearLine.classList.has('empty'), false);
     assert.equal(did.elements.release.classList.has('empty'), false);
+});
+
+test('the year joins the album\'s line only when the column has no room for its own; with no album it is that line', () => {
+    const metadata = { title: 'Song', albumName: 'Album', releaseDate: '2015' };
+    // The song's column too full (its own height over it): the year joins the album's line.
+    const tight = run([{ type: 'LOAD', request: { media: { metadata } } }], { textHeights: { song: 1 } });
+    assert.equal(tight.elements.year.textContent, '2015');
+    assert.equal(tight.elements.yearLine.textContent, '');
+    assert.equal(tight.elements.yearLine.classList.has('empty'), true);
+
+    const noAlbum = run([{ type: 'LOAD', request: { media: { metadata: { title: 'Song', releaseDate: '2015' } } } }]);
+    assert.equal(noAlbum.elements.year.textContent, '2015');
+    assert.equal(noAlbum.elements.yearLine.textContent, '');
+    assert.equal(noAlbum.elements.release.classList.has('empty'), false);
 });
 
 test('a cover that loads is the backdrop; one that fails leaves no picture and no backdrop', () => {

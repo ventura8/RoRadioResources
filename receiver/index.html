@@ -178,7 +178,7 @@
              * column is the cover's height, so nothing moves between a song and the station alone.
              */
             height: var(--cover);
-            grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+            grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
             align-content: start;
             row-gap: clamp(8px, 1.6vmin, 22px);
         }
@@ -218,8 +218,12 @@
             line-height: 1.2;
         }
 
-        /* The album and its year on one line: "Deliria · 2015". */
-        #release {
+        /*
+         * The album, and under it the year on a line of its own; the year joins the album's line ("Deliria · 2015")
+         * only when the column has no room for it (receiver.js).
+         */
+        #release,
+        #yearLine {
             font-size: clamp(24px, 5.5vmin, 80px);
             color: var(--muted);
             line-height: 1.25;
@@ -231,7 +235,7 @@
 
         #station {
             display: flex;
-            grid-row: 5;
+            grid-row: 6;
             align-self: end;
             align-items: center;
             min-width: 0;
@@ -296,6 +300,7 @@
         #captions.empty,
         /* By class, set by show(): a selector a receiver's browser does not know (:has) would drop the whole rule. */
         #release.empty,
+        #yearLine.empty,
         #station.empty {
             display: none;
         }
@@ -369,19 +374,15 @@
             font-size: clamp(26px, 5vmin, 84px);
         }
 
-        body.touch #release {
+        body.touch #release,
+        body.touch #yearLine {
             font-size: clamp(24px, 4vmin, 64px);
         }
 
+        /* The app's icon is the page's heading: no wordmark beside it (owner, 2026-11-14), its alt text names it. */
         #idle h1 {
             margin: 0;
-            font-size: clamp(40px, 9vmin, 120px);
-            font-weight: 700;
-            letter-spacing: -0.02em;
-        }
-
-        #idle h1 span {
-            color: var(--accent);
+            line-height: 0;
         }
 
         #idle p {
@@ -446,8 +447,7 @@
     <div id="backdrop" aria-hidden="true"></div>
     <div id="scrim" aria-hidden="true"></div>
     <section id="idle" aria-label="RoRadio">
-        <img id="appIcon" src="icon.png" alt="">
-        <h1>Ro<span>Radio</span></h1>
+        <h1><img id="appIcon" src="icon.png" alt="RoRadio"></h1>
         <p id="status">Ready to play</p>
         <p id="hint">Romanian radio, live</p>
     </section>
@@ -458,6 +458,7 @@
             <p id="title"></p>
             <p id="artist"></p>
             <p id="release"><span id="album"></span><span id="year"></span></p>
+            <p id="yearLine" class="empty"></p>
         </section>
         <div id="captions" class="empty" aria-live="polite"><span id="captionText"></span></div>
     </main>
@@ -465,6 +466,7 @@
     <script src="logo-tone.js"></script>
     <script src="theme.js"></script>
     <script src="layout-report.js"></script>
+    <script src="fit.js"></script>
     <script src="receiver.js"></script>
 </body>
 </html>
