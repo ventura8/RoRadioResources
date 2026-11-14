@@ -85,9 +85,13 @@ function Test-Step([string]$Name, [scriptblock]$Check) {
 # pause, next on one row at 89 % of the height.
 $bar = @{ previous = 0.401; pause = 0.5; next = 0.599; row = 0.888; reserve = 0.28 }
 
+# The screen as it is turned now: `wm size` gives the natural (portrait) size, so it is read from a screenshot.
 function Get-ScreenSize {
-    $size = [regex]::Match((Invoke-Adb @('shell', 'wm', 'size')) -join ' ', '(\d+)x(\d+)')
-    @{ width = [int]$size.Groups[1].Value; height = [int]$size.Groups[2].Value }
+    $file = Join-Path $OutDir 'size.png'
+    Start-Process adb -ArgumentList @('-s', $Device, 'exec-out', 'screencap', '-p') -NoNewWindow -Wait -RedirectStandardOutput $file
+    Add-Type -AssemblyName System.Drawing
+    $image = [Drawing.Image]::FromFile($file)
+    try { @{ width = $image.Width; height = $image.Height } } finally { $image.Dispose(); Remove-Item $file }
 }
 
 # Taps a system bar button while a sender listens; returns the steps the page broadcast and what it says it shows.
