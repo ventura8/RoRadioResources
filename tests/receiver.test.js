@@ -18,14 +18,15 @@ const source = fs.readFileSync(script, 'utf8');
 
 test('metadata that looks like markup is drawn as text, never parsed as HTML', () => {
     const markup = '<img src=x onerror=alert(1)>';
-    const data = JSON.stringify({ caption: markup, station: markup });
+    const station = `${markup} FM`;
+    const data = JSON.stringify({ caption: markup, station });
     const did = run([
         { type: 'LOAD', request: { media: { metadata: { title: markup, artist: markup }, customData: data } } },
     ]);
     assert.equal(did.title, markup);
     assert.equal(did.artist, markup);
     assert.equal(did.caption, markup);
-    assert.equal(did.stationName, markup);
+    assert.equal(did.stationName, station);
     // No API that parses HTML or code anywhere in the page's script.
     for (const sink of ['innerHTML', 'outerHTML', 'insertAdjacentHTML', 'document.write', 'eval(', 'new Function', "setTimeout('"]) {
         assert.ok(!source.includes(sink), `receiver/receiver.js uses ${sink}`);
@@ -88,6 +89,10 @@ function element() {
         },
         hasAttribute(name) {
             return this[name] !== undefined;
+        },
+        // Drawn boxes for the test mode's rects: a box the test set, else none (not drawn).
+        getBoundingClientRect() {
+            return this.box || { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 };
         },
     };
 }
@@ -191,7 +196,13 @@ function run(
                 ui: { UiConfig: function UiConfig() {} },
             },
         },
-        window: coarse === undefined ? {} : { matchMedia: (query) => ({ matches: coarse && query === '(pointer: coarse)' }) },
+        window: {
+            devicePixelRatio: 2,
+            innerWidth: 1280,
+            innerHeight: 800,
+            ...(coarse === undefined ? {} : { matchMedia: (query) => ({ matches: coarse && query === '(pointer: coarse)' }) }),
+        },
+        getComputedStyle: () => ({ color: 'rgb(255, 255, 255)' }),
         document: { getElementById: (id) => (elements[id] ??= element()), body: element() },
         Image,
     };
@@ -387,12 +398,6 @@ test('a step press carries the screen too, and an older app still reads its step
     assert.equal(press.shown.title, 'Song');
 });
 
-test('a double tap on a touch button within a moment is one step', () => {
-    const did = run([load(appData('', true, true))], { taps: ['next'] });
-    did.within(() => did.elements.next.listeners.click());
-    assert.equal(did.broadcasts.length, 1);
-});
-
 test("a sender's queue jump of +1 / -1 is a step, and the song is left alone", () => {
     const did = run([
         load('caption', 'Playing'),
@@ -459,38 +464,58 @@ test('a touch display gets this page, not the default audio UI: own media elemen
     assert.equal(did.options.maxInactivity, 3600);
 });
 
-test('the buttons show on a touch display only', () => {
+test('test mode ({"rects": true}): the drawn boxes, their colours, the pixel ratio and the viewport, for the device E2E', () => {
+    const data = JSON.stringify({ rects: true, station: 'Pro FM' });
+    const did = run([{ type: 'LOAD', request: { media: { metadata: { title: 'Song' }, customData: data } } }]);
+    assert.deepEqual(did.shown.rects, {});
+    assert.equal(did.shown.scale, 2);
+    assert.deepEqual(did.shown.viewport, [1280, 800]);
+
+    did.elements.title.box = { left: 10, top: 20, right: 110, bottom: 60, width: 100, height: 40 };
+    did.stationImage.box = { left: 0, top: 70, right: 50, bottom: 120, width: 50, height: 50 };
+    did.within((more) => more([{ type: 'LOAD', request: { media: { metadata: { title: 'Song' }, customData: data } } }]));
+    assert.deepEqual(did.shown.rects, {
+        title: { box: [10, 20, 110, 60], color: 'rgb(255, 255, 255)' },
+        station: { box: [0, 70, 50, 120], color: 'rgb(255, 255, 255)' },
+    });
+
+    // Without the flag (every app): no rects.
+    assert.equal(run([load('')]).shown.rects, undefined);
+});
+
+test('no song (the station alone): its name once, never repeated as the title or the artist', () => {
+    const did = run([
+        { type: 'LOAD', request: { media: { metadata: { title: 'Pro FM', artist: ' pro fm ', albumName: 'Pro FM' }, customData: JSON.stringify({ station: 'Pro FM' }) } } },
+    ]);
+    assert.equal(did.stationName, 'Pro FM');
+    assert.equal(did.title, '');
+    assert.equal(did.artist, '');
+    assert.equal(did.elements.album.textContent, '');
+    assert.equal(did.elements.release.classList.has('empty'), true);
+    const texts = [did.stationName, did.title, did.artist, did.elements.album.textContent].filter(Boolean);
+    assert.equal(new Set(texts).size, texts.length, 'no text twice on screen');
+});
+
+test("a song's own fields may repeat each other: a title, album and artist that are one string all show", () => {
+    const did = run([
+        { type: 'LOAD', request: { media: { metadata: { title: 'Abba', artist: 'Abba', albumName: 'Abba' }, customData: JSON.stringify({ station: 'Pro FM' }) } } },
+    ]);
+    assert.deepEqual([did.title, did.artist, did.elements.album.textContent], ['Abba', 'Abba', 'Abba']);
+});
+
+test('a touch display is marked, so the page keeps clear of its system media bar', () => {
     assert.equal(run([], { touch: true }).touch, true);
     assert.equal(run([]).touch, false);
 });
 
-test('tapping previous / next steps through the group in the app, like the device buttons', () => {
-    const data = JSON.stringify({ previous: true, next: true });
-    const did = run([load(data)], { touch: true, taps: ['next', 'previous'] });
-    assert.deepEqual(
-        did.broadcasts.map((b) => b.customData.step),
-        ['next', 'previous'],
-    );
-    assert.equal(did.elements.previous.classList.has('hidden'), false);
-    assert.equal(did.elements.next.classList.has('hidden'), false);
-});
-
-test('a step the station lacks hides its button', () => {
+test('no buttons of its own: the system media bar has previous / pause / next, and a step the station lacks is not declared', () => {
     const did = run([load(JSON.stringify({ previous: false, next: true }))], { touch: true });
-    assert.equal(did.elements.previous.classList.has('hidden'), true);
-    assert.equal(did.elements.next.classList.has('hidden'), false);
-});
-
-test('the pause button pauses while it plays, plays while paused, and shows which', () => {
-    assert.deepEqual(run([], { taps: ['playPause'] }).calls, ['pause']);
-    const paused = run([], { taps: ['playPause'], playerState: 'PAUSED' });
-    assert.deepEqual(paused.calls, ['play']);
-    paused.within(() => paused.playerEvents.PAUSE());
-    assert.equal(paused.elements.playPause.attributes['aria-label'], 'Play');
-    assert.equal(paused.elements.playPause.textContent, '▶');
-    paused.within(() => paused.playerEvents.PLAYING());
-    assert.equal(paused.elements.playPause.textContent, '⏸');
-    assert.equal(paused.elements.playPause.attributes['aria-label'], 'Pause');
+    assert.deepEqual(did.shown.steps, { next: true, previous: false });
+    assert.equal(did.supported, BASE | QUEUE_NEXT);
+    assert.equal(did.elements.previous, undefined);
+    assert.equal(did.elements.next, undefined);
+    assert.equal(did.elements.playPause, undefined);
+    assert.ok(!/<button/.test(html), 'receiver/index.html has no buttons');
 });
 
 test('a logo that is already the cover (no song cover) is not shown twice', () => {

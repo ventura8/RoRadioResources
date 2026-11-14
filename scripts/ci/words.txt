@@ -3,6 +3,11 @@ Alexandrescu
 allowzero
 Amma
 byurl
+IDAT
+IHDR
+Paeth
+rects
+WCAG
 CASTV
 EXTINF
 EXTM

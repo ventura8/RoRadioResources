@@ -24,8 +24,8 @@
         {"step": "previous"|"next", "stepId": n}, and the app steps through the group exactly as its own buttons do,
         then loads the new station here.
         Touch displays (2.4.5): the page plays through its own audio element and declares uiConfig.touchScreenOptimizedApp,
-        so a Pixel Tablet or a Nest Hub shows this page, not Google's default audio UI, and the page's own previous /
-        pause / next buttons are there to tap.
+        so a Pixel Tablet or a Nest Hub shows this page, not Google's default audio UI. The device still draws its
+        system media bar (previous / pause / next) over the bottom; the page keeps above it and has no buttons of its own.
         The cover fills the safe area's height on the left (the station's logo takes its place when the song has no
         cover), the station's logo heads the song's column, and the text is sized for a room away from the TV.
         Layout rules (Cast design guidelines): everything inside a 5 % safe area, text at least 24 px at 720p, white on
@@ -128,17 +128,20 @@
             aspect-ratio: 1;
             border-radius: clamp(12px, 2vmin, 28px);
             object-fit: cover;
-            background: rgb(255 255 255 / 8%);
-            box-shadow: 0 2vmin 6vmin rgb(0 0 0 / 55%);
 
-            /* No animation of its size: shrinking as a caption band appeared, it covered the band for 300 ms. */
+            /*
+             * The picture sits directly on the page: no background, plate, card or shadow behind the cover or the
+             * logo (owner, 2026-11-14). No animation of its size: shrinking as a caption band appeared, it covered
+             * the band for 300 ms.
+             */
+            background: none;
+            box-shadow: none;
         }
 
-        /* No cover for the song: the station's own logo in its place, whole, on white. */
+        /* No cover for the song: the station's own logo in its place, whole, as it is drawn. */
         #cover.logo {
             object-fit: contain;
-            padding: 4vmin;
-            background: #fff;
+            border-radius: 0;
         }
 
         /*
@@ -151,6 +154,14 @@
             max-height: 100%;
             overflow: hidden;
             display: grid;
+
+            /*
+             * A fixed layout, the same with and without a cover (owner, 2026-11-14): the song's text from the top of
+             * the cover, the station's logo and name at the column's bottom, level with the cover's bottom edge. The
+             * column is the cover's height, so nothing moves between a song and the station alone.
+             */
+            height: var(--cover);
+            grid-template-rows: auto auto auto minmax(0, 1fr) auto;
             align-content: start;
             row-gap: clamp(8px, 1.6vmin, 22px);
         }
@@ -193,9 +204,10 @@
 
         #station {
             display: flex;
+            grid-row: 5;
+            align-self: end;
             align-items: center;
             min-width: 0;
-            margin-bottom: clamp(4px, 1vmin, 14px);
         }
 
         #station img {
@@ -203,13 +215,10 @@
             width: clamp(72px, 22vmin, 300px);
             height: clamp(72px, 22vmin, 300px);
             flex: none;
-            border-radius: 22%;
             object-fit: contain;
 
-            /* In vmin: a padding in % is a share of the column's width, which left no room for the logo. */
-            padding: clamp(4px, 1vmin, 14px);
-            background: #fff;
-            box-shadow: 0 1vmin 3vmin rgb(0 0 0 / 45%);
+            /* Beside a cover the logo looks as it does in the cover's place: transparent, no plate or shadow. */
+            background: none;
         }
 
         /* The station's name beside its logo: never a placeholder, nothing when the app sends none. */
@@ -286,54 +295,46 @@
         }
 
         #idle #hint {
-            font-size: clamp(24px, 2.4vmin, 32px);
+            /* 24 px at 1080p and in proportion above it (10-foot UI): 2.4 % of the height. */
+            font-size: max(2.4vh, 16px);
             color: rgb(255 255 255 / 60%);
         }
 
         /*
-         * Previous / pause / next to tap, on a touch display only (a TV has its remote and the device's own controls):
-         * a row of their own under the song, so a long song can never push them out of the clipped song column.
+         * A touch display (Pixel Tablet) draws its system media bar over the bottom of the page: progress, LIVE, the
+         * output chip, previous / pause / next, from 73 % of the height down (2560 x 1600, 2026-11-14). The page keeps
+         * out of that band: the song, the cover and the captions end above it, nothing is drawn under the bar.
          */
-        #controls {
-            grid-area: controls;
-            display: none;
-            column-gap: clamp(24px, 5vmin, 72px);
-            padding-top: clamp(12px, 2.4vmin, 32px);
+        body.touch {
+            --system-bar: 30vh;
+            --cover: min(64vh, 48vw);
         }
 
-        body.touch main {
-            grid-template-rows: minmax(0, 1fr) auto auto;
-            grid-template-areas:
-                "cover song"
-                "cover controls"
-                "captions captions";
+        body.touch.captioned {
+            --cover: min(44vh, 48vw);
         }
 
-        body.touch #controls {
-            display: flex;
+        body.touch main,
+        body.touch #idle {
+            bottom: var(--system-bar);
         }
 
-        #controls button {
-            width: clamp(64px, 11vmin, 140px);
-            height: clamp(64px, 11vmin, 140px);
-            border: 0;
-            border-radius: 50%;
-            background: rgb(255 255 255 / 14%);
-            color: var(--text);
-            font-size: clamp(28px, 5vmin, 64px);
-            touch-action: manipulation;
+        /* Less height above the bar: the logo and the song's text a size smaller, so a long song still fits. */
+        body.touch #station img {
+            width: clamp(56px, 14vmin, 240px);
+            height: clamp(56px, 14vmin, 240px);
         }
 
-        #controls button:active {
-            background: rgb(255 255 255 / 30%);
+        body.touch #title {
+            font-size: clamp(32px, 7vmin, 120px);
         }
 
-        #controls #playPause {
-            background: var(--accent);
+        body.touch #artist {
+            font-size: clamp(26px, 5vmin, 84px);
         }
 
-        #controls button.hidden {
-            visibility: hidden;
+        body.touch #release {
+            font-size: clamp(24px, 4vmin, 64px);
         }
 
         #idle h1 {
@@ -360,6 +361,11 @@
 
         /* A tall screen (a display turned upright): the cover above the song. */
         @media (aspect-ratio < 1) {
+            /* Upright, the song is under the cover: its column is as tall as its text. */
+            #song {
+                height: auto;
+            }
+
             main {
                 grid-template:
                     "cover" auto
@@ -370,19 +376,16 @@
                 text-align: center;
             }
 
-            body.touch main {
-                grid-template-rows: auto minmax(0, 1fr) auto auto;
-                grid-template-areas:
-                    "cover"
-                    "song"
-                    "controls"
-                    "captions";
-            }
-
             /* The cover, the logo, a two-line title and a two-line caption, stacked within the height (800 x 1280). */
             body,
             body.captioned {
                 --cover: min(84vw, 36vh);
+            }
+
+            /* Upright on a touch display: the same, above the system media bar. */
+            body.touch,
+            body.touch.captioned {
+                --cover: min(84vw, 24vh);
             }
 
             #station img {
@@ -390,8 +393,7 @@
                 height: clamp(56px, 12vmin, 160px);
             }
 
-            #station,
-            #controls {
+            #station {
                 justify-content: center;
             }
         }
@@ -407,12 +409,12 @@
     <audio id="media"></audio>
     <div id="backdrop" aria-hidden="true"></div>
     <div id="scrim" aria-hidden="true"></div>
-    <div id="idle">
+    <section id="idle" aria-label="RoRadio">
         <img id="appIcon" src="icon.png" alt="">
         <h1>Ro<span>Radio</span></h1>
         <p id="status">Ready to play</p>
         <p id="hint">Romanian radio, live</p>
-    </div>
+    </section>
     <main>
         <img id="cover" alt="">
         <section id="song" aria-live="polite">
@@ -421,11 +423,6 @@
             <p id="artist"></p>
             <p id="release"><span id="album"></span><span id="year"></span></p>
         </section>
-        <nav id="controls" aria-label="Playback">
-            <button id="previous" type="button" class="hidden" aria-label="Previous station">&#x23EE;</button>
-            <button id="playPause" type="button" aria-label="Pause">&#x23F8;</button>
-            <button id="next" type="button" class="hidden" aria-label="Next station">&#x23ED;</button>
-        </nav>
         <div id="captions" class="empty" aria-live="polite"><span id="captionText"></span></div>
     </main>
     <!-- The page's script (receiver.js): after the elements it draws in, as the framework above. -->
