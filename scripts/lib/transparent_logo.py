@@ -107,15 +107,30 @@ def make_transparent(image: Image.Image) -> tuple[Image.Image, str]:
     kept = 1 - background.mean()
     if not MIN_KEPT <= kept <= MAX_KEPT:
         return image, "covers its square"
-    alpha = pixels[..., 3].astype(float)
-    alpha[background] = 0
-    # The mark's edge, next to the removed background: as opaque as it is far from the background colour.
+    pixels[background, 3] = 0
+    # The mark's edge, next to the removed background: an anti-aliased blend of the mark and the background.
     edge = ~background & np.roll(background, 1, 0) | ~background & np.roll(background, -1, 0)
     edge |= ~background & np.roll(background, 1, 1) | ~background & np.roll(background, -1, 1)
-    softened = np.clip((distance - TOLERANCE) / TOLERANCE, 0, 1) * 255
-    alpha[edge] = np.minimum(alpha[edge], softened[edge])
-    pixels[..., 3] = alpha.astype(np.uint8)
+    pixels[edge] = unblend(pixels[edge], colour)
     return Image.fromarray(pixels, "RGBA"), "transparent"
+
+
+def unblend(pixels: np.ndarray, background: np.ndarray) -> np.ndarray:
+    """Return edge pixels with the background taken out of them (colour to alpha, as GIMP's).
+
+    Each pixel is read as the mark's colour over the background at some opacity: the least opacity that explains
+    it, and the colour that opacity needs. A grey (180) anti-aliasing pixel between a black mark and white becomes
+    black at 29 %, not an opaque grey outline (Greptile, #41).
+    """
+    rgb = pixels[:, :3].astype(float)
+    reach = np.where(rgb < background, background, 255.0 - background)
+    share = np.divide(np.abs(rgb - background), reach, out=np.zeros_like(rgb), where=reach > 0)
+    opacity = share.max(axis=1, keepdims=True)
+    colour = np.divide(rgb - background, opacity, out=np.zeros_like(rgb), where=opacity > 0) + background
+    result = pixels.copy()
+    result[:, :3] = np.clip(np.rint(colour), 0, 255).astype(np.uint8)
+    result[:, 3] = np.rint(opacity[:, 0] * pixels[:, 3]).astype(np.uint8)
+    return result
 
 
 def dark_share(image: Image.Image) -> float:

@@ -5,17 +5,24 @@ Usage: normalize_logo.py <downloaded file> <output .png> <smallest side in px>
 
 A usable logo decodes as an image, is at least that many pixels on its short side (a 32 px favicon is a blur on a
 station tile), is no wider than twice its height or the other way round (a wide og:image is a banner or a photo,
-not a logo), and is not blank (fully transparent, or one colour). It is written as a PNG at most 400 px on its
-longest side, without metadata. Writes one JSON line: {"ok": true, "width", "height", "sha256"} for the written
-file, or {"ok": false, "reason"}. Used by Update-StationLogos.ps1.
+not a logo), and is not blank (fully transparent, or one colour). A solid background is made transparent
+(transparent_logo.py: the cast receiver and the apps draw logos on their own backgrounds, never on a plate). It is
+written as a PNG at most 400 px on its longest side, without metadata. Writes one JSON line: {"ok": true,
+"width", "height", "sha256"} for the written file, or {"ok": false, "reason"}. Used by Update-StationLogos.ps1.
 """
 
 import hashlib
+import importlib.util
 import json
 import sys
 from pathlib import Path
 
 from PIL import Image, UnidentifiedImageError
+
+# Its sibling, loaded from its file: scripts/lib is not a package on the path (the refresh runs this as a script).
+_SPEC = importlib.util.spec_from_file_location("transparent_logo", Path(__file__).with_name("transparent_logo.py"))
+transparent_logo = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(transparent_logo)
 
 MAX_SIDE = 400
 MAX_ASPECT = 2.0
@@ -69,6 +76,8 @@ def normalize(source: str, target: str, min_side: int) -> dict:
     if problem:
         return {"ok": False, "reason": problem}
 
+    # A logo on a solid plate keeps its mark and loses the plate (tests/test_transparent_logo.py checks every logo).
+    image, _ = transparent_logo.make_transparent(image)
     image.thumbnail((MAX_SIDE, MAX_SIDE), Image.Resampling.LANCZOS)
     image.save(target, "PNG", optimize=True)
     digest = hashlib.sha256(Path(target).read_bytes()).hexdigest()

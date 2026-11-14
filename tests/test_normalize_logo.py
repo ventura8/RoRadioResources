@@ -66,6 +66,14 @@ class NormalizeLogoTest(unittest.TestCase):
             self.assertEqual(written.size, (200, 200))
             self.assertEqual(written.mode, "RGBA")
 
+    def test_a_logo_on_a_solid_plate_is_written_transparent(self) -> None:
+        """The refresh writes no plate: the logo's solid background goes, its mark stays (Greptile, #41)."""
+        self.assertTrue(self.check(self.image("plate.jpg", (300, 300)))["ok"])
+        with Image.open(self.root / "out.png") as written:
+            self.assertEqual(written.mode, "RGBA")
+            self.assertEqual(written.getpixel((0, 0))[3], 0)
+            self.assertEqual(written.getpixel((112, 112)), (20, 20, 20, 255))
+
     def test_a_favicon_is_too_small(self) -> None:
         """A 32 px icon is a blur on a station tile."""
         result = self.check(self.image("icon.png", (32, 32)))

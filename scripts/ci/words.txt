@@ -1,5 +1,9 @@
 aacp
 Alexandrescu
+keepdims
+rint
+unblend
+unblended
 allowzero
 Amma
 byurl

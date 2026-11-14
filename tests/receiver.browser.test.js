@@ -856,6 +856,9 @@ test('layout and accessibility in every state, at 1920 x 1080, on the tablet (25
             );
             await pause(500);
             assert.equal(await evaluate('document.getElementById("cover").classList.contains("light")'), light, name);
+            // The class is drawn: a glow around the logo's shapes, or nothing at all.
+            const filter = await evaluate('getComputedStyle(document.getElementById("cover")).filter');
+            assert.equal(filter.includes('drop-shadow'), light, `${name}: filter ${filter}`);
             assert.deepEqual(await evaluate(PLATE('#cover')), NO_PLATE);
         }
     });

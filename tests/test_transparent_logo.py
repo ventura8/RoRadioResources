@@ -64,9 +64,23 @@ class TransparentLogoTest(unittest.TestCase):
         """No background to remove: the edges are see-through, not one colour, or the whole square."""
         clear = square((0, 0, 0, 0), mark=(255, 0, 0, 255))
         self.assertEqual(transparent_logo.make_transparent(clear)[1], "already transparent")
-        noise = Image.fromarray(np.random.default_rng(1).integers(0, 255, (40, 40, 4), dtype=np.uint8) | 255)
+        # Artwork: random colours, fully opaque (only the alpha byte is set to 255).
+        art = np.random.default_rng(1).integers(0, 255, (40, 40, 4), dtype=np.uint8)
+        art[..., 3] = 255
+        noise = Image.fromarray(art, "RGBA")
         self.assertEqual(transparent_logo.make_transparent(noise)[1], "covers its square")
         self.assertEqual(transparent_logo.make_transparent(square((10, 200, 10, 255)))[1], "covers its square")
+
+    def test_an_anti_aliased_edge_becomes_the_mark_s_colour_at_partial_opacity(self) -> None:
+        """A grey (180) pixel between a black mark and white is black at 29 %, not an opaque grey outline."""
+        logo = square((255, 255, 255, 255), mark=(0, 0, 0, 255))
+        logo.paste(Image.new("RGBA", (10, 1), (180, 180, 180, 255)), (15, 14))
+        image, _ = transparent_logo.make_transparent(logo)
+        self.assertEqual(image.getpixel((20, 14)), (0, 0, 0, 75))
+        # A pixel the background colour itself (no share of the mark) on the edge is fully see-through.
+        white = np.array([255.0, 255.0, 255.0])
+        edge = transparent_logo.unblend(np.array([[255, 255, 255, 255]], dtype=np.uint8), white)
+        self.assertEqual(edge.tolist(), [[255, 255, 255, 0]])
 
     def test_dark_share_measures_the_mark_alone(self) -> None:
         """Dark lettering on transparency is all dark; a white mark is none; nothing opaque is none."""

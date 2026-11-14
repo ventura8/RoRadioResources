@@ -9,11 +9,16 @@ readable there. Merge this before RoRadio 2.4.5 ships.
   already transparent with white lettering. The white tile came from the receiver page, which drew logos on a white
   plate until #39. The receiver now draws every logo directly on its dark background, and "OPEN RADIO" shows white
   on dark, as in the app's list.
-- **63 logos made transparent.** These logos had a solid background, a white or coloured plate filling their
-  edges. `scripts/lib/transparent_logo.py` flood-fills that background from the edges and makes it see-through,
-  and softens the mark's edge so no halo is left. Colour inside the mark, such as white lettering, stays. Artwork
-  that covers its square (52 logos, whose edges are not one colour) is left as it is. The 16 such logos that were
-  JPEGs are now PNGs of the same name, and `RadioStationsData.json` points to them.
+- **61 logos made transparent.** These logos had a solid background, a white or coloured plate filling their
+  edges. `scripts/lib/transparent_logo.py` flood-fills that background from the edges and makes it see-through.
+  The pixels along the mark's edge are un-blended from the background (colour to alpha), so an anti-aliased grey
+  edge becomes the mark's colour at partial opacity, not an opaque outline. Colour inside the mark, such as white
+  lettering, stays. Artwork that covers its square (52 logos, whose edges are not one colour) is left as it is.
+  The 15 such logos that were JPEGs are now PNGs of the same name, and `RadioStationsData.json` points to them.
+- **New logos too.** The weekly refresh (`normalize_logo.py`) makes a new logo's solid background transparent in
+  the same way, so a refreshed logo passes the check below.
+- **Older apps.** A 2.x app shows a logo its package does not bundle from GitHub Pages, so the renamed logos still
+  show there. An app built before that fallback shows its own bundled copy until it updates.
 - **Dark logos get a light glow.** The receiver measures each logo it shows: dark lettering on transparency, too
   dark for the dark screen, gets a white glow around its own shapes. There is still no plate behind it. The page
   reads the GitHub Pages copy through CORS; a picture from a host without CORS is shown as it is.
