@@ -136,6 +136,10 @@ function serve(withPage) {
         'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
         'base64',
     );
+    const white = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==',
+        'base64',
+    );
     const server = http.createServer((request, response) => {
         if (request.url === '/receiver/') {
             // The page's Content-Security-Policy stays in force; the injected probe is allowed by its own hash.
@@ -155,6 +159,10 @@ function serve(withPage) {
             const name = path.basename(request.url);
             response.writeHead(200, { 'content-type': 'image/png' });
             response.end(fs.readFileSync(path.join(__dirname, '..', 'RadioLogos', name)));
+        } else if (request.url.startsWith('/white/')) {
+            // A white cover: the brightest backdrop the scrim has to keep the text readable on (CodeRabbit, #49).
+            response.writeHead(200, { 'content-type': 'image/png' });
+            response.end(white);
         } else if (request.url.startsWith('/img/')) {
             response.writeHead(200, { 'content-type': 'image/png' });
             response.end(png);
@@ -924,6 +932,20 @@ test('layout and accessibility in every state, at 1920 x 1080, on the tablet (25
             assert.equal(await evaluate('document.body.classList.contains("themed")'), false);
             assert.equal((await evaluate('window.probe')).shown.theme, null);
             assert.deepEqual(await problems(session, size), []);
+        });
+
+        await t.test(`${size.name}: over a white cover, shrunk album and year still read at AA, theme off and on`, async () => {
+            await resize(session, size.width, size.height);
+            await evaluate(`document.body.classList.toggle('touch', ${size.touch})`);
+            const longAlbum = 'An album with a very long name that needs the texts to shrink before it fits in its column at all';
+            const whiteCover = `${origin}/white/cover.png`;
+            for (const theme of [undefined, { accent: '#f0e040', tint: '#4d4813' }]) {
+                const data = { station: 'Pro FM', album: longAlbum, ...(theme ? { theme } : {}) };
+                await evaluate(intercept('QUEUE_UPDATE', updateRequest(song('A long song title for a white cover', 'A band', data, [whiteCover, logo('Profm')]))));
+                await pause(1200);
+                assert.match(await evaluate(backdropNow), /white/);
+                assert.deepEqual(await problems(session, size), [], `theme ${theme ? 'on' : 'off'}`);
+            }
         });
     }
 

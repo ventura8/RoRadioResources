@@ -247,10 +247,12 @@ Test-Step 'theme off' {
     $null -eq $script:layout.theme -and $script:layout.cover -and $script:layout.logo -and $script:layout.title -eq 'Test song'
 }
 Test-Step 'theme keeps the texts' {
-    $on = @($script:themedLayout.rects.PSObject.Properties.Name | Sort-Object) -join ','
-    $off = @($script:layout.rects.PSObject.Properties.Name | Sort-Object) -join ','
-    Write-Information "    theme on: $on; theme off: $off" -InformationAction Continue
-    $on -eq $off -and $off -match 'release'
+    # Each drawn text with its words: a year that leaves the album's line keeps the box names alike (Greptile, #49).
+    $texts = { param($Shown) @($Shown.rects.PSObject.Properties | Sort-Object Name | ForEach-Object { "$($_.Name)=$($_.Value.text)" }) -join '; ' }
+    $on = & $texts $script:themedLayout
+    $off = & $texts $script:layout
+    Write-Information "    theme on: $on`n    theme off: $off" -InformationAction Continue
+    $on -eq $off -and $off -match 'Test album' -and $off -match '2025'
 }
 # The screen as the page reports it, on each theme step's screenshot.
 Test-Step 'layout on the screenshot' { Test-Layout $script:layout (Join-Path $OutDir 'theme-off.png') }
