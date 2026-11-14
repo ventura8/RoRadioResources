@@ -31,15 +31,21 @@ function element() {
             toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)),
             add: (name) => classes.add(name),
             remove: (name) => classes.delete(name),
+            has: (name) => classes.has(name),
         },
-        removeAttribute: () => undefined,
-        querySelector: () => element(),
+        removeAttribute(name) {
+            delete this[name];
+        },
     };
 }
 
 /** Loads the page in a fresh context, plays `messages` and returns what the page did. */
 function run(messages) {
     const elements = {};
+    const stationImage = element();
+    const station = element();
+    station.querySelector = () => stationImage;
+    elements.station = station;
     const interceptors = {};
     const did = { commands: [], broadcasts: [], mediaInformation: [], results: [] };
     // The device starts with QUEUE_PREV on: the page must drop it unless the station has a previous one.
@@ -73,8 +79,14 @@ function run(messages) {
             },
         },
         document: { getElementById: (id) => (elements[id] ??= element()), body: element() },
-        // Pictures never finish loading here: these tests check the text and the commands, not the images.
-        Image: function Image() {},
+        // Pictures load at once here, so the logo shown is the url the page asked for.
+        Image: function Image() {
+            return {
+                set src(url) {
+                    this.onload();
+                },
+            };
+        },
         // A clock that stands still: the step ids must still rise.
         Date: { now: () => 1000 },
     };
@@ -87,6 +99,9 @@ function run(messages) {
 
     did.caption = elements.captionText ? elements.captionText.textContent : '';
     did.title = elements.title ? elements.title.textContent : '';
+    did.stationName = elements.stationName ? elements.stationName.textContent : '';
+    did.logo = elements.station ? stationImage.src : undefined;
+    did.stationShown = elements.station ? !elements.station.classList.has('empty') : false;
     did.supported = supported;
     return did;
 }
@@ -187,4 +202,37 @@ test('a jump other than +1 / -1 is passed on to the player', () => {
     const did = run([{ type: 'QUEUE_UPDATE', request: { jump: 2 } }]);
     assert.deepEqual(did.results, ['request']);
     assert.deepEqual(did.broadcasts, []);
+});
+
+/** A LOAD of a song with these `images` and the app's customData. */
+const loadWith = (images, customData) => ({
+    type: 'LOAD',
+    request: { media: { metadata: { title: 'Song', images: images.map((url) => ({ url })) }, customData } },
+});
+
+test('the station name comes from the app, and nothing at all when the app sends none', () => {
+    const named = run([loadWith(['https://x/cover.jpg'], JSON.stringify({ station: 'Rock FM' }))]);
+    assert.equal(named.stationName, 'Rock FM');
+    assert.ok(named.stationShown);
+
+    for (const customData of ['', 'old caption', JSON.stringify({ station: 5 })]) {
+        const did = run([loadWith([], customData)]);
+        assert.equal(did.stationName, '');
+        assert.equal(did.stationShown, false);
+    }
+});
+
+test('the station logo shows beside the song cover', () => {
+    const fromImages = run([loadWith(['https://x/cover.jpg', 'https://x/logo.png'], '')]);
+    assert.equal(fromImages.logo, 'https://x/logo.png');
+
+    const fromData = run([loadWith(['https://x/cover.jpg'], JSON.stringify({ logo: 'https://x/logo.png' }))]);
+    assert.equal(fromData.logo, 'https://x/logo.png');
+    assert.ok(fromData.stationShown);
+});
+
+test('a logo that is already the cover (no song cover) is not shown twice', () => {
+    const did = run([loadWith(['https://x/logo.png'], JSON.stringify({ logo: 'https://x/logo.png' }))]);
+    assert.equal(did.logo, undefined);
+    assert.equal(did.stationShown, false);
 });
