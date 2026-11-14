@@ -128,6 +128,7 @@ function run(
         textHeights = {},
         roundFont = 0,
         boxes = {},
+        mainBox = null,
     } = {},
 ) {
     const elements = {};
@@ -284,6 +285,11 @@ function run(
 
     for (const [id, drawn] of Object.entries(boxes)) {
         sandbox.document.getElementById(id).box = drawn;
+    }
+
+    // The page's main area, the caption band's parent: its box bounds the band.
+    if (mainBox) {
+        sandbox.document.getElementById('captions').parentElement = { getBoundingClientRect: () => mainBox };
     }
 
     try {
@@ -644,38 +650,61 @@ test('a slow tone measure of an old logo never marks the new one', () => {
     assert.equal(did.stationImage.classList.has('light'), false);
 });
 
-test('a text that fits two lines keeps its full size; a longer one shrinks in steps, never under 24 px at 1080p', () => {
-    // Lengths in line widths at 40 px. At 800 px high the readable minimum is 24 * 800 / 1080 = 17.8 px.
-    const did = run([load('', 'Song')], { textHeights: { title: 0.9, artist: 2.6, release: 30 } });
-    assert.equal(did.elements.title.style.fontSize, '');
-    // 2.6 lines at 40 px: 2.34 at 36 px, 2.1 at 32.4 px, 1.9 at 29.16 px: two lines.
-    assert.equal(parseFloat(did.elements.artist.style.fontSize).toFixed(2), '29.16');
-    // Far too long: down to the minimum, and no further (the styles then end its second line in an ellipsis).
-    assert.equal(parseFloat(did.elements.release.style.fontSize).toFixed(2), (24 * 800 / 1080).toFixed(2));
+test('the song\'s texts are never cut: they keep their size while they fit, then the caption yields, the year joins, and they shrink', () => {
+    // At 800 px high: 24 px at 1080p is 17.8 px, the floor (16 px at 1080p) 11.9 px.
+    const floor = (16 * 800 / 1080).toFixed(2);
+    const metadata = { title: 'Song', albumName: 'Album', releaseDate: '2015' };
+    const data = JSON.stringify({ caption: 'Live words' });
+    const roomy = run([{ type: 'LOAD', request: { media: { metadata, customData: data } } }]);
+    for (const id of ['title', 'artist', 'release', 'yearLine']) {
+        assert.equal(roomy.elements[id].style.fontSize, '', `${id} at its own size`);
+    }
+    assert.equal(roomy.body.classList.has('caption-yields'), false);
+    assert.equal(roomy.body.classList.has('captioned'), true);
+    assert.equal(roomy.elements.yearLine.textContent, '2015');
 
-    // The song's column too full for its three texts (a constant 50 px over its height): all shrink together, to
-    // the minimum at most.
-    const full = run([load('', 'Song')], { textHeights: { title: 1, artist: 1, release: 1, song: 1 } });
-    for (const id of ['title', 'artist', 'release']) {
-        assert.equal(parseFloat(full.elements[id].style.fontSize).toFixed(2), (24 * 800 / 1080).toFixed(2), id);
+    // The song's column overflows whatever is done (a constant over its height): the caption yields, the year joins
+    // the album's line, and every text shrinks to the floor, never further.
+    const full = run([{ type: 'LOAD', request: { media: { metadata, customData: data } } }], { textHeights: { song: 1 } });
+    assert.equal(full.body.classList.has('caption-yields'), true);
+    assert.equal(full.body.classList.has('captioned'), false);
+    assert.equal(full.elements.year.textContent, '2015');
+    // The station's name shrinks with them: a long one is never cut at the column's bottom (CodeRabbit, #48).
+    for (const id of ['title', 'artist', 'release', 'yearLine', 'stationName']) {
+        assert.equal(parseFloat(full.elements[id].style.fontSize).toFixed(2), floor, id);
     }
 
-    // The album line reaching into the station's line under it (tablet, a long song): all shrink too. With no
+    // With no caption to yield, the next steps come at once.
+    const noCaption = run([{ type: 'LOAD', request: { media: { metadata } } }], { textHeights: { song: 1 } });
+    assert.equal(noCaption.body.classList.has('caption-yields'), false);
+    assert.equal(parseFloat(noCaption.elements.title.style.fontSize).toFixed(2), floor);
+
+    // The album line reaching into the station's line under it (tablet, a long song): it shrinks too. With no
     // station's line (none sent), only the column's own height counts.
     const box = (top, bottom) => ({ left: 0, right: 10, width: 10, top, bottom, height: bottom - top });
     const into = run([load(JSON.stringify({ station: 'Pro FM' }), 'Song')], { boxes: { release: box(300, 420), station: box(400, 500) } });
-    assert.equal(parseFloat(into.elements.release.style.fontSize).toFixed(2), (24 * 800 / 1080).toFixed(2));
+    assert.equal(parseFloat(into.elements.release.style.fontSize).toFixed(2), floor);
     const noStation = run([load('', 'Song')], { boxes: { release: box(300, 420), station: box(400, 500) } });
     assert.equal(noStation.elements.release.style.fontSize, '');
 
-    // A size the browser rounded a little above the minimum is the minimum: no endless shrinking to the same size.
-    const rounded = run([load('', 'Song')], { textHeights: { release: 30 }, roundFont: 0.0001 });
-    assert.ok(parseFloat(rounded.elements.release.style.fontSize) < 24 * 800 / 1080 + 0.5);
+    // A size the browser rounded a little above the floor is the floor: no endless shrinking to the same size.
+    const rounded = run([load('', 'Song')], { textHeights: { song: 1 }, roundFont: 0.0001 });
+    assert.ok(parseFloat(rounded.elements.release.style.fontSize) < 16 * 800 / 1080 + 0.5);
 
     // The screen changes size: fitted again from the full size.
-    did.elements.artist.textHeight = 1.5;
-    did.within(() => did.windowEvents.resize());
-    assert.equal(did.elements.artist.style.fontSize, '');
+    full.elements.song.textHeight = 0;
+    full.within(() => full.windowEvents.resize());
+    assert.equal(full.elements.title.style.fontSize, '');
+    assert.equal(full.body.classList.has('caption-yields'), false);
+});
+
+test('a caption band past the bottom of the safe area yields to the song (the caption is the first to give way)', () => {
+    const box = (top, bottom) => ({ left: 0, right: 10, width: 10, top, bottom, height: bottom - top });
+    const did = run([{ type: 'LOAD', request: { media: { metadata: { title: 'Song' }, customData: JSON.stringify({ caption: 'Words' }) } } }], {
+        boxes: { captions: box(700, 900) },
+        mainBox: box(0, 800),
+    });
+    assert.equal(did.body.classList.has('caption-yields'), true);
 });
 
 test('no song (the station alone): its name once, never repeated as the title or the artist', () => {

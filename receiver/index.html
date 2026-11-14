@@ -29,8 +29,8 @@
         The cover fills the safe area's height on the left (the station's logo takes its place when the song has no
         cover), the station's logo heads the song's column, and the text is sized for a room away from the TV.
         Layout rules (Cast design guidelines): everything inside a 5 % safe area, text at least 24 px at 720p, white on
-        a dark scrim over the blurred cover, a fixed grid so no element can grow into another, long text clamped with an
-        ellipsis. Audio-only devices draw nothing and play the audio.
+        a dark scrim over the blurred cover, a fixed grid so no element can grow into another, and long text never cut:
+        it wraps and shrinks to fit (receiver/fit.js). Audio-only devices draw nothing and play the audio.
     -->
     <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
     <style>
@@ -183,12 +183,15 @@
             row-gap: clamp(8px, 1.6vmin, 22px);
         }
 
+        /*
+         * Never cut, never an ellipsis (owner, 2026-11-14): every text wraps over as many lines as it needs, and
+         * receiver/fit.js shrinks the song's texts until they all fit the column.
+         */
         #song > * {
             margin: 0;
             min-width: 0;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+            white-space: normal;
+            overflow-wrap: anywhere;
         }
 
         #title {
@@ -196,20 +199,6 @@
             font-weight: 700;
             line-height: 1.1;
             letter-spacing: -0.01em;
-        }
-
-        /*
-         * The title, the artist and the album take up to two lines each. receiver.js shrinks a text that needs more
-         * in steps, down to 24 px at 1080p, before the second line ends in an ellipsis.
-         */
-        #title,
-        #artist,
-        #release {
-            white-space: normal;
-            overflow-wrap: anywhere;
-            display: -webkit-box;
-            -webkit-box-orient: vertical;
-            -webkit-line-clamp: 2;
         }
 
         #artist {
@@ -265,11 +254,9 @@
         #stationName {
             min-width: 0;
             margin-left: clamp(10px, 2vmin, 28px);
-            overflow: hidden;
             color: var(--muted);
             font-size: clamp(22px, 4vmin, 56px);
-            text-overflow: ellipsis;
-            white-space: nowrap;
+            overflow-wrap: anywhere;
         }
 
         #station img:not([src]) {
@@ -289,12 +276,13 @@
             text-align: center;
         }
 
-        /* Clamped inside the band: the band's padding never shows a cut third line. */
+        /* Never cut either: a caption the screen has no room for yields its band to the song (receiver/fit.js). */
         #captionText {
-            overflow: hidden;
-            display: -webkit-box;
-            -webkit-box-orient: vertical;
-            -webkit-line-clamp: 2;
+            overflow-wrap: anywhere;
+        }
+
+        body.caption-yields #captions {
+            display: none;
         }
 
         #captions.empty,

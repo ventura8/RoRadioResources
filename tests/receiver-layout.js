@@ -2,8 +2,10 @@
 // The receiver's layout and accessibility checks, run by tests/receiver.browser.test.js in headless Chrome with the
 // real Cast framework, for every screen size and every state:
 //   - no visible text or picture overlaps another, and none is off screen or under a touch display's system bar;
-//   - no text is cut: it fits its box, or it ends in an ellipsis or a line clamp;
-//   - text at least 24 px at 1080p (10-foot UI), scaled to the screen's height;
+//   - no text is ever cut, by its own box or by the song's column, and none ends in an ellipsis or a line clamp
+//     (owner, 2026-11-14: the title, the artist and the album always show in full);
+//   - text at least 16 px at 1080p, the floor the fitting may go to when nothing else fits (24 px is its own size),
+//     scaled to the screen's height;
 //   - contrast at least WCAG AA (4.5:1, or 3:1 for large text) against the real background: the text is hidden, the
 //     screen is captured, and the text colour is measured against every pixel under the text box;
 //   - axe-core (pinned in scripts/ci/package.json) finds no violation;
@@ -36,11 +38,16 @@ const MEASURE = `(() => {
         }
 
         const clamped = style.textOverflow === 'ellipsis' || (style.webkitLineClamp && style.webkitLineClamp !== 'none');
-        const cut = element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1;
+        // A box that hides what passes it cuts it; one that lets it show (overflow visible) cuts nothing.
+        const hides = style.overflow !== 'visible';
+        const overflows = hides && (element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1);
+        // Inside the song's column (which hides what passes it), a text past the column's bottom is cut too.
+        const column = element.closest('#song');
+        const clipped = Boolean(column) && r.bottom > column.getBoundingClientRect().bottom + 1;
         return [{
             selector, text, left: r.left, top: r.top, right: r.right, bottom: r.bottom,
             fontSize: parseFloat(style.fontSize), fontWeight: Number(style.fontWeight), color: style.color,
-            cut: text && cut && !clamped,
+            cut: text && (overflows || clamped || clipped),
         }];
     });
 })()`;
@@ -87,11 +94,11 @@ async function problems(session, { width, height, touch }) {
         }
 
         if (leaf.cut) {
-            found.push(`${leaf.selector} is cut without an ellipsis`);
+            found.push(`${leaf.selector} is cut or ellipsized`);
         }
 
-        if (leaf.text && leaf.fontSize < (24 * height) / 1080 - 0.5) {
-            found.push(`${leaf.selector} is ${leaf.fontSize} px, under 24 px at 1080p`);
+        if (leaf.text && leaf.fontSize < (16 * height) / 1080 - 0.5) {
+            found.push(`${leaf.selector} is ${leaf.fontSize} px, under 16 px at 1080p`);
         }
     }
 

@@ -5,7 +5,7 @@
 // media status, PAUSE / PLAY, STOP.
 //
 //   node cast-client.mjs <address> <step> [json]
-//   steps: launch | load | song | tap | pause | play | status | shown | stop
+//   steps: avail | launch | load | song | tap | jump | pause | play | status | shown | stop
 //   "shown" needs no session of its own: it reads what the receiver shows in whichever session runs it (the app's).
 // Prints one JSON line: what the device answered. The session (transport id, media session id) is kept in
 // %TEMP%/roradio-cast-e2e.json between calls, so each step is its own call and the script screenshots in between.
@@ -135,6 +135,29 @@ function connect(address) {
     });
 }
 
+/** What the page broadcasts while a press is made: its steps, the request each came by, what it dropped, the screen. */
+function listen(cast) {
+    const heard = { steps: [], vias: [], skipped: [], shown: null };
+    cast.listeners.push((message) => {
+        const status = message.payload && message.payload.status && message.payload.status[0];
+        const data = (status && status.customData) || {};
+        if (data.step) {
+            heard.steps.push(data.step);
+            heard.vias.push(data.via);
+        }
+
+        // Test mode: a press the page took for a repeat, and the request it came by.
+        if (data.skipped) {
+            heard.skipped.push(`${data.skipped} (${data.via})`);
+        }
+
+        if (data.shown) {
+            heard.shown = data.shown;
+        }
+    });
+    return heard;
+}
+
 const load = (url, title, artist, extra) => ({
     contentId: url,
     contentType: 'audio/mpeg',
@@ -204,36 +227,29 @@ async function main() {
             answer = { playerState: status.status && status.status[0] && status.status[0].playerState };
             break;
         }
-        case 'tap': {
-            // A tap on the device's system media bar, made while this sender listens for 4 s: the page broadcasts each
+        case 'tap':
+        case 'jump': {
+            // A press made while this sender listens for 4 s: a tap on a touch display's system media bar, or (a TV,
+            // no touch screen) the queue jump a remote's or a sender's previous / next sends. The page broadcasts each
             // step as a media status ({"step", "stepId", "shown"}), which only a connected sender hears. Every step
             // heard is counted (one press must be one step), and the last "shown" says what the screen shows.
-            app();
-            const steps = [];
-            const vias = [];
-            const skipped = [];
-            let shown = null;
-            cast.listeners.push((message) => {
-                const status = message.payload && message.payload.status && message.payload.status[0];
-                const data = status && status.customData;
-                if (data && data.step) {
-                    steps.push(data.step);
-                    vias.push(data.via);
-                }
+            const transport = app();
+            const heard = listen(cast);
+            if (step === 'tap') {
+                const { execFileSync } = await import('node:child_process');
+                execFileSync('adb', ['-s', input.device, 'shell', 'input', 'tap', String(input.x), String(input.y)]);
+            } else {
+                cast.send(transport, NS.media, { type: 'QUEUE_UPDATE', mediaSessionId: state.mediaSessionId, jump: input.jump, requestId: 700 + input.jump });
+            }
 
-                // Test mode: a press the page took for a repeat, and the request it came by.
-                if (data && data.skipped) {
-                    skipped.push(`${data.skipped} (${data.via})`);
-                }
-
-                if (data && data.shown) {
-                    ({ shown } = data);
-                }
-            });
-            const { execFileSync } = await import('node:child_process');
-            execFileSync('adb', ['-s', input.device, 'shell', 'input', 'tap', String(input.x), String(input.y)]);
             await new Promise((resolve) => setTimeout(resolve, 4000));
-            answer = { steps, vias, skipped, shown };
+            answer = heard;
+            break;
+        }
+        case 'avail': {
+            // Whether the device can run the RoRadio receiver now (a stale cached app config answers APP_UNAVAILABLE).
+            const reply = await cast.request('receiver-0', NS.receiver, { type: 'GET_APP_AVAILABILITY', appId: [APP_ID] }, 40000);
+            answer = { availability: reply.availability && reply.availability[APP_ID] };
             break;
         }
         case 'status': {
