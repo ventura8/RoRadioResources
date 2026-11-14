@@ -3,7 +3,9 @@
 .SYNOPSIS
     Runs every test of this repository: the station list's integrity (tests/Catalogue.Tests.ps1), the scripts'
     helpers (tests/Helpers.Tests.ps1), the logo checks (tests/test_*.py) and the Cast receiver's script
-    (tests/receiver.test.js, on Node's own test runner, no packages).
+    (tests/receiver.test.js, on Node's own test runner, no packages), and the receiver page itself in headless Chrome
+    with Google's real Cast receiver framework (tests/receiver.browser.test.js: Chrome from CHROME_PATH or its usual
+    install path, and network access to www.gstatic.com).
 
 .DESCRIPTION
     The CI's test job, the weekly refresh (before it commits: pull requests opened by GitHub Actions do not start

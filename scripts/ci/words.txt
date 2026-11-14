@@ -10,6 +10,7 @@ gamertag
 getchannel
 getcolors
 getextrema
+gstatic
 icecast
 icestats
 istupakov
