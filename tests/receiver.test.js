@@ -774,9 +774,12 @@ test("the app's cover colour theme: its colours on the page and in the status; o
     assert.equal(did.shown.theme, null);
 
     // Anything but two #rrggbb colours is no theme (never CSS from a sender).
-    for (const bad of [{ accent: 'red', tint: '#000000' }, { accent: '#000000' }, 'dark', null, 5]) {
-        const plain = run([load(JSON.stringify({ theme: bad }))]);
+    for (const bad of [{ accent: 'red', tint: '#000000' }, { accent: '#000000' }, { accent: ['#f0e040'], tint: '#000000' }, 'dark', null, 5]) {
+        const plain = run([load(JSON.stringify({ theme: bad, station: 'Pro FM', next: true }), 'Song')]);
         assert.equal(plain.body.classList.has('themed'), false, JSON.stringify(bad));
+        // A bad theme costs nothing else of the item: its station and steps stay (#46).
+        assert.equal(plain.stationName, 'Pro FM', JSON.stringify(bad));
+        assert.equal(plain.supported, BASE | QUEUE_NEXT, JSON.stringify(bad));
     }
 });
 

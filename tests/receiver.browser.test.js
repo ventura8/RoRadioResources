@@ -883,6 +883,9 @@ test('layout and accessibility in every state, at 1920 x 1080, on the tablet (25
             await pause(1200);
             assert.equal(await evaluate('document.body.classList.contains("themed")'), true);
             assert.deepEqual((await evaluate('window.probe')).shown.theme, theme);
+            // The scrim is drawn in the tint (77, 72, 19; Chrome writes it as srgb fractions), not the default one (#46).
+            const scrim = await evaluate('getComputedStyle(document.getElementById("scrim")).backgroundImage');
+            assert.match(scrim, /color\(srgb 0\.30196\d* 0\.28235\d* 0\.07450\d*/u, `the themed scrim: ${scrim}`);
             assert.deepEqual(await problems(session, size), []);
 
             // Off in the app: the next song comes without it, and the receiver has its default look again.
@@ -893,6 +896,16 @@ test('layout and accessibility in every state, at 1920 x 1080, on the tablet (25
             assert.deepEqual(await problems(session, size), []);
         });
     }
+
+    await t.test('the first song after the idle screen is fitted too (its screen was hidden while it was measured, #46)', async () => {
+        await resize(session, 1920, 1080);
+        await evaluate('window.events[cast.framework.events.EventType.MEDIA_FINISHED]({})');
+        const veryLong = 'A title long enough to need more than two lines at its full size on any screen at all, and then some more';
+        await evaluate(intercept('LOAD', { media: song(veryLong, 'A band', { station: 'Pro FM' }, [logo('90er-stream'), logo('Profm')]) }));
+        const title = (await evaluate(lines))[0];
+        assert.ok(title.size < title.full, `the title shrank on the first load: ${JSON.stringify(title)}`);
+        assert.equal(title.lines, 2);
+    });
 
     for (const size of sizes) {
         await t.test(`${size.name}: a short text is one line at full size; a long one takes two lines, smaller, before it is cut`, async () => {

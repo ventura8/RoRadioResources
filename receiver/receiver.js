@@ -375,9 +375,10 @@ function show(media) {
     showText(metadata, data);
     showSteps(data.previous, data.next);
     showPictures(metadata, data);
-    fitSong();
+    // The song's screen shows first: hidden (the idle screen), the texts measured nothing and never shrank (#46).
     document.body.classList.remove('failed');
     document.body.classList.add('playing');
+    fitSong();
     report();
 }
 

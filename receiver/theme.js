@@ -9,9 +9,12 @@
 
 const HEX = /^#[\da-f]{6}$/iu;
 
+/** Whether a value is a colour as "#rrggbb" text (an array of one, ['#f0e040'], is not: it only reads as one). */
+const isColour = (value) => typeof value === 'string' && HEX.test(value);
+
 /** The app's theme from its customData: both colours as "#rrggbb", or null (none sent, or not colours). */
 function themeOf(value) {
-    if (!value || typeof value !== 'object' || !HEX.test(value.accent) || !HEX.test(value.tint)) {
+    if (!value || typeof value !== 'object' || !isColour(value.accent) || !isColour(value.tint)) {
         return null;
     }
 
