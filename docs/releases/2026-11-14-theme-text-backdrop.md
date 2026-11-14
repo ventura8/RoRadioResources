@@ -9,7 +9,10 @@
   an even dark olive wash on the tablet. Now:
   - the blur is 3vmin;
   - the backdrop is no longer zoomed;
-  - the default scrim is 56-78% dark;
-  - with the theme on, the tint is a 30-45% layer over a neutral 45-65% dark one.
+  - the default scrim is 64-78% dark;
+  - with the theme on, the tint is a 30-45% layer over a neutral 52-68% dark one.
 
-  The cover's colours and shapes now show through. The text's WCAG AA contrast is still measured on the real pixels.
+  The cover's colours and shapes now show through. The text's WCAG AA contrast is still measured on the real pixels,
+  including over a white cover with the album shrunk to fit, at three sizes, with the theme off and on.
+- The page's test report gives each drawn text's words, and leaves out a text hidden by visibility or a zero opacity.
+  The E2E compares the words, so a year that leaves the album's line is caught.
