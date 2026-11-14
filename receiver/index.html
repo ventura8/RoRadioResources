@@ -3,6 +3,13 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!--
+        Content Security Policy: scripts only from the Cast framework on www.gstatic.com (and the Shaka player it loads,
+        protocol-relative, from ajax.googleapis.com: https on a device, as the page is https) and this page's own inline
+        script, by its hash (tests/receiver.test.js recomputes it, so a script change without a new hash fails CI); no
+        eval, no plugins, no forms, no base. Pictures and streams are the station's own, on any http(s) host.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-/FgAlM5ixk1wc8NLGYtuh4gyBm9UNOSwKWuqR21pdw4=' https://www.gstatic.com ajax.googleapis.com; style-src 'unsafe-inline' https://www.gstatic.com https://fonts.googleapis.com; font-src https://fonts.gstatic.com https://www.gstatic.com data:; img-src https: http: data: blob:; media-src https: http: data: blob:; connect-src https: http: wss: ws://localhost:8008; worker-src blob: https://www.gstatic.com; object-src 'none'; base-uri 'none'; form-action 'none'">
     <title>RoRadio</title>
     <!--
         The RoRadio Cast receiver (2.4.5). A Chromecast, a TV or a smart display loads this page when the app casts a
@@ -339,6 +346,23 @@
         }
 
         /**
+         * An image url from the app's metadata, only when it is http(s), normalized (quotes, spaces and newlines
+         * percent-encoded) so it is safe inside CSS url("..."); anything else (javascript:, data:, junk) is none.
+         */
+        function imageUrl(url) {
+            if (typeof url !== 'string') {
+                return '';
+            }
+
+            try {
+                const parsed = new URL(url);
+                return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? parsed.href : '';
+            } catch (e) {
+                return '';
+            }
+        }
+
+        /**
          * Sets an image's source once it has loaded, so a broken url never shows a broken picture. Only the newest
          * request for an image applies: a slow old cover never replaces a newer one, nor brings back a removed one.
          */
@@ -446,8 +470,9 @@
             // the logo then takes the cover's place, whole, and is not shown twice. Since 2.4.5 the customData also
             // names the station and its logo, so the logo shows beside the cover whatever the images hold.
             const images = metadata.images || [];
-            const cover = images[0] && images[0].url;
-            const logo = (images[1] && images[1].url) || (data.logo !== cover ? data.logo : '');
+            const cover = imageUrl(images[0] && images[0].url);
+            const dataLogo = imageUrl(data.logo);
+            const logo = imageUrl(images[1] && images[1].url) || (dataLogo !== cover ? dataLogo : '');
             byId('stationName').textContent = data.station;
             byId('cover').classList.toggle('logo', Boolean(cover) && !logo);
             const backdrop = byId('backdrop');

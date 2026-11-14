@@ -6,6 +6,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
@@ -94,6 +95,7 @@ function run(messages) {
         },
         // A clock that stands still: the step ids must still rise.
         Date: { now: () => 1000 },
+        URL,
     };
     vm.runInNewContext(source, sandbox, { filename: 'receiver/index.html' });
 
@@ -106,7 +108,10 @@ function run(messages) {
     did.title = elements.title ? elements.title.textContent : '';
     did.stationName = elements.stationName ? elements.stationName.textContent : '';
     did.logo = elements.station ? stationImage.src : undefined;
-    did.stationShown = elements.station ? !elements.station.classList.has('empty') : false;
+    did.cover = elements.cover ? elements.cover.src : undefined;
+    did.backdrop = elements.backdrop ? elements.backdrop.style.backgroundImage : undefined;
+    did.artist = elements.artist ? elements.artist.textContent : '';
+    did.stationShown = elements.station ?!elements.station.classList.has('empty') : false;
     did.supported = supported;
     return did;
 }
@@ -239,6 +244,45 @@ test('the station logo shows beside the song cover', () => {
     const fromData = run([loadWith(['https://x/cover.jpg'], JSON.stringify({ logo: 'https://x/logo.png' }))]);
     assert.equal(fromData.logo, 'https://x/logo.png');
     assert.ok(fromData.stationShown);
+});
+
+test('metadata that looks like markup is drawn as text, never parsed as HTML', () => {
+    const markup = '<img src=x onerror=alert(1)>';
+    const data = JSON.stringify({ caption: markup, station: markup });
+    const did = run([
+        { type: 'LOAD', request: { media: { metadata: { title: markup, artist: markup }, customData: data } } },
+    ]);
+    assert.equal(did.title, markup);
+    assert.equal(did.artist, markup);
+    assert.equal(did.caption, markup);
+    assert.equal(did.stationName, markup);
+    // No API that parses HTML or code anywhere in the page's script.
+    for (const sink of ['innerHTML', 'outerHTML', 'insertAdjacentHTML', 'document.write', 'eval(', 'new Function', 'setTimeout(\'']) {
+        assert.ok(!source.includes(sink), `receiver/index.html uses ${sink}`);
+    }
+});
+
+test('only http(s) pictures are shown, and a quote cannot break out of the backdrop url', () => {
+    for (const bad of ['javascript:alert(1)', 'data:image/svg+xml,<svg onload=alert(1)>', 'not a url', 42]) {
+        const did = run([loadWith([bad], JSON.stringify({ logo: bad }))]);
+        assert.equal(did.cover, undefined, String(bad));
+        assert.equal(did.logo, undefined, String(bad));
+        assert.equal(did.backdrop, '', String(bad));
+    }
+
+    const did = run([loadWith(['https://x/a.jpg?q=")"; background:red'], '')]);
+    assert.equal(did.cover, 'https://x/a.jpg?q=%22)%22;%20background:red');
+    assert.equal(did.backdrop, 'url("https://x/a.jpg?q=%22)%22;%20background:red")');
+});
+
+test('the Content-Security-Policy allows the inline script by its exact hash, and never eval', () => {
+    const csp = html.match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)">/);
+    assert.ok(csp, 'receiver/index.html declares a Content-Security-Policy');
+    const hash = crypto.createHash('sha256').update(source, 'utf8').digest('base64');
+    assert.ok(csp[1].includes(`'sha256-${hash}'`), `script-src needs 'sha256-${hash}'`);
+    assert.ok(!csp[1].includes('unsafe-eval'));
+    assert.match(csp[1], /script-src [^;]*https:\/\/www\.gstatic\.com/);
+    assert.ok(!/script-src[^;]*'unsafe-inline'/.test(csp[1]));
 });
 
 test('a logo that is already the cover (no song cover) is not shown twice', () => {
