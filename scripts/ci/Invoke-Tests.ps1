@@ -46,8 +46,13 @@ Push-Location $root
 try {
     & $Python -m unittest discover --start-directory tests --verbose
     $pythonFailed = $LASTEXITCODE -ne 0
-    # The Cast receiver's script (receiver/index.html).
-    & node --test (Get-ChildItem tests -Filter '*.test.js' | ForEach-Object FullName)
+    # The Cast receiver (receiver/receiver.js): unit tests and the real framework in Chrome. Below 100 % line, branch
+    # or function coverage of the script, Node's runner fails the run.
+    $coverage = @(
+        '--experimental-test-coverage', '--test-coverage-include=receiver/receiver.js',
+        '--test-coverage-lines=100', '--test-coverage-branches=100', '--test-coverage-functions=100'
+    )
+    & node --test @coverage (Get-ChildItem tests -Filter '*.test.js' | ForEach-Object FullName)
     $nodeFailed = $LASTEXITCODE -ne 0
 } finally {
     Pop-Location
