@@ -196,7 +196,9 @@ Test-Step 'touch next' {
     ($heard.steps -join ',') -eq 'next' -and $heard.shown.cover -and $heard.shown.logo -and $heard.shown.title -eq 'Test song'
 }
 Test-Step 'layout on the screenshot' { Test-Layout $script:layout (Join-Path $OutDir 'touch-next.png') }
+# The bar sends every press with one request id: previous after next, and next again, must each still step.
 Test-Step 'touch previous' { ((Invoke-Tap 'previous').steps -join ',') -eq 'previous' }
+Test-Step 'touch next again' { ((Invoke-Tap 'next').steps -join ',') -eq 'next' }
 Test-Step 'touch pause' {
     Invoke-Tap 'pause' | Out-Null
     (Invoke-Cast 'status').playerState -eq 'PAUSED'

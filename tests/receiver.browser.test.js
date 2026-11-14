@@ -121,7 +121,11 @@ function probe() {
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** The receiver's files beside its page, with their content types. */
-const ownFiles = { '/receiver/receiver.js': 'text/javascript; charset=utf-8', '/receiver/icon.png': 'image/png' };
+const ownFiles = {
+    '/receiver/receiver.js': 'text/javascript; charset=utf-8',
+    '/receiver/logo-tone.js': 'text/javascript; charset=utf-8',
+    '/receiver/icon.png': 'image/png',
+};
 
 /** The page as a device gets it, with the probe after the framework; pictures served from /img/<name>.png. */
 function serve(withPage) {
@@ -696,6 +700,19 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
         assert.deepEqual((await evaluate('window.probe')).statusRequestIds, [0]);
     });
 
+    await t.test('the system bar\'s presses all carry one request id: next, previous 1 s later, next 2 s later, all step', async () => {
+        await pause(700);
+        const before = (await evaluate('window.probe.broadcasts')).length;
+        await evaluate(intercept('QUEUE_UPDATE', { jump: 1, requestId: 1, senderId: 'local' }));
+        await pause(1000);
+        await evaluate(intercept('QUEUE_UPDATE', { jump: -1, requestId: 1, senderId: 'local' }));
+        await pause(2000);
+        await evaluate(intercept('QUEUE_UPDATE', { jump: 1, requestId: 1, senderId: 'local' }));
+        const steps = (await evaluate('window.probe.broadcasts')).slice(before);
+        assert.deepEqual(steps.map((s) => s.step), ['next', 'previous', 'next']);
+        assert.deepEqual(steps.map((s) => s.via), ['local/1/next', 'local/1/previous', 'local/1/next']);
+    });
+
     await t.test('a double press on the system bar (two jumps at once, new ids) is one step', async () => {
         await pause(700);
         const before = (await evaluate('window.probe.broadcasts')).length;
@@ -829,7 +846,48 @@ test('layout and accessibility in every state, at 1920 x 1080, on the tablet (25
         const box = (s) => document.querySelector(s).getBoundingClientRect();
         return { title: box('#title').top, cover: box('#cover').bottom, station: box('#station').bottom, song: box('#song').top };
     })()`;
+    // Each text's lines, font size, CSS full size and whether it is cut (more than its two lines).
+    const lines = `(() => ['title', 'artist', 'release'].map((id) => {
+        const e = document.getElementById(id);
+        const s = getComputedStyle(e);
+        const full = (() => { const k = e.style.fontSize; e.style.fontSize = ''; const f = parseFloat(getComputedStyle(e).fontSize); e.style.fontSize = k; return f; })();
+        // Cut: its full text passes two lines (glyphs overhanging a line by a few pixels are not a third line).
+        const cut = e.scrollHeight > 2.5 * parseFloat(s.lineHeight);
+        return { id, lines: Math.round(e.clientHeight / parseFloat(s.lineHeight)), size: parseFloat(s.fontSize), full, cut };
+    }))()`;
     for (const size of sizes) {
+        await t.test(`${size.name}: a short text is one line at full size; a long one takes two lines, smaller, before it is cut`, async () => {
+            await resize(session, size.width, size.height);
+            await evaluate(`document.body.classList.toggle('touch', ${size.touch})`);
+            const minimum = (24 * size.height) / 1080 - 0.5;
+            await evaluate(intercept('LOAD', { media: song('Hello', 'Adele', { station: 'Pro FM', album: '25' }, [logo('90er-stream'), logo('Profm')]) }));
+            await pause(300);
+            for (const text of await evaluate(lines)) {
+                assert.equal(text.lines, 1, `${text.id}: ${JSON.stringify(text)}`);
+                assert.equal(text.size, text.full, `${text.id} keeps its full size`);
+            }
+
+            const medium = 'A title that needs two lines of room at its full size on this screen, or a little more';
+            await evaluate(intercept('LOAD', { media: song(medium, medium, { station: 'Pro FM', album: medium }, [logo('90er-stream'), logo('Profm')]) }));
+            await pause(300);
+            for (const text of await evaluate(lines)) {
+                assert.ok(text.lines <= 2, `${text.id}: ${JSON.stringify(text)}`);
+                assert.ok(text.size >= minimum, `${text.id} at ${text.size} px is readable`);
+                // Cut only once it is at the readable minimum.
+                assert.ok(!text.cut || text.size <= minimum + 1, `${text.id} shrinks before it is cut: ${JSON.stringify(text)}`);
+            }
+
+            const veryLong = `${medium} ${medium} ${medium} ${medium}`;
+            await evaluate(intercept('LOAD', { media: song(veryLong, veryLong, { station: 'Pro FM', album: veryLong }, [logo('90er-stream'), logo('Profm')]) }));
+            await pause(300);
+            for (const text of await evaluate(lines)) {
+                assert.equal(text.lines, 2, `${text.id}: ${JSON.stringify(text)}`);
+                assert.ok(text.size < text.full && text.size >= minimum, `${text.id} shrank to ${text.size} px, no less than the minimum`);
+            }
+
+            assert.deepEqual(await problems(session, size), []);
+        });
+
         await t.test(`${size.name}: a fixed layout, the title where it was, the station's line level with the cover's bottom`, async () => {
             await resize(session, size.width, size.height);
             await evaluate(`document.body.classList.toggle('touch', ${size.touch})`);

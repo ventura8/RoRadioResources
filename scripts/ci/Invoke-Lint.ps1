@@ -82,7 +82,7 @@ try {
     Invoke-Check 'cspell' { & (Get-NodeTool 'cspell') --no-progress --config cspell.json '**' | Out-Host }
     # The Cast receiver: its script (eslint:all, scripts/ci/eslint.config.mjs) and tests, its page, its styles.
     Invoke-Check 'eslint (receiver)' {
-        & (Get-NodeTool 'eslint') --max-warnings 0 --config scripts/ci/eslint.config.mjs receiver/receiver.js tests/receiver.test.js tests/receiver.browser.test.js tests/receiver-layout.js tests/png.js scripts/e2e/cast-client.mjs | Out-Host
+        & (Get-NodeTool 'eslint') --max-warnings 0 --config scripts/ci/eslint.config.mjs receiver/receiver.js receiver/logo-tone.js tests/receiver.test.js tests/receiver.browser.test.js tests/receiver-layout.js tests/png.js scripts/e2e/cast-client.mjs | Out-Host
     }
     Invoke-Check 'html-validate (receiver)' {
         & (Get-NodeTool 'html-validate') --max-warnings 0 --config scripts/ci/htmlvalidate.cjs receiver/index.html | Out-Host
