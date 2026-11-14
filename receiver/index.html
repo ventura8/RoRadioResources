@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
@@ -36,10 +36,11 @@
     <style>
         :root {
             color-scheme: dark;
+
             --safe-x: 5vw;
             --safe-y: 5vh;
             --gap: clamp(16px, 3.5vmin, 48px);
-            --text: #ffffff;
+            --text: #fff;
             --muted: rgb(255 255 255 / 78%);
             --scrim: rgb(8 10 14 / 72%);
             --accent: #ff6a3d;
@@ -93,13 +94,12 @@
             position: fixed;
             inset: var(--safe-y) var(--safe-x);
             display: grid;
-            grid-template-columns: minmax(0, auto) minmax(0, 1fr);
-            grid-template-rows: minmax(0, 1fr) auto;
-            grid-template-areas:
-                "cover song"
-                "captions captions";
-            column-gap: var(--gap);
-            row-gap: var(--gap);
+            grid-template:
+                "cover song" minmax(0, 1fr)
+                "captions captions" auto
+                / minmax(0, auto) minmax(0, 1fr);
+            gap: var(--gap);
+
             /* The cover and the song from the same top: the station's logo level with the cover's top edge. */
             align-items: start;
         }
@@ -130,6 +130,7 @@
             object-fit: cover;
             background: rgb(255 255 255 / 8%);
             box-shadow: 0 2vmin 6vmin rgb(0 0 0 / 55%);
+
             /* No animation of its size: shrinking as a caption band appeared, it covered the band for 300 ms. */
         }
 
@@ -137,7 +138,7 @@
         #cover.logo {
             object-fit: contain;
             padding: 4vmin;
-            background: #ffffff;
+            background: #fff;
         }
 
         /*
@@ -204,9 +205,10 @@
             flex: none;
             border-radius: 22%;
             object-fit: contain;
+
             /* In vmin: a padding in % is a share of the column's width, which left no room for the logo. */
             padding: clamp(4px, 1vmin, 14px);
-            background: #ffffff;
+            background: #fff;
             box-shadow: 0 1vmin 3vmin rgb(0 0 0 / 45%);
         }
 
@@ -275,6 +277,12 @@
             background: rgb(255 255 255 / 8%);
             box-shadow: 0 2vmin 6vmin rgb(0 0 0 / 50%);
             object-fit: contain;
+        }
+
+        /* The last station's stream failed: the status says so, in the accent colour. */
+        body.failed #status {
+            max-width: 70vw;
+            color: var(--accent);
         }
 
         #idle #hint {
@@ -353,12 +361,11 @@
         /* A tall screen (a display turned upright): the cover above the song. */
         @media (aspect-ratio < 1) {
             main {
-                grid-template-columns: minmax(0, 1fr);
-                grid-template-rows: auto minmax(0, 1fr) auto;
-                grid-template-areas:
-                    "cover"
-                    "song"
-                    "captions";
+                grid-template:
+                    "cover" auto
+                    "song" minmax(0, 1fr)
+                    "captions" auto
+                    / minmax(0, 1fr);
                 justify-items: center;
                 text-align: center;
             }
@@ -421,264 +428,7 @@
         </nav>
         <div id="captions" class="empty" aria-live="polite"><span id="captionText"></span></div>
     </main>
-    <script>
-        'use strict';
-
-        const context = cast.framework.CastReceiverContext.getInstance();
-        const player = context.getPlayerManager();
-        const byId = (id) => document.getElementById(id);
-
-        /** The year of a release date ("2015" or "2015-03-01"); empty when there is none. */
-        function yearOf(date) {
-            return typeof date === 'string' ? date.slice(0, 4) : '';
-        }
-
-        /**
-         * An image url from the app's metadata, only when it is http(s), normalized (quotes, spaces and newlines
-         * percent-encoded) so it is safe inside CSS url("..."); anything else (javascript:, data:, junk) is none.
-         */
-        function imageUrl(url) {
-            if (typeof url !== 'string') {
-                return '';
-            }
-
-            try {
-                const parsed = new URL(url);
-                return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? parsed.href : '';
-            } catch (e) {
-                return '';
-            }
-        }
-
-        /**
-         * Sets an image's source once it has loaded, so a broken url never shows a broken picture. Only the newest
-         * request for an image applies: a slow old cover never replaces a newer one, nor brings back a removed one.
-         */
-        function showImage(image, url, onShown) {
-            const request = (image.dataset.request = String(Number(image.dataset.request || 0) + 1));
-            if (!url) {
-                image.removeAttribute('src');
-                return;
-            }
-
-            const probe = new Image();
-            probe.onload = () => {
-                if (image.dataset.request !== request) {
-                    return;
-                }
-
-                image.src = url;
-                if (onShown) {
-                    onShown(url);
-                }
-            };
-            probe.onerror = () => {
-                // A picture that does not load: none, rather than the last song's.
-                if (image.dataset.request !== request) {
-                    return;
-                }
-
-                image.removeAttribute('src');
-                if (onShown) {
-                    onShown(null);
-                }
-            };
-            probe.src = url;
-        }
-
-        /**
-         * The app's data for this item: {"caption", "previous", "next"} as JSON text; a plain string (older app builds)
-         * is the caption alone, with no steps.
-         */
-        function appData(customData) {
-            const none = { caption: '', previous: false, next: false, station: '', logo: '' };
-            const text = (value) => (typeof value === 'string' ? value : '');
-            if (typeof customData !== 'string') {
-                return none;
-            }
-
-            if (customData.startsWith('{')) {
-                try {
-                    const data = JSON.parse(customData);
-                    return {
-                        caption: text(data.caption),
-                        previous: data.previous === true,
-                        next: data.next === true,
-                        station: text(data.station),
-                        logo: text(data.logo),
-                    };
-                } catch (e) {
-                    // Not the app's JSON: a caption that starts with a brace.
-                }
-            }
-
-            return { ...none, caption: customData };
-        }
-
-        const Command = cast.framework.messages.Command;
-        const stepCommands = Command.QUEUE_PREV | Command.QUEUE_NEXT;
-        let baseCommands = null;
-
-        /**
-         * Previous / next as the app offers them: declared only for a step the station has, so the device's own media
-         * controls (smart display, Google TV, Google Home) show exactly those buttons.
-         */
-        function showSteps(previous, next) {
-            if (baseCommands === null) {
-                baseCommands = player.getSupportedMediaCommands() & ~stepCommands;
-            }
-
-            const commands = baseCommands | (previous ? Command.QUEUE_PREV : 0) | (next ? Command.QUEUE_NEXT : 0);
-            player.setSupportedMediaCommands(commands, true);
-            // The page's own buttons on a touch display: exactly the steps the station has.
-            byId('previous').classList.toggle('hidden', !previous);
-            byId('next').classList.toggle('hidden', !next);
-        }
-
-        /** A previous / next press, for the app: a media status whose customData names it, numbered upwards. */
-        let lastStepId = 0;
-        function step(name) {
-            lastStepId = Math.max(Date.now(), lastStepId + 1);
-            player.broadcastStatus(false, undefined, { step: name, stepId: lastStepId });
-        }
-
-        /** Draws the song of `media`: its metadata, its pictures (the cover, then the station's logo), its caption. */
-        function show(media) {
-            const metadata = (media && media.metadata) || {};
-            byId('title').textContent = metadata.title || metadata.songName || '';
-            byId('artist').textContent = metadata.artist || metadata.subtitle || '';
-            byId('album').textContent = metadata.albumName || '';
-            byId('year').textContent = yearOf(metadata.releaseDate);
-            byId('release').classList.toggle('empty', !metadata.albumName && !yearOf(metadata.releaseDate));
-            const data = appData(media && media.customData);
-            const caption = data.caption;
-            showSteps(data.previous, data.next);
-            byId('captionText').textContent = caption;
-            byId('captions').classList.toggle('empty', !caption);
-            document.body.classList.toggle('captioned', Boolean(caption));
-
-            // The app sends [cover, station logo] when the song has a cover, and [station logo] alone when it has none:
-            // the logo then takes the cover's place, whole, and is not shown twice. Since 2.4.5 the customData also
-            // names the station and its logo, so the logo shows beside the cover whatever the images hold.
-            const images = metadata.images || [];
-            const cover = imageUrl(images[0] && images[0].url);
-            const dataLogo = imageUrl(data.logo);
-            const logo = imageUrl(images[1] && images[1].url) || (dataLogo !== cover ? dataLogo : '');
-            byId('stationName').textContent = data.station;
-            byId('cover').classList.toggle('logo', Boolean(cover) && !logo);
-            const backdrop = byId('backdrop');
-            const showBackdrop = (url) => {
-                // No picture for this song (none sent, or it did not load): no backdrop from the last one.
-                backdrop.style.backgroundImage = url ? `url("${url}")` : '';
-                backdrop.classList.toggle('shown', Boolean(url));
-            };
-            if (!cover) {
-                showBackdrop(null);
-            }
-
-            showImage(byId('cover'), cover, showBackdrop);
-            const station = byId('station');
-            station.classList.toggle('empty', !logo && !data.station);
-            showImage(station.querySelector('img'), logo);
-            document.body.classList.add('playing');
-        }
-
-        /** A LOAD: the station starts; its song is shown with it. */
-        player.setMessageInterceptor(cast.framework.messages.MessageType.LOAD, (request) => {
-            if (request.media) {
-                show(request.media);
-            }
-
-            return request;
-        });
-
-        /**
-         * A song change or a caption (the app's QUEUE_UPDATE of the item playing): shown here, and given to the
-         * player's media information so the senders' notifications and the Google Home app show the new song too.
-         */
-        player.setMessageInterceptor(cast.framework.messages.MessageType.QUEUE_UPDATE, (request) => {
-            // A sender's previous / next (the Google Home app, an Android notification) is a jump in the queue: the app
-            // steps instead, and loads the station it reaches.
-            if (request.jump === 1 || request.jump === -1) {
-                step(request.jump === 1 ? 'next' : 'previous');
-                return null;
-            }
-
-            const media = request.items && request.items[0] && request.items[0].media;
-            if (media && media.metadata) {
-                show(media);
-                const playing = player.getMediaInformation();
-                if (playing) {
-                    // The new song's metadata whole: an album or a year the new song has none of must not stay.
-                    playing.metadata = media.metadata;
-                    playing.customData = media.customData;
-                    player.setMediaInformation(playing, true);
-                }
-            }
-
-            return request;
-        });
-
-        /*
-         * The device's own previous / next (a smart display's touch controls, Google TV's remote, the Assistant) reach
-         * the page as a QUEUE_UPDATE jump, above. No interceptor for QUEUE_NEXT / QUEUE_PREV: the framework names them in
-         * MessageType but throws "Unknown message type" for an interceptor, which stopped this script before
-         * context.start(), so the page never answered the launch and the app fell back to the Default Media Receiver
-         * after 30 s (Pixel Tablet, 2026-11-14).
-         */
-
-        player.addEventListener(cast.framework.events.EventType.MEDIA_FINISHED, () => document.body.classList.remove('playing'));
-
-        /** The pause button shows what a tap does: pause while it plays, play while it is paused. */
-        function showPaused(paused) {
-            const button = byId('playPause');
-            button.textContent = paused ? '▶' : '⏸';
-            button.setAttribute('aria-label', paused ? 'Play' : 'Pause');
-        }
-
-        player.addEventListener(cast.framework.events.EventType.PAUSE, () => showPaused(true));
-        player.addEventListener(cast.framework.events.EventType.PLAYING, () => showPaused(false));
-
-        // A touch display's taps: previous / next step through the group in the app, as the device's own buttons do.
-        byId('previous').addEventListener('click', () => step('previous'));
-        byId('next').addEventListener('click', () => step('next'));
-        byId('playPause').addEventListener('click', () => {
-            if (player.getPlayerState() === cast.framework.messages.PlayerState.PAUSED) {
-                player.play();
-            } else {
-                player.pause();
-            }
-        });
-
-        /** Whether this device takes touch (Pixel Tablet, Nest Hub): its buttons show on the page then. */
-        function isTouch() {
-            try {
-                const capabilities = context.getDeviceCapabilities() || {};
-                if (capabilities[cast.framework.system.DeviceCapabilities.TOUCH_INPUT_SUPPORTED]) {
-                    return true;
-                }
-            } catch (e) {
-                // Not ready yet, or off a device: the pointer decides.
-            }
-
-            return typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
-        }
-
-        const markTouch = () => document.body.classList.toggle('touch', isTouch());
-        context.addEventListener(cast.framework.system.EventType.READY, markTouch);
-        markTouch();
-
-        // The page's own media element: with Google's cast-media-player a touch display drew its default audio UI (the
-        // station's name twice, no logo) over this page (Pixel Tablet, 2026-11-14).
-        player.setMediaElement(byId('media'));
-
-        const options = new cast.framework.CastReceiverOptions();
-        // A radio station plays until it is stopped; the receiver stays while it is idle between two stations.
-        options.maxInactivity = 3600;
-        // This page is the touch UI (Cast's smart display guide): no default controls or opaque scrim over it.
-        options.uiConfig = new cast.framework.ui.UiConfig();
-        options.uiConfig.touchScreenOptimizedApp = true;
-        context.start(options);
-    </script>
+    <!-- The page's script (receiver.js): after the elements it draws in, as the framework above. -->
+    <script src="receiver.js"></script>
 </body>
 </html>

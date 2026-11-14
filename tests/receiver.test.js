@@ -1,8 +1,8 @@
 // Copyright 2026 Sergiu Alexandrescu
-// The Cast receiver's script (receiver/index.html): captions, previous / next and the steps it sends the app.
-// Each test runs the page's inline script in a fresh Node context with the Cast framework and the page stubbed, plays
-// messages through the interceptors the page registered, and checks what the page declared, drew and broadcast.
-// Node's own test runner and assert, nothing to install: scripts/ci/Invoke-Tests.ps1 runs `node --test tests/*.test.js`.
+// The Cast receiver's script (receiver/receiver.js): song, pictures, captions, previous / next, touch buttons, status.
+// Each test loads the script afresh with the Cast framework and the page stubbed as globals, plays messages through the
+// interceptors the page registered, and checks what the page declared, drew and broadcast. Loaded with require, so
+// Node's coverage measures it: scripts/ci/Invoke-Tests.ps1 fails below 100 % lines, branches and functions.
 'use strict';
 
 const assert = require('node:assert/strict');
@@ -10,12 +10,11 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
-const vm = require('node:vm');
 
+const script = path.join(__dirname, '..', 'receiver', 'receiver.js');
 const html = fs.readFileSync(path.join(__dirname, '..', 'receiver', 'index.html'), 'utf8');
-const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
-assert.equal(scripts.length, 1, 'receiver/index.html has one inline script');
-const source = scripts[0][1];
+assert.ok(html.includes('<script src="receiver.js"></script>'), 'receiver/index.html loads receiver.js');
+assert.ok(!/<script>/.test(html), 'receiver/index.html has no inline script');
 
 // The framework's own values (cast.framework.messages.Command).
 const Command = { PAUSE: 1, SEEK: 2, STREAM_VOLUME: 4, STREAM_MUTE: 8, QUEUE_NEXT: 64, QUEUE_PREV: 128 };
@@ -49,7 +48,10 @@ function element() {
 }
 
 /** Loads the page in a fresh context, plays `messages` and returns what the page did. */
-function run(messages, { touch = false, taps = [], playerState = 'PLAYING' } = {}) {
+function run(
+    messages,
+    { touch = false, taps = [], playerState = 'PLAYING', pictures = 'load', coarse, capabilities, playingMedia } = {},
+) {
     const elements = {};
     const stationImage = element();
     const station = element();
@@ -59,7 +61,7 @@ function run(messages, { touch = false, taps = [], playerState = 'PLAYING' } = {
     const did = { commands: [], broadcasts: [], mediaInformation: [], results: [] };
     // The device starts with QUEUE_PREV on: the page must drop it unless the station has a previous one.
     let supported = BASE | QUEUE_PREV;
-    let playing = { metadata: { title: 'Before' }, customData: '' };
+    let playing = playingMedia === undefined ? { metadata: { title: 'Before' }, customData: '' } : playingMedia;
     const player = {
         getSupportedMediaCommands: () => supported,
         setSupportedMediaCommands: (commands, broadcast) => {
@@ -96,8 +98,32 @@ function run(messages, { touch = false, taps = [], playerState = 'PLAYING' } = {
             did.options = options;
         },
         addEventListener: (type, handler) => (did.contextEvents = { [type]: handler }),
-        getDeviceCapabilities: () => ({ touch_input_supported: touch }),
+        getDeviceCapabilities: () => {
+            if (capabilities === 'throws') {
+                throw new Error('not ready');
+            }
+
+            return capabilities === 'none' ? null : { touch_input_supported: touch };
+        },
     };
+    // Pictures load at once ('load'), fail ('error'), or wait for the test to settle them ('later').
+    did.probes = [];
+    function Image() {
+        const probe = {};
+        Object.defineProperty(probe, 'src', {
+            set(url) {
+                probe.url = url;
+                if (pictures === 'load') {
+                    probe.onload();
+                } else if (pictures === 'error') {
+                    probe.onerror();
+                } else {
+                    did.probes.push(probe);
+                }
+            },
+        });
+        return probe;
+    }
     const sandbox = {
         cast: {
             framework: {
@@ -108,35 +134,58 @@ function run(messages, { touch = false, taps = [], playerState = 'PLAYING' } = {
                     MessageType: Object.fromEntries(types.map((type) => [type, type])),
                     PlayerState: { PLAYING: 'PLAYING', PAUSED: 'PAUSED' },
                 },
-                events: { EventType: { MEDIA_FINISHED: 'MEDIA_FINISHED', PAUSE: 'PAUSE', PLAYING: 'PLAYING' } },
+                events: { EventType: { MEDIA_FINISHED: 'MEDIA_FINISHED', ERROR: 'ERROR', PAUSE: 'PAUSE', PLAYING: 'PLAYING' } },
                 system: { DeviceCapabilities: { TOUCH_INPUT_SUPPORTED: 'touch_input_supported' }, EventType: { READY: 'ready' } },
                 ui: { UiConfig: function UiConfig() {} },
             },
         },
-        window: {},
+        window: coarse === undefined ? {} : { matchMedia: (query) => ({ matches: coarse && query === '(pointer: coarse)' }) },
         document: { getElementById: (id) => (elements[id] ??= element()), body: element() },
-        // Pictures load at once here, so the logo shown is the url the page asked for.
-        Image: function Image() {
-            return {
-                set src(url) {
-                    this.onload();
-                },
-            };
-        },
-        // A clock that stands still: the step ids must still rise.
-        Date: { now: () => 1000 },
-        URL,
+        Image,
     };
-    vm.runInNewContext(source, sandbox, { filename: 'receiver/index.html' });
+    // The page's globals for one fresh load of the script; a clock that stands still: the step ids must still rise.
+    const saved = Object.fromEntries(Object.keys(sandbox).map((name) => [name, globalThis[name]]));
+    const now = Date.now;
+    Object.assign(globalThis, sandbox);
+    Date.now = () => 1000;
+    try {
+        delete require.cache[script];
+        require(script);
+        play(messages, interceptors, did);
+        for (const id of taps) {
+            elements[id].listeners.click();
+        }
+    } finally {
+        Date.now = now;
+        Object.assign(globalThis, saved);
+    }
 
+    did.body = sandbox.document.body;
+    did.stationImage = stationImage;
+    // Later work in the same page (more messages, a framework event, a picture that settles), with its globals.
+    did.within = (work) => {
+        Object.assign(globalThis, sandbox);
+        Date.now = () => 1000;
+        try {
+            return work((more) => play(more, interceptors, did));
+        } finally {
+            Date.now = now;
+            Object.assign(globalThis, saved);
+        }
+    };
+    return finish(did, elements, stationImage, sandbox, () => supported);
+}
+
+/** Plays `messages` through the page's interceptors. */
+function play(messages, interceptors, did) {
     for (const message of messages) {
         const result = interceptors[message.type](message.request ?? {});
         did.results.push(result === null ? null : 'request');
     }
+}
 
-    for (const id of taps) {
-        elements[id].listeners.click();
-    }
+/** What the page shows, read into `did`. */
+function finish(did, elements, stationImage, sandbox, supported) {
 
     did.touch = sandbox.document.body.classList.has('touch');
     did.elements = elements;
@@ -145,11 +194,8 @@ function run(messages, { touch = false, taps = [], playerState = 'PLAYING' } = {
     did.title = elements.title ? elements.title.textContent : '';
     did.stationName = elements.stationName ? elements.stationName.textContent : '';
     did.logo = elements.station ? stationImage.src : undefined;
-    did.cover = elements.cover ? elements.cover.src : undefined;
-    did.backdrop = elements.backdrop ? elements.backdrop.style.backgroundImage : undefined;
-    did.artist = elements.artist ? elements.artist.textContent : '';
-    did.stationShown = elements.station ?!elements.station.classList.has('empty') : false;
-    did.supported = supported;
+    did.stationShown = elements.station ? !elements.station.classList.has('empty') : false;
+    did.supported = supported();
     return did;
 }
 
@@ -316,9 +362,11 @@ test('the pause button pauses while it plays, plays while paused, and shows whic
     assert.deepEqual(run([], { taps: ['playPause'] }).calls, ['pause']);
     const paused = run([], { taps: ['playPause'], playerState: 'PAUSED' });
     assert.deepEqual(paused.calls, ['play']);
-    paused.playerEvents.PAUSE();
+    paused.within(() => paused.playerEvents.PAUSE());
     assert.equal(paused.elements.playPause.attributes['aria-label'], 'Play');
-    paused.playerEvents.PLAYING();
+    assert.equal(paused.elements.playPause.textContent, '▶');
+    paused.within(() => paused.playerEvents.PLAYING());
+    assert.equal(paused.elements.playPause.textContent, '⏸');
     assert.equal(paused.elements.playPause.attributes['aria-label'], 'Pause');
 });
 
@@ -326,4 +374,88 @@ test('a logo that is already the cover (no song cover) is not shown twice', () =
     const did = run([loadWith(['https://x/logo.png'], JSON.stringify({ logo: 'https://x/logo.png' }))]);
     assert.equal(did.logo, undefined);
     assert.equal(did.stationShown, false);
+});
+
+test('a song with no app data and no metadata fields shows empty text, not "undefined"', () => {
+    const did = run([{ type: 'LOAD', request: { media: {} } }, { type: 'LOAD', request: {} }]);
+    assert.equal(did.title, '');
+    assert.equal(did.caption, '');
+    assert.equal(did.elements.artist.textContent, '');
+    assert.equal(did.elements.release.classList.has('empty'), true);
+    assert.equal(did.body.classList.has('playing'), true);
+});
+
+test('the song name, subtitle, album and year are used when the main fields are missing', () => {
+    const metadata = { songName: 'Name', subtitle: 'Sub', albumName: 'Album', releaseDate: '2015-03-01' };
+    const did = run([{ type: 'LOAD', request: { media: { metadata } } }]);
+    assert.equal(did.title, 'Name');
+    assert.equal(did.elements.artist.textContent, 'Sub');
+    assert.equal(did.elements.album.textContent, 'Album');
+    assert.equal(did.elements.year.textContent, '2015');
+    assert.equal(did.elements.release.classList.has('empty'), false);
+});
+
+test('a cover that loads is the backdrop; one that fails leaves no picture and no backdrop', () => {
+    const shown = run([loadWith(['https://x/cover.jpg'], '')]);
+    assert.equal(shown.elements.cover.src, 'https://x/cover.jpg');
+    assert.equal(shown.elements.backdrop.style.backgroundImage, 'url("https://x/cover.jpg")');
+    assert.equal(shown.elements.cover.classList.has('logo'), true);
+
+    const failed = run([loadWith(['https://x/cover.jpg', 'https://x/logo.png'], '')], { pictures: 'error' });
+    assert.equal(failed.elements.cover.src, undefined);
+    assert.equal(failed.logo, undefined);
+    assert.equal(failed.elements.backdrop.style.backgroundImage, '');
+    assert.equal(failed.elements.backdrop.classList.has('shown'), false);
+});
+
+test('a slow old picture never replaces a newer one, loaded or failed', () => {
+    const did = run([loadWith(['https://x/old.jpg'], '')], { pictures: 'later' });
+    did.within((more) => more([loadWith(['https://x/new.jpg'], '')]));
+    const [oldCover, newCover] = did.probes;
+    did.within(() => newCover.onload());
+    did.within(() => oldCover.onload());
+    did.within(() => oldCover.onerror());
+    assert.equal(did.elements.cover.src, 'https://x/new.jpg');
+    assert.equal(did.elements.backdrop.style.backgroundImage, 'url("https://x/new.jpg")');
+});
+
+test('a station that ends goes back to the idle screen; a failed stream says why', () => {
+    const did = run([load('')]);
+    did.within(() => did.playerEvents.MEDIA_FINISHED({ endedReason: 'END_OF_STREAM' }));
+    assert.equal(did.body.classList.has('playing'), false);
+    assert.equal(did.body.classList.has('failed'), false);
+    assert.equal(did.elements.status.textContent, 'Ready to play');
+
+    did.within(() => did.playerEvents.MEDIA_FINISHED({ endedReason: 'ERROR' }));
+    assert.equal(did.body.classList.has('failed'), true);
+    assert.match(did.elements.status.textContent, /could not be played/);
+
+    did.within(() => did.playerEvents.MEDIA_FINISHED());
+    assert.equal(did.body.classList.has('failed'), false);
+
+    did.within(() => did.playerEvents.ERROR({}));
+    assert.equal(did.body.classList.has('failed'), true);
+    did.within((more) => more([load('')]));
+    assert.equal(did.body.classList.has('failed'), false);
+    assert.equal(did.body.classList.has('playing'), true);
+});
+
+test('touch comes from the device, else from a coarse pointer; a device not ready yet leaves it to the pointer', () => {
+    assert.equal(run([], { capabilities: 'throws', coarse: true }).touch, true);
+    assert.equal(run([], { capabilities: 'none', coarse: false }).touch, false);
+    assert.equal(run([], { capabilities: 'none' }).touch, false);
+    const later = run([], { touch: true, capabilities: 'throws' });
+    assert.equal(later.touch, false);
+    later.within(() => later.contextEvents.ready());
+    assert.equal(later.body.classList.has('touch'), false);
+});
+
+test('an update with no item, or before the player has media, is shown and passed on without failing', () => {
+    const empty = run([{ type: 'QUEUE_UPDATE', request: { items: [] } }, { type: 'QUEUE_UPDATE', request: { items: [{}] } }]);
+    assert.deepEqual(empty.results, ['request', 'request']);
+    assert.deepEqual(empty.mediaInformation, []);
+
+    const noPlayer = run([update('', 'New')], { playingMedia: null });
+    assert.equal(noPlayer.title, 'New');
+    assert.deepEqual(noPlayer.mediaInformation, []);
 });

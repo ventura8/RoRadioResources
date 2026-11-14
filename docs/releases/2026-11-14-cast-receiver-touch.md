@@ -17,6 +17,15 @@ idle screen carries the app's icon. Merge this before RoRadio 2.4.5 ships.
   unplated icon) on a tile, the name, "Ready to play" and a short line, over a soft accent glow. It is sized for a
   1920 x 1080 TV and a 2560 x 1600 tablet alike.
 
+- **A failed stream says so.** When the stream fails (`MEDIA_FINISHED` with `ERROR`, or the player's `ERROR`), the
+  idle screen comes back and says the station's stream could not be played. The next station clears it.
+- **The script is its own file, at 100 % coverage.** `receiver/receiver.js` holds the whole script. The unit tests
+  load it with `require`, and `Invoke-Tests.ps1` fails below 100 % line, branch and function coverage.
+- **Strict lint of the receiver.** ESLint (`eslint:all` on the script), html-validate and stylelint, all pinned in
+  `scripts/ci/package.json`. The suppression ban covers their disable comments too.
+- **An on-device E2E.** `scripts/e2e/Test-ReceiverOnTablet.ps1` plays the flows on a Pixel Tablet over adb and Cast
+  and saves a screenshot per step.
+
 ## Checked
 
 - `tests/receiver.test.js`: the options declare the touch UI and the page's media element; the buttons show on touch

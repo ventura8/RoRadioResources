@@ -90,6 +90,10 @@ function probe() {
             record.commands.push(commands);
             return setSupported(commands, broadcast);
         };
+        // No stream off a device: a tap's pause / play is recorded instead.
+        record.playback = [];
+        player.pause = () => record.playback.push('pause');
+        player.play = () => record.playback.push('play');
         player.broadcastStatus = (includeMedia, requestId, customData) => {
             record.broadcasts.push(customData);
         };
@@ -107,6 +111,9 @@ function probe() {
     };
 }
 
+/** The receiver's files beside its page, with their content types. */
+const ownFiles = { '/receiver/receiver.js': 'text/javascript; charset=utf-8', '/receiver/icon.png': 'image/png' };
+
 /** The page as a device gets it, with the probe after the framework; pictures served from /img/<name>.png. */
 function serve(withPage) {
     const png = Buffer.from(
@@ -123,10 +130,10 @@ function serve(withPage) {
                 .replace(sdkTag, `${sdkTag}\n<script>${probeScript}</script>`);
             response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
             response.end(html);
-        } else if (request.url === '/receiver/icon.png') {
+        } else if (ownFiles[request.url]) {
             // The page's own files as GitHub Pages serves them: a missing one is a 404 here too.
-            response.writeHead(200, { 'content-type': 'image/png' });
-            response.end(fs.readFileSync(path.join(__dirname, '..', 'receiver', 'icon.png')));
+            response.writeHead(200, { 'content-type': ownFiles[request.url] });
+            response.end(fs.readFileSync(path.join(__dirname, '..', request.url)));
         } else if (request.url.startsWith('/img/')) {
             response.writeHead(200, { 'content-type': 'image/png' });
             response.end(png);
@@ -531,7 +538,27 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
         await evaluate('document.getElementById("next").click(); document.getElementById("previous").click()');
         const steps = (await evaluate('window.probe')).broadcasts.slice(before).map((b) => b.step);
         assert.deepEqual(steps, ['next', 'previous']);
+
+        // Pause and resume: a tap pauses while it plays; the player's PAUSE shows play, and a tap then plays.
+        await evaluate('document.getElementById("playPause").click()');
+        await evaluate('window.events[cast.framework.events.EventType.PAUSE]({})');
+        assert.equal(await evaluate('document.getElementById("playPause").getAttribute("aria-label")'), 'Play');
+        await evaluate('window.events[cast.framework.events.EventType.PLAYING]({})');
+        assert.equal(await evaluate('document.getElementById("playPause").getAttribute("aria-label")'), 'Pause');
+        assert.deepEqual((await evaluate('window.probe')).playback, ['pause']);
         await evaluate('document.body.classList.remove("touch")');
+    });
+
+    await t.test('a stream that fails shows the idle screen with why, and the next station clears it', async () => {
+        await evaluate('window.events[cast.framework.events.EventType.MEDIA_FINISHED]({ endedReason: "ERROR" })');
+        let screen = await evaluate(SCREEN);
+        assert.equal(screen.idleVisible, true);
+        assert.match(await evaluate('document.getElementById("status").textContent'), /could not be played/);
+        assert.equal(await evaluate('document.body.classList.contains("failed")'), true);
+        await evaluate(intercept('LOAD', loadRequest(media(origin, { title: 'Back', customData: '' }))));
+        screen = await evaluate(SCREEN);
+        assert.equal(screen.mainVisible, true);
+        assert.equal(await evaluate('document.body.classList.contains("failed")'), false);
     });
 
     await t.test('a LOAD with the old bare-string caption shows the song and the caption, with no steps', async () => {
