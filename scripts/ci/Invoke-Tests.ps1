@@ -2,7 +2,8 @@
 <#
 .SYNOPSIS
     Runs every test of this repository: the station list's integrity (tests/Catalogue.Tests.ps1), the scripts'
-    helpers (tests/Helpers.Tests.ps1) and the logo checks (tests/test_normalize_logo.py).
+    helpers (tests/Helpers.Tests.ps1), the logo checks (tests/test_*.py) and the Cast receiver's script
+    (tests/receiver.test.js, on Node's own test runner, no packages).
 
 .DESCRIPTION
     The CI's test job, the weekly refresh (before it commits: pull requests opened by GitHub Actions do not start
@@ -43,12 +44,17 @@ Push-Location $root
 try {
     & $Python -m unittest discover --start-directory tests --verbose
     $pythonFailed = $LASTEXITCODE -ne 0
+    # The Cast receiver's script (receiver/index.html).
+    & node --test (Get-ChildItem tests -Filter '*.test.js' | ForEach-Object FullName)
+    $nodeFailed = $LASTEXITCODE -ne 0
 } finally {
     Pop-Location
 }
 
 $failures = $pesterResult.FailedCount + $pesterResult.FailedBlocksCount + $pesterResult.FailedContainersCount
-if ($failures -gt 0 -or $pythonFailed) {
-    Write-Error "Tests failed: $failures Pester failure(s), Python tests $(if ($pythonFailed) { 'failed' } else { 'passed' })."
+if ($failures -gt 0 -or $pythonFailed -or $nodeFailed) {
+    $python = if ($pythonFailed) { 'failed' } else { 'passed' }
+    $receiver = if ($nodeFailed) { 'failed' } else { 'passed' }
+    Write-Error "Tests failed: $failures Pester failure(s), Python tests $python, receiver tests $receiver."
 }
-Write-Information "All tests passed ($($pesterResult.PassedCount) Pester, and the Python tests)." -InformationAction Continue
+Write-Information "All tests passed ($($pesterResult.PassedCount) Pester, the Python tests and the receiver tests)." -InformationAction Continue

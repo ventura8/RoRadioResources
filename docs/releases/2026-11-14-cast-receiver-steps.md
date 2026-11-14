@@ -25,6 +25,9 @@ merge this before that release ships.
 - The page's script parses (no syntax error), and the app's unit tests cover the sender side against a loopback Cast
   receiver: the steps the app sends, a press reaching the app once, and a repeated status not counting as a second
   press.
+- The receiver's own tests (`tests/receiver.test.js`, in CI's test job) run the page's script with the Cast framework
+  stubbed: a bare-string caption, the JSON item and the commands it declares, step ids that rise even on a clock that
+  stands still, and a queue jump of +1 / -1 (a step) against the app's song update (shown, no step).
 - On a device once GitHub Pages serves it:
   - cast a station from a group of several to the Pixel Tablet;
   - the tablet's media controls and the Google Home app show previous and next;
