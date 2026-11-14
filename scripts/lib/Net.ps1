@@ -1,15 +1,24 @@
-﻿# Network helpers shared by the station scripts (dot-sourced; Test-StationStreams.ps1 loads it inside each of its
-# parallel runspaces). The weekly refresh runs on a GitHub runner against urls that come from the internet
-# (directories, the status pages of stream servers, station web sites). A url - or a redirect - that points into a
-# private network, the machine itself or a cloud metadata address (169.254.169.254) is never requested (CodeRabbit,
-# RoRadioResources#2), so redirects are followed one checked hop at a time, never by curl -L.
+﻿# Network helpers shared by the station scripts (dot-sourced; Test-StationStreams.ps1 loads lib/Probe.ps1, and this
+# file with it, inside each of its parallel runspaces). The weekly refresh runs on a GitHub runner against urls that
+# come from the internet (directories, the status pages of stream servers, station web sites). A url - or a redirect -
+# that points into a private network, the machine itself or a cloud metadata address (169.254.169.254) is never
+# requested (CodeRabbit, RoRadioResources#2), so redirects are followed one checked hop at a time, never by curl -L.
+#
+# The one exception is the end-to-end tests (tests/Refresh.E2E.Tests.ps1): they run the real scripts against a fake
+# station server on this machine and set RORADIO_REFRESH_ALLOW_LOOPBACK=1 for that. It opens the loopback addresses
+# (127.0.0.0/8, ::1) and nothing else: private networks and the metadata address stay refused. No workflow sets it.
 
 $script:StationUserAgent = 'RoRadio-station-refresh (+https://github.com/ventura8/RoRadioResources)'
-$script:Curl = if (Get-Command curl.exe -ErrorAction SilentlyContinue) { 'curl.exe' } else { 'curl' }
+# curl.exe on Windows (Windows PowerShell's "curl" was an alias of Invoke-WebRequest), curl elsewhere.
+$script:Curl = ('curl', 'curl.exe')[[int][bool](Get-Command curl.exe -CommandType Application -ErrorAction SilentlyContinue)]
+# What Get-Text could not read in this run: a directory or a station page that was down. The refresh report lists
+# them, so a run that found nothing because a source was down says so instead of only listing stations unresolved.
+$script:UnreadableSource = [Collections.Generic.List[string]]::new()
 
 function Test-PrivateAddress([Net.IPAddress]$Address) {
     if ($Address.IsIPv4MappedToIPv6) { $Address = $Address.MapToIPv4() }
-    if ([Net.IPAddress]::IsLoopback($Address) -or $Address.IsIPv6LinkLocal -or $Address.IsIPv6SiteLocal -or $Address.IsIPv6Multicast) { return $true }
+    if ([Net.IPAddress]::IsLoopback($Address)) { return $env:RORADIO_REFRESH_ALLOW_LOOPBACK -ne '1' }
+    if ($Address.IsIPv6LinkLocal -or $Address.IsIPv6SiteLocal -or $Address.IsIPv6Multicast) { return $true }
     $b = $Address.GetAddressBytes()
     if ($Address.AddressFamily -eq [Net.Sockets.AddressFamily]::InterNetworkV6) {
         return ($b[0] -band 0xFE) -eq 0xFC -or $Address.Equals([Net.IPAddress]::IPv6None)
@@ -20,18 +29,23 @@ function Test-PrivateAddress([Net.IPAddress]$Address) {
         ($b[0] -eq 192 -and $b[1] -eq 168) -or ($b[0] -eq 100 -and $b[1] -ge 64 -and $b[1] -le 127)
 }
 
+# The addresses of a host name (a function of its own, so that the tests can answer for DNS).
+function Resolve-HostAddress([string]$HostName) {
+    [Net.Dns]::GetHostAddresses($HostName)
+}
+
 # The curl arguments that pin a request to an address checked here, or $null when the url may not be requested.
 # Checking the name and letting curl resolve it again would leave a gap (DNS rebinding: the second answer can be
 # private), so a name is bound with --resolve to the first checked address.
 function Get-PinnedTarget([string]$Url) {
     try { $uri = [Uri]$Url } catch { return $null }
     if (-not $uri.IsAbsoluteUri -or $uri.Scheme -notin 'http', 'https') { return $null }
-    try { $addresses = [Net.Dns]::GetHostAddresses($uri.DnsSafeHost) } catch { return $null }
+    try { $addresses = @(Resolve-HostAddress $uri.DnsSafeHost) } catch { return $null }
     if ($addresses.Count -eq 0 -or ($addresses | Where-Object { Test-PrivateAddress $_ })) { return $null }
     if ($uri.HostNameType -in 'IPv4', 'IPv6') { return , @() }
     # IPv4 first: GitHub's runners have no IPv6 route, and a pinned IPv6 address would read as dead there.
     $address = @($addresses | Where-Object AddressFamily -eq ([Net.Sockets.AddressFamily]::InterNetwork)) + @($addresses) | Select-Object -First 1
-    $literal = if ($address.AddressFamily -eq [Net.Sockets.AddressFamily]::InterNetworkV6) { "[$address]" } else { "$address" }
+    $literal = ("$address", "[$address]")[[int]($address.AddressFamily -eq [Net.Sockets.AddressFamily]::InterNetworkV6)]
     , @('--resolve', "$($uri.Host):$($uri.Port):$literal")
 }
 
@@ -44,6 +58,7 @@ function Test-PublicUrl([string]$Url) {
 function Save-PublicFile([string]$Url, [string]$Path, [int]$TimeoutSeconds = 20, [long]$MaxBytes = 5MB, [int]$Retries = 0) {
     $current = $Url
     foreach ($hop in 0..5) {
+        Write-Debug "Hop ${hop}: $current"
         $pin = Get-PinnedTarget $current
         if ($null -eq $pin) { break }
         $line = & $script:Curl -s @pin -o $Path --max-time $TimeoutSeconds --max-filesize $MaxBytes --retry $Retries -A $script:StationUserAgent -w '%{http_code}|%{redirect_url}' $current 2>$null
@@ -56,7 +71,7 @@ function Save-PublicFile([string]$Url, [string]$Path, [int]$TimeoutSeconds = 20,
         $current = $parts[1]
     }
 
-    Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue -WhatIf:$false
     $null
 }
 
@@ -64,17 +79,21 @@ function Save-PublicFile([string]$Url, [string]$Path, [int]$TimeoutSeconds = 20,
 function Get-PublicText([string]$Url, [long]$MaxBytes = 10MB, [int]$TimeoutSeconds = 30, [int]$Retries = 0) {
     $file = [IO.Path]::GetTempFileName()
     try {
-        if (Save-PublicFile $Url $file -TimeoutSeconds $TimeoutSeconds -MaxBytes $MaxBytes -Retries $Retries) { [IO.File]::ReadAllText($file) } else { $null }
+        $final = Save-PublicFile $Url $file -TimeoutSeconds $TimeoutSeconds -MaxBytes $MaxBytes -Retries $Retries
+        if ($final) { [IO.File]::ReadAllText($file) }
     } finally {
-        Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
+        # Scratch files go even under -WhatIf, which guards the catalogue only (dry runs left them in the temp folder).
+        Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue -WhatIf:$false
     }
 }
 
-# A web page's text; '' (with a warning) when it cannot be read. Two retries: directories answer slowly at times.
+# A web page's text; '' (with a warning, and the url noted for the report) when it cannot be read. Two retries:
+# directories answer slowly at times.
 function Get-Text([string]$Url) {
     $text = Get-PublicText $Url -Retries 2
     if ($null -eq $text) {
         Write-Warning "Could not read $Url"
+        $script:UnreadableSource.Add($Url)
         return ''
     }
     $text

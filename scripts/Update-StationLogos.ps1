@@ -51,6 +51,12 @@
 .PARAMETER Python
     The Python 3 command. Default: python on Windows, python3 elsewhere.
 
+.PARAMETER MyRadioOnlineUrl
+    The sources' addresses. The defaults are the real ones; the end-to-end tests point them at a fake server.
+
+.PARAMETER RadioBrowserUrl
+    See -MyRadioOnlineUrl.
+
 .OUTPUTS
     One object per station without a logo: Title, Guid, File, Source, Suggested, Tried, Reasons.
 #>
@@ -62,7 +68,9 @@ param(
     [string]$ImageBase = '../../RadioLogos/',
     [string[]]$Title,
     [int]$MinSize = 128,
-    [string]$Python
+    [string]$Python,
+    [string]$MyRadioOnlineUrl = 'https://myradioonline.ro',
+    [string]$RadioBrowserUrl = 'https://de1.api.radio-browser.info'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -72,7 +80,7 @@ if (-not $LogoFolder) { $LogoFolder = Join-Path $root 'RadioLogos' }
 $Catalog = (Resolve-Path $Catalog).Path
 $LogoFolder = (Resolve-Path $LogoFolder).Path
 # Not "python3" on Windows: there it is the Microsoft Store's installer stub unless Python came from the Store.
-if (-not $Python) { $Python = if ($IsWindows) { 'python' } else { 'python3' } }
+if (-not $Python) { $Python = ('python3', 'python')[[int][bool]$IsWindows] }
 $normalizer = Join-Path $PSScriptRoot 'lib/normalize_logo.py'
 & $Python -c 'import PIL' 2>$null
 if ($LASTEXITCODE -ne 0) { throw "Python 3 with Pillow is needed: '$Python -m pip install pillow'." }
@@ -126,7 +134,8 @@ if ($Title) {
 }
 Write-Information "$($missing.Count) of $(@($stations).Count) station(s) have no logo." -InformationAction Continue
 
-$slugs = if ($missing) { Get-MyRadioOnlineSitemap } else { @() }
+$slugs = @()
+if ($missing) { $slugs = Get-MyRadioOnlineSitemap $MyRadioOnlineUrl }
 $notStream = '\.(png|jpe?g|webp|gif|svg|ico|css|js|json|html?)(\?|$)|google|facebook|apple\.com|twitter|instagram|youtube|myradioonline|schema\.org|w3\.org'
 $counter = 0
 
@@ -137,8 +146,8 @@ $results = foreach ($station in $missing) {
     $plainTitle = ConvertTo-PlainTitle $station.Title
     $marks = Get-NameMark $station.Title
 
-    $byUrl = Get-OptionalJson "https://de1.api.radio-browser.info/json/stations/byurl?url=$([Uri]::EscapeDataString($station.Url))"
-    $byName = Get-OptionalJson "https://de1.api.radio-browser.info/json/stations/search?hidebroken=true&limit=50&name=$([Uri]::EscapeDataString($station.Title))"
+    $byUrl = Get-OptionalJson "$RadioBrowserUrl/json/stations/byurl?url=$([Uri]::EscapeDataString($station.Url))"
+    $byName = Get-OptionalJson "$RadioBrowserUrl/json/stations/search?hidebroken=true&limit=50&name=$([Uri]::EscapeDataString($station.Title))"
     # The same rule as Update-StationUrls.ps1: the exact name, Romanian or Moldovan, and a host carrying the name.
     # The entry's hosts are read before the marks are walked: inside the inner block $_ is the mark (CodeRabbit,
     # RoRadioResources#2 - reading $_.homepage there matched no by-name entry at all).
@@ -148,7 +157,8 @@ $results = foreach ($station in $missing) {
         $entry -and (ConvertTo-PlainTitle $entry.name) -eq $plainTitle -and $entry.countrycode -in 'RO', 'MD' -and
             ($marks | Where-Object { $mark = $_; $hosts | Where-Object { $_.Contains($mark) } })
     })
-    foreach ($entry in ($entries | Group-Object stationuuid | ForEach-Object { $_.Group[0] })) {
+    $seenEntry = [Collections.Generic.HashSet[string]]::new()
+    foreach ($entry in @($entries | Where-Object { $seenEntry.Add("$($_.stationuuid)") })) {
         if ($entry.favicon) { $candidates.Add((ConvertTo-Candidate -Url $entry.favicon -Source "radio-browser.info favicon ($($entry.name))" -Strong $true)) }
         if ($entry.homepage) {
             $page = Get-PublicPage $entry.homepage
@@ -159,16 +169,19 @@ $results = foreach ($station in $missing) {
     }
 
     foreach ($pageSlug in Get-MyRadioOnlineSlug $station.Title $slugs) {
-        $page = Get-Text "https://myradioonline.ro/$pageSlug"
+        $page = Get-Text "$MyRadioOnlineUrl/$pageSlug"
         $streamHosts = @([regex]::Matches($page, '(?:src|url)="(https?://[^"]+)"') | ForEach-Object { [Net.WebUtility]::HtmlDecode($_.Groups[1].Value) } |
             Where-Object { $_ -notmatch $notStream } | ForEach-Object { Get-UrlHost $_ })
         $own = $stationHost -and $streamHosts -contains $stationHost
         foreach ($logo in [regex]::Matches($page, '<link itemprop="logo" href="([^"]+)"') | ForEach-Object { $_.Groups[1].Value }) {
-            $candidates.Add((ConvertTo-Candidate -Url $logo -Source "myradioonline.ro/$pageSlug" -Strong $own))
+            $candidates.Add((ConvertTo-Candidate -Url $logo -Source "$((Get-UrlHost $MyRadioOnlineUrl) -replace '^www\.', '')/$pageSlug" -Strong $own))
         }
     }
 
-    $ordered = @($candidates | Where-Object Strong) + @($candidates | Where-Object { -not $_.Strong }) | Group-Object Url | ForEach-Object { $_.Group[0] }
+    # Strong first, each in the order found; a url found twice counts once (a set: Group-Object sorts by url, which
+    # put a later source - or a weak candidate - ahead of the first strong one).
+    $seen = [Collections.Generic.HashSet[string]]::new()
+    $ordered = @(@($candidates | Where-Object Strong) + @($candidates | Where-Object { -not $_.Strong }) | Where-Object { $seen.Add($_.Url) })
     $chosen = $null
     $suggested = $null
     $reasons = [Collections.Generic.List[string]]::new()
@@ -219,7 +232,7 @@ foreach ($result in $added) {
 $bytes = [IO.File]::ReadAllBytes($Catalog)
 $hasBom = $bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
 $text = [Text.UTF8Encoding]::new($false).GetString($bytes).TrimStart([char]0xFEFF)
-$newline = if ($text.Contains("`r`n")) { "`r`n" } else { "`n" }
+$newline = ("`n", "`r`n")[[int]$text.Contains("`r`n")]
 foreach ($result in $added) {
     $block = '("GUID":\s*"' + [regex]::Escape($result.Guid) + '"[^}]*?'
     $value = ($result.File | ConvertTo-Json).Replace('$', '$$')

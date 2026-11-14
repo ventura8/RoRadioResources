@@ -5,6 +5,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import runpy
 import sys
 import tempfile
 import unittest
@@ -114,6 +115,16 @@ class NormalizeLogoTest(unittest.TestCase):
         self.assertTrue(json.loads(output.getvalue())["ok"])
         with mock.patch.object(sys, "argv", [str(SCRIPT)]), contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(normalize_logo.main(), USAGE_EXIT_CODE)
+
+    def test_run_as_a_script_it_exits_with_main_s_code(self) -> None:
+        """`python normalize_logo.py` exits with what main() returns."""
+        with (
+            mock.patch.object(sys, "argv", [str(SCRIPT)]),
+            contextlib.redirect_stderr(io.StringIO()),
+            self.assertRaises(SystemExit) as raised,
+        ):
+            runpy.run_path(str(SCRIPT), run_name="__main__")
+        self.assertEqual(raised.exception.code, USAGE_EXIT_CODE)
 
 
 if __name__ == "__main__":

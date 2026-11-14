@@ -1,12 +1,19 @@
+aacp
 Alexandrescu
 allowzero
 Amma
+byurl
 IDAT
 IHDR
 Paeth
 rects
 WCAG
 CASTV
+EXTINF
+EXTM
+hidebroken
+stylesheet
+tunein
 colours
 Constan
 countrycode
@@ -18,6 +25,7 @@ gamertag
 getchannel
 getcolors
 getextrema
+Greptile
 gstatic
 htmlvalidate
 icecast

@@ -41,7 +41,8 @@ function Get-MyRadioOnlineSlug([string]$Title, [string[]]$Known) {
     @($slug, ($slug -replace '^radio-', ''), "radio-$slug") | Select-Object -Unique | Where-Object { $Known -contains $_ }
 }
 
-function Get-MyRadioOnlineSitemap {
-    $sitemap = Get-Text 'https://myradioonline.ro/sitemap.xml'
-    @([regex]::Matches($sitemap, '<loc>https://myradioonline\.ro/([a-z0-9-]+)</loc>') | ForEach-Object { $_.Groups[1].Value })
+# The station slugs of myradioonline.ro's sitemap ($Base: the site, another one in the end-to-end tests).
+function Get-MyRadioOnlineSitemap([string]$Base = 'https://myradioonline.ro') {
+    $sitemap = Get-Text "$Base/sitemap.xml"
+    @([regex]::Matches($sitemap, '<loc>' + [regex]::Escape($Base) + '/([a-z0-9-]+)</loc>') | ForEach-Object { $_.Groups[1].Value })
 }
