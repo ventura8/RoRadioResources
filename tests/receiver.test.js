@@ -669,7 +669,8 @@ test('the song\'s texts are never cut: they keep their size while they fit, then
     assert.equal(full.body.classList.has('caption-yields'), true);
     assert.equal(full.body.classList.has('captioned'), false);
     assert.equal(full.elements.year.textContent, '2015');
-    for (const id of ['title', 'artist', 'release', 'yearLine']) {
+    // The station's name shrinks with them: a long one is never cut at the column's bottom (CodeRabbit, #48).
+    for (const id of ['title', 'artist', 'release', 'yearLine', 'stationName']) {
         assert.equal(parseFloat(full.elements[id].style.fontSize).toFixed(2), floor, id);
     }
 

@@ -154,7 +154,11 @@ function Test-Layout($Shown, [string]$Png) {
         $floor = $image.Height * $(if ($script:Touch) { 1 - $bar.reserve } else { 1 })
         $ok = $true
         foreach ($b in $boxes) {
-            if ($b.box[3] -gt $floor + 1) { $failures.Add("$($b.id) reaches under the system bar or off the screen"); $ok = $false }
+            # All four sides inside the screenshot (and above a touch display's system bar) (CodeRabbit, #48).
+            if ($b.box[0] -lt -1 -or $b.box[1] -lt -1 -or $b.box[2] -gt $image.Width + 1 -or $b.box[3] -gt $floor + 1) {
+                $failures.Add("$($b.id) reaches under the system bar or off the screen")
+                $ok = $false
+            }
         }
         for ($i = 0; $i -lt $boxes.Count; $i++) {
             for ($j = $i + 1; $j -lt $boxes.Count; $j++) {

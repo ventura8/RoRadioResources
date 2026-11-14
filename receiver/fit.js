@@ -16,7 +16,9 @@ const FIT_STEP = 0.9;
 const READABLE_AT_1080P = 24;
 const FLOOR_AT_1080P = 16;
 const FULL_HD_HEIGHT = 1080;
+/** The song's texts, which must end above the station's line; the station's name shrinks with them (CodeRabbit, #48). */
 const FITTED = ['title', 'artist', 'release', 'yearLine'];
+const SHRUNK = [...FITTED, 'stationName'];
 const HALF_PIXEL = 0.5;
 
 /** The song's release year ("2015"), or '' for none. */
@@ -67,9 +69,10 @@ function yieldCaption(yields) {
     document.body.classList.toggle('captioned', caption && !yields);
 }
 
-/** All the texts a step smaller while they do not fit, down to `minimum`. */
+/** All the texts and the station's name a step smaller while the song's texts do not fit, down to `minimum`. */
 function shrinkAll(texts, minimum) {
-    while (crowded(texts) && texts.map((element) => shrink(element, minimum)).includes(true)) {
+    const all = SHRUNK.map(byId);
+    while (crowded(texts) && all.map((element) => shrink(element, minimum)).includes(true)) {
         // All of them shrunk a step; measured again.
     }
 }
@@ -81,7 +84,7 @@ function shrinkAll(texts, minimum) {
 function fitSong() {
     const scale = window.innerHeight / FULL_HD_HEIGHT;
     const texts = FITTED.map(byId);
-    texts.forEach((element) => {
+    SHRUNK.map(byId).forEach((element) => {
         element.style.fontSize = '';
     });
     yieldCaption(false);
