@@ -9,7 +9,13 @@
         station: Google's media player plays the stream, and this page shows the song - cover, title, artist, album,
         year - and the live captions, each on its own line. The app sends a song change as a QUEUE_UPDATE of the item
         playing (Google's own receiver ignores those); the interceptor below applies it here, and to the senders'
-        notifications through setMediaInformation. The caption comes as the item's customData (a string).
+        notifications through setMediaInformation. The item's customData is JSON text, {"caption", "previous",
+        "next"} (a bare string from older app builds is the caption alone).
+        Previous / next (2.4.5): while the station has others in its group the page declares QUEUE_PREV / QUEUE_NEXT,
+        so a smart display, Google TV and the Google Home app show those buttons (none when the station is alone in its
+        group, as in the app). A press is not played here: the page broadcasts a media status whose customData is
+        {"step": "previous"|"next", "stepId": n}, and the app steps through the group exactly as its own buttons do,
+        then loads the new station here.
         The cover fills the safe area's height on the left (the station's logo takes its place when the song has no
         cover), the station's logo heads the song's column, and the text is sized for a room away from the TV.
         Layout rules (Cast design guidelines): everything inside a 5 % safe area, text at least 24 px at 720p, white on
@@ -353,6 +359,56 @@
             probe.src = url;
         }
 
+        /**
+         * The app's data for this item: {"caption", "previous", "next"} as JSON text; a plain string (older app builds)
+         * is the caption alone, with no steps.
+         */
+        function appData(customData) {
+            const none = { caption: '', previous: false, next: false };
+            if (typeof customData !== 'string') {
+                return none;
+            }
+
+            if (customData.startsWith('{')) {
+                try {
+                    const data = JSON.parse(customData);
+                    return {
+                        caption: typeof data.caption === 'string' ? data.caption : '',
+                        previous: data.previous === true,
+                        next: data.next === true,
+                    };
+                } catch (e) {
+                    // Not the app's JSON: a caption that starts with a brace.
+                }
+            }
+
+            return { caption: customData, previous: false, next: false };
+        }
+
+        const Command = cast.framework.messages.Command;
+        const stepCommands = Command.QUEUE_PREV | Command.QUEUE_NEXT;
+        let baseCommands = null;
+
+        /**
+         * Previous / next as the app offers them: declared only for a step the station has, so the device's own media
+         * controls (smart display, Google TV, Google Home) show exactly those buttons.
+         */
+        function showSteps(previous, next) {
+            if (baseCommands === null) {
+                baseCommands = player.getSupportedMediaCommands() & ~stepCommands;
+            }
+
+            const commands = baseCommands | (previous ? Command.QUEUE_PREV : 0) | (next ? Command.QUEUE_NEXT : 0);
+            player.setSupportedMediaCommands(commands, true);
+        }
+
+        /** A previous / next press, for the app: a media status whose customData names it, numbered upwards. */
+        let lastStepId = 0;
+        function step(name) {
+            lastStepId = Math.max(Date.now(), lastStepId + 1);
+            player.broadcastStatus(false, undefined, { step: name, stepId: lastStepId });
+        }
+
         /** Draws the song of `media`: its metadata, its pictures (the cover, then the station's logo), its caption. */
         function show(media) {
             const metadata = (media && media.metadata) || {};
@@ -361,7 +417,9 @@
             byId('album').textContent = metadata.albumName || '';
             byId('year').textContent = yearOf(metadata.releaseDate);
             byId('release').classList.toggle('empty', !metadata.albumName && !yearOf(metadata.releaseDate));
-            const caption = typeof media.customData === 'string' ? media.customData : '';
+            const data = appData(media && media.customData);
+            const caption = data.caption;
+            showSteps(data.previous, data.next);
             byId('captionText').textContent = caption;
             byId('captions').classList.toggle('empty', !caption);
             document.body.classList.toggle('captioned', Boolean(caption));
@@ -403,6 +461,13 @@
          * player's media information so the senders' notifications and the Google Home app show the new song too.
          */
         player.setMessageInterceptor(cast.framework.messages.MessageType.QUEUE_UPDATE, (request) => {
+            // A sender's previous / next (the Google Home app, an Android notification) is a jump in the queue: the app
+            // steps instead, and loads the station it reaches.
+            if (request.jump === 1 || request.jump === -1) {
+                step(request.jump === 1 ? 'next' : 'previous');
+                return null;
+            }
+
             const media = request.items && request.items[0] && request.items[0].media;
             if (media && media.metadata) {
                 show(media);
@@ -417,6 +482,16 @@
 
             return request;
         });
+
+        /** The device's own previous / next (a smart display's touch controls, Google TV's remote, the Assistant). */
+        for (const [type, name] of [['QUEUE_NEXT', 'next'], ['QUEUE_PREV', 'previous']]) {
+            if (cast.framework.messages.MessageType[type]) {
+                player.setMessageInterceptor(cast.framework.messages.MessageType[type], () => {
+                    step(name);
+                    return null;
+                });
+            }
+        }
 
         player.addEventListener(cast.framework.events.EventType.MEDIA_FINISHED, () => document.body.classList.remove('playing'));
 
