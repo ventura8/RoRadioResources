@@ -124,6 +124,8 @@ const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const ownFiles = {
     '/receiver/receiver.js': 'text/javascript; charset=utf-8',
     '/receiver/logo-tone.js': 'text/javascript; charset=utf-8',
+    '/receiver/theme.js': 'text/javascript; charset=utf-8',
+    '/receiver/layout-report.js': 'text/javascript; charset=utf-8',
     '/receiver/icon.png': 'image/png',
 };
 
@@ -502,7 +504,10 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
     await t.test('registers its interceptors on the real framework without an error', async () => {
         const record = await evaluate('window.probe');
         assert.deepEqual(record.interceptorErrors, []);
-        assert.deepEqual(record.interceptors, ['LOAD', 'QUEUE_UPDATE']);
+        assert.deepEqual(record.interceptors, ['LOAD', 'MEDIA_STATUS', 'QUEUE_UPDATE']);
+        // The real framework's MEDIA_STATUS interceptor: a status the page sends says what the screen shows.
+        const status = await evaluate('window.interceptors.MEDIA_STATUS({ playerState: "IDLE" })');
+        assert.equal(typeof status.customData.shown, 'object');
     });
 
     await t.test('shows the idle screen before a station is cast', async () => {
@@ -696,6 +701,7 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
             cover: true,
             steps: { previous: true, next: false },
             defaultTitle: false,
+            theme: null,
         });
         assert.deepEqual((await evaluate('window.probe')).statusRequestIds, [0]);
     });
@@ -855,6 +861,39 @@ test('layout and accessibility in every state, at 1920 x 1080, on the tablet (25
         const cut = e.scrollHeight > 2.5 * parseFloat(s.lineHeight);
         return { id, lines: Math.round(e.clientHeight / parseFloat(s.lineHeight)), size: parseFloat(s.fontSize), full, cut };
     }))()`;
+    const backdropNow = 'document.getElementById("backdrop").style.backgroundImage';
+    for (const size of sizes) {
+        await t.test(`${size.name}: the blurred backdrop follows the song; the app's cover theme on and off, readable over both`, async () => {
+            await resize(session, size.width, size.height);
+            await evaluate(`document.body.classList.toggle('touch', ${size.touch})`);
+            // A song: its cover is the backdrop, very blurred.
+            await evaluate(intercept('LOAD', { media: song('One song', 'A band', { station: 'Pro FM' }, [logo('90er-stream'), logo('Profm')]) }));
+            await pause(1200);
+            assert.match(await evaluate(backdropNow), /90er-stream/);
+            assert.match(await evaluate('getComputedStyle(document.getElementById("backdrop")).filter'), /blur/);
+            // The next station, with no cover: its logo is the backdrop.
+            await evaluate(intercept('LOAD', { media: song('Europa FM', 'Europa FM', { station: 'Europa FM', logo: logo('EuropaFM') }, []) }));
+            await pause(1200);
+            assert.match(await evaluate(backdropNow), /EuropaFM/);
+            assert.deepEqual(await problems(session, size), []);
+
+            // The app's cover colour theme on: the scrim takes its tint, and the text stays readable on the real pixels.
+            const theme = { accent: '#f0e040', tint: '#4d4813' };
+            await evaluate(intercept('QUEUE_UPDATE', updateRequest(song('A themed song', 'A band', { station: 'Pro FM', theme }, [logo('90er-stream'), logo('Profm')]))));
+            await pause(1200);
+            assert.equal(await evaluate('document.body.classList.contains("themed")'), true);
+            assert.deepEqual((await evaluate('window.probe')).shown.theme, theme);
+            assert.deepEqual(await problems(session, size), []);
+
+            // Off in the app: the next song comes without it, and the receiver has its default look again.
+            await evaluate(intercept('QUEUE_UPDATE', updateRequest(song('A plain song', 'A band', { station: 'Pro FM' }, [logo('90er-stream'), logo('Profm')]))));
+            await pause(1200);
+            assert.equal(await evaluate('document.body.classList.contains("themed")'), false);
+            assert.equal((await evaluate('window.probe')).shown.theme, null);
+            assert.deepEqual(await problems(session, size), []);
+        });
+    }
+
     for (const size of sizes) {
         await t.test(`${size.name}: a short text is one line at full size; a long one takes two lines, smaller, before it is cut`, async () => {
             await resize(session, size.width, size.height);

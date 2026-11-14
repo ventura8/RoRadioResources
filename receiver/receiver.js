@@ -66,6 +66,11 @@ function showImage(image, url, onShown) {
 
 /** Whether a logo is too dark for the screen (receiver/logo-tone.js, loaded before this script). */
 const { isDark } = window.logoTone;
+/** The app's cover colour theme (receiver/theme.js, loaded before this script), and the one on screen. */
+const { applyTheme, themeOf } = window.receiverTheme;
+/** The test mode's layout report (receiver/layout-report.js). */
+const { layoutNow } = window.layoutReport;
+let theme = null;
 
 /**
  * The light treatment for a dark logo (class "light", a white glow in the page's styles; never a plate behind it),
@@ -96,7 +101,7 @@ const text = (value) => (typeof value === 'string' ? value : '');
  * app builds) is the caption alone, with no steps.
  */
 function appData(customData) {
-    const none = { caption: '', logo: '', next: false, previous: false, rects: false, station: '' };
+    const none = { caption: '', logo: '', next: false, previous: false, rects: false, station: '', theme: null };
     if (typeof customData !== 'string') {
         return none;
     }
@@ -111,6 +116,7 @@ function appData(customData) {
                 previous: data.previous === true,
                 rects: data.rects === true,
                 station: text(data.station),
+                theme: themeOf(data.theme),
             };
         } catch {
             // Not the app's JSON: a caption that starts with a brace.
@@ -220,29 +226,12 @@ function shownNow() {
         logo: byId('station').querySelector('img').hasAttribute('src'),
         station,
         steps: { ...steps },
+        theme,
         title,
         ...(withRects ? layoutNow() : {}),
     };
 }
 
-/** The leaves an on-device test measures on the device's own screenshot. */
-const LEAVES = ['cover', 'stationName', 'title', 'artist', 'release', 'captionText'];
-
-/**
- * Test mode: each visible leaf's box (CSS px, [left, top, right, bottom]), its text colour, the device pixel ratio
- * and the viewport, so an on-device E2E can check overlaps and contrast on the device's real screenshot.
- */
-function layoutNow() {
-    const rects = {};
-    for (const id of [...LEAVES, 'station']) {
-        const box = (id === 'station' ? byId(id).querySelector('img') : byId(id)).getBoundingClientRect();
-        if (box.width > 0 && box.height > 0) {
-            rects[id] = { box: [box.left, box.top, box.right, box.bottom], color: getComputedStyle(byId(id)).color };
-        }
-    }
-
-    return { rects, scale: window.devicePixelRatio, viewport: [window.innerWidth, window.innerHeight] };
-}
 
 /**
  * Tells the senders what the screen shows now; a step press carries it too (stepPress). Request id 0 is the Cast
@@ -351,7 +340,8 @@ function showPictures(metadata, data) {
     const logo = imageUrl(images[1] && images[1].url) || (dataLogo === cover ? '' : dataLogo);
     byId('cover').classList.toggle('logo', Boolean(cover) && !logo);
     if (!cover) {
-        showBackdrop(null);
+        // No picture in the cover's place: the station's logo blurred behind (the app's customData), else none.
+        showBackdrop(logo || null);
     }
 
     showImage(byId('cover'), cover, showBackdrop);
@@ -371,11 +361,17 @@ function showLogo(logo, station, coverLogo) {
     markTone(byId('cover'), coverLogo);
 }
 
+/** The item's modes: the test mode, and the app's cover colour theme (or the default look without one). */
+function applyModes(data) {
+    ({ rects: withRects, theme } = data);
+    applyTheme(theme);
+}
+
 /** Draws the song of `media`: its metadata, its pictures (the cover, then the station's logo), its caption. */
 function show(media) {
     const metadata = media.metadata || {};
     const data = appData(media.customData);
-    withRects = data.rects;
+    applyModes(data);
     showText(metadata, data);
     showSteps(data.previous, data.next);
     showPictures(metadata, data);
@@ -406,6 +402,16 @@ player.setMessageInterceptor(MessageType.LOAD, (request) => {
     }
 
     return request;
+});
+
+/**
+ * Every media status the page sends says what the screen shows, a sender's GET_STATUS answer too: a sender (or a
+ * test) asks at any time, without waiting for the next change. A status that already carries custom data (a step
+ * press) keeps it.
+ */
+player.setMessageInterceptor(MessageType.MEDIA_STATUS, (status) => {
+    status.customData ||= { shown: shownNow() };
+    return status;
 });
 
 /**
