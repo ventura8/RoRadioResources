@@ -75,12 +75,32 @@
 .PARAMETER RadioNetUrl
     See -MyRadioOnlineUrl.
 
+.PARAMETER SourceOrder
+    The order the strong sources are tried in (myradioonline, radio-browser, same-server). The weekly run passes the
+    ranking from its metrics (Get-SourceRanking: the best hit rate first).
+
+.PARAMETER MaxFailureRatio
+    More failing stations than this share of the stations probed means the runner's network, not the stations, is
+    broken (a blocked runner, a DNS outage): nothing is searched or written, and the report says so. Checked from 10
+    stations probed.
+
+.PARAMETER MetricsPath
+    Where to write this run's numbers as JSON: stations probed, failing, fixed, unresolved, and per source the
+    queries, hits, candidates and milliseconds.
+
+.PARAMETER ResultsPath
+    Where to write the results (the output objects) as JSON, for Update-StationLifecycle.ps1.
+
 .OUTPUTS
     One object per station that failed both probes: Title, Guid, OldUrl, OldVerdict, NewUrl, Suggested, Source,
     Tried.
 #>
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
+    [string[]]$SourceOrder,
+    [double]$MaxFailureRatio = 0.5,
+    [string]$MetricsPath,
+    [string]$ResultsPath,
     [string]$Catalog,
     [string]$ReportPath,
     [string[]]$Title,
@@ -96,6 +116,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# The sources' addresses, for the search blocks below.
+$sourceUrl = @{ RadioBrowser = $RadioBrowserUrl; ShoutcastDirectory = $ShoutcastDirectoryUrl; ShoutcastPlaylist = $ShoutcastPlaylistUrl; RadioNet = $RadioNetUrl }
+# A strong source the ranking does not name keeps its default place after the ranked ones.
+$SourceOrder = @(@($SourceOrder) + @('myradioonline', 'radio-browser', 'same-server') | Where-Object { $_ } | Select-Object -Unique)
 if (-not $Catalog) { $Catalog = Join-Path (Split-Path $PSScriptRoot -Parent) 'RadioStationsData.json' }
 $Catalog = (Resolve-Path $Catalog).Path
 $probeScript = Join-Path $PSScriptRoot 'Test-StationStreams.ps1'
@@ -105,6 +129,8 @@ $scratch = Join-Path ([IO.Path]::GetTempPath()) "roradio-refresh-$PID"
 New-Item -ItemType Directory -Force -Path $scratch -WhatIf:$false | Out-Null
 . (Join-Path $PSScriptRoot 'lib/Net.ps1')
 . (Join-Path $PSScriptRoot 'lib/Names.ps1')
+. (Join-Path $PSScriptRoot 'lib/Catalog.ps1')
+. (Join-Path $PSScriptRoot 'lib/Resilience.ps1')
 
 # Probes an arbitrary list of { Title, Url, Guid } through a throw-away catalogue, so the verdicts come from
 # exactly the same code as the catalogue-wide probe.
@@ -193,9 +219,8 @@ function Test-UrlClash([string]$Url, [string[]]$Others) {
 }
 
 # 1 and 2: what is broken now, and still broken a minute later.
-$stations = @(foreach ($category in (Get-Content $Catalog -Raw -Encoding utf8 | ConvertFrom-Json)) {
-    foreach ($station in $category.List) { [pscustomobject]@{ Title = $station.Title; Url = $station.Url; Guid = $station.GUID } }
-})
+# A list cut short or corrupt stops the run here, before anything is probed or written (Read-StationList throws).
+$stations = @(Read-StationList (Get-Content $Catalog -Raw -Encoding utf8))
 $toProbe = $stations
 if ($Title) {
     $wanted = @($Title | ForEach-Object { ConvertTo-PlainTitle $_ })
@@ -210,9 +235,30 @@ if ($failing) {
 }
 Write-Information "$($failing.Count) station(s) failed both probes." -InformationAction Continue
 
+# A runner whose network is blocked sees most stations fail at once: then nothing is searched or written, and the
+# report says why (the stations keep their urls; the next run tries again).
+$blocked = $toProbe.Count -ge 10 -and $failing.Count -gt $MaxFailureRatio * $toProbe.Count
+$searched = @($failing | Where-Object { -not $blocked })
+
+# Per source: how often it was asked, how often it found the fix, how many candidates it gave, how long it took.
+$sourceStats = [ordered]@{}
+foreach ($name in 'myradioonline', 'radio-browser', 'same-server', 'shoutcast', 'radio.net') {
+    $sourceStats[$name] = [ordered]@{ Queries = 0; Hits = 0; Candidates = 0; Milliseconds = 0 }
+}
+# Runs one source for one station, counts it, and labels its candidates with the source's name.
+function Invoke-Source([string]$Name, [scriptblock]$Search) {
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    $found = @(& $Search)
+    $stats = $sourceStats[$Name]
+    $stats.Queries++
+    $stats.Candidates += $found.Count
+    $stats.Milliseconds += [int]$clock.Elapsed.TotalMilliseconds
+    $found | ForEach-Object { $_ | Add-Member -NotePropertyName Key -NotePropertyValue $Name -PassThru }
+}
+
 # 3: candidates.
 $slugs = @()
-if ($failing) {
+if ($searched) {
     $slugs = Get-MyRadioOnlineSitemap $MyRadioOnlineUrl
     Write-Information "myradioonline.ro lists $($slugs.Count) stations." -InformationAction Continue
 }
@@ -220,33 +266,41 @@ if ($failing) {
 $notStream = '\.(png|jpe?g|webp|gif|svg|ico|css|js|json|html?)(\?|$)|google|facebook|apple\.com|twitter|instagram|youtube|myradioonline|schema\.org|w3\.org'
 $claimed = [Collections.Generic.List[string]]::new()
 $results = foreach ($station in $failing) {
-    $candidates = [Collections.Generic.List[object]]::new()
-    foreach ($pageSlug in Get-MyRadioOnlineSlug $station.Title $slugs) {
-        $pageUrl = "$MyRadioOnlineUrl/$pageSlug"
-        $page = Get-Text $pageUrl
-        foreach ($match in [regex]::Matches($page, '(?:src|url)="(https?://[^"]+)"')) {
-            $url = [Net.WebUtility]::HtmlDecode($match.Groups[1].Value) -replace '[?&]time=\d+$', ''
-            if ($url -notmatch $notStream) { $candidates.Add([pscustomobject]@{ Url = $url; Source = $pageUrl; Strong = $true }) }
-        }
-    }
-
-    # A directory entry with the same name is often another station: the first dry run (2026-09-29) matched
-    # "Flash FM" to a GTA game radio, "One FM" to a Swiss one and "Radio Campus" to a Belgian one. So an entry
-    # counts only when it is Romanian or Moldovan AND its homepage or stream host carries the station's name.
     $plainTitle = ConvertTo-PlainTitle $station.Title
     $marks = Get-NameMark $station.Title
-    $directory = Get-Text "$RadioBrowserUrl/json/stations/search?hidebroken=true&limit=50&name=$([Uri]::EscapeDataString($station.Title))"
-    foreach ($entry in @($directory | Where-Object { $_ } | ConvertFrom-Json)) {
-        if ((ConvertTo-PlainTitle $entry.name) -ne $plainTitle -or -not $entry.url_resolved -or $entry.countrycode -notin 'RO', 'MD') { continue }
-        $hosts = @($entry.homepage, $entry.url_resolved) | Where-Object { $_ } | ForEach-Object { Get-UrlHost $_ }
-        if (-not ($marks | Where-Object { $mark = $_; $hosts | Where-Object { $_.Replace('-', '').Contains($mark) } })) { continue }
-        $candidates.Add([pscustomobject]@{ Url = $entry.url_resolved; Source = "radio-browser.info ($($entry.homepage))"; Strong = $true })
-    }
+    $strong = @(if ($searched) {
+        Invoke-Source 'myradioonline' {
+            foreach ($pageSlug in Get-MyRadioOnlineSlug $station.Title $slugs) {
+                $pageUrl = "$MyRadioOnlineUrl/$pageSlug"
+                $page = Get-Text $pageUrl
+                foreach ($match in [regex]::Matches($page, '(?:src|url)="(https?://[^"]+)"')) {
+                    $url = [Net.WebUtility]::HtmlDecode($match.Groups[1].Value) -replace '[?&]time=\d+$', ''
+                    if ($url -notmatch $notStream) { [pscustomobject]@{ Url = $url; Source = $pageUrl; Strong = $true } }
+                }
+            }
+        }
 
-    $shoutcast = @(Get-ShoutcastCandidate -StationTitle $station.Title -DirectoryUrl $ShoutcastDirectoryUrl -PlaylistUrl $ShoutcastPlaylistUrl)
-    foreach ($candidate in @(Get-SameServerCandidate $station.Url $marks) + $shoutcast + @(Get-RadioNetCandidate -StationTitle $station.Title -SearchUrl $RadioNetUrl)) {
-        $candidates.Add($candidate)
-    }
+        # A directory entry with the same name is often another station: the first dry run (2026-09-29) matched
+        # "Flash FM" to a GTA game radio, "One FM" to a Swiss one and "Radio Campus" to a Belgian one. So an entry
+        # counts only when it is Romanian or Moldovan AND its homepage or stream host carries the station's name.
+        Invoke-Source 'radio-browser' {
+            $directory = Get-Text "$($sourceUrl.RadioBrowser)/json/stations/search?hidebroken=true&limit=50&name=$([Uri]::EscapeDataString($station.Title))"
+            foreach ($entry in @($directory | Where-Object { $_ } | ConvertFrom-Json)) {
+                if ((ConvertTo-PlainTitle $entry.name) -ne $plainTitle -or -not $entry.url_resolved -or $entry.countrycode -notin 'RO', 'MD') { continue }
+                $hosts = @($entry.homepage, $entry.url_resolved) | Where-Object { $_ } | ForEach-Object { Get-UrlHost $_ }
+                if (-not ($marks | Where-Object { $mark = $_; $hosts | Where-Object { $_.Replace('-', '').Contains($mark) } })) { continue }
+                [pscustomobject]@{ Url = $entry.url_resolved; Source = "radio-browser.info ($($entry.homepage))"; Strong = $true }
+            }
+        }
+
+        Invoke-Source 'same-server' { Get-SameServerCandidate $station.Url $marks }
+    })
+    $weak = @(if ($searched) {
+        Invoke-Source 'shoutcast' { Get-ShoutcastCandidate -StationTitle $station.Title -DirectoryUrl $sourceUrl.ShoutcastDirectory -PlaylistUrl $sourceUrl.ShoutcastPlaylist }
+        Invoke-Source 'radio.net' { Get-RadioNetCandidate -StationTitle $station.Title -SearchUrl $sourceUrl.RadioNet }
+    })
+    # The strong sources in the ranked order (each one's own candidates keep their order); the weak ones after them.
+    $candidates = @($strong | Sort-Object -Stable { $SourceOrder.IndexOf($_.Key) }) + $weak
 
     # RoRadio's unit tests require every url to be unique and none to contain another: a candidate that is
     # another station's stream, or the new stream of a station fixed earlier in this run, means the broadcaster
@@ -275,7 +329,10 @@ $results = foreach ($station in $failing) {
     }
 
     $held = $best -and (-not $best.Strong -or ($ReplaceOnlyDead -and $station.Verdict -ne 'dead'))
-    if ($best -and -not $held) { $claimed.Add($best.Url) }
+    if ($best -and -not $held) {
+        $claimed.Add($best.Url)
+        $sourceStats[$best.Key].Hits++
+    }
     [pscustomobject]@{
         Title      = $station.Title
         Guid       = $station.Guid
@@ -312,7 +369,7 @@ $expected = @($stations | ForEach-Object {
 $written = @(foreach ($category in ($text | ConvertFrom-Json)) { foreach ($station in $category.List) { "$($station.GUID)|$($station.Title)|$($station.Url)" } })
 if (Compare-Object $expected $written -SyncWindow 0) { throw 'The updated station list differs from the list with only the verified urls changed; nothing was written.' }
 if ($fixed -and $PSCmdlet.ShouldProcess($Catalog, "Update $($fixed.Count) station url(s)")) {
-    [IO.File]::WriteAllText($Catalog, $text, [Text.UTF8Encoding]::new($hasBom))
+    Write-FileAtomic $Catalog $text $hasBom
 }
 
 # 5: the report. It becomes the pull request body and docs/releases/<date>-refresh.md, so what can be a link is one.
@@ -329,6 +386,12 @@ function Format-Source([string]$Source) {
 $lines = [Collections.Generic.List[string]]::new()
 $lines.Add("Probed $(@($toProbe).Count) stations; $($results.Count) failed twice; $($fixed.Count) fixed.")
 $lines.Add('')
+if ($blocked) {
+    $lines.Add('## Not searched: the runner''s network')
+    $lines.Add('')
+    $lines.Add("$($failing.Count) of $($toProbe.Count) stations failed, more than $([Math]::Round(100 * $MaxFailureRatio))%: the network the refresh ran from is the problem, not the stations. Nothing was searched or changed; the next run tries again.")
+    $lines.Add('')
+}
 if ($fixed) {
     $lines.Add('## Fixed')
     $lines.Add('')
@@ -365,6 +428,15 @@ if ($unreadable) {
 }
 $report = $lines -join "`n"
 if ($ReportPath) { Set-Content -Path $ReportPath -Value $report -Encoding utf8 -WhatIf:$false }
+if ($ResultsPath) { Set-Content -Path $ResultsPath -Value (ConvertTo-Json -InputObject @($results) -Depth 4) -Encoding utf8 -WhatIf:$false }
+if ($MetricsPath) {
+    $metrics = [ordered]@{
+        Probed = $toProbe.Count; Failing = $failing.Count; Dead = @($failing | Where-Object Verdict -eq 'dead').Count
+        Fixed = $fixed.Count; Suggested = $review.Count; Unresolved = $unresolved.Count; Blocked = $blocked
+        Retries = $RetryCount; Sources = $sourceStats; Unreadable = $unreadable
+    }
+    Set-Content -Path $MetricsPath -Value ($metrics | ConvertTo-Json -Depth 5) -Encoding utf8 -WhatIf:$false
+}
 Write-Information $report -InformationAction Continue
 Remove-Item -Recurse -Force $scratch -WhatIf:$false
 $results

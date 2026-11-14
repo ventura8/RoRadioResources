@@ -12,7 +12,8 @@ pages) and logo images, all from one JSON file of routes:
      {"path": "/json/stations/search", "query": "name=Radio%20Beta", "type": "application/json", "body": "[]"}]
 
 A route matches on its method (GET by default), its path and, when it has one, a piece of the query string; the first
-match answers. A route with "times" answers only that many requests, then leaves them to the next match. "{base}"
+match answers. A route with "times" answers only that many requests, then leaves them to the next match. A POST
+route with "record" appends each request body, one per line, to that file. "{base}"
 in a body or a header is the server's own address. "file" sends a file's bytes. An unknown path answers 404.
 The port is chosen by the system and written as the first line on stdout.
 
@@ -54,14 +55,18 @@ class FakeHandler(BaseHTTPRequestHandler):
     @override
     def do_GET(self) -> None:
         """Answer a GET."""
-        self._answer("GET")
+        self._send(self._find("GET"))
 
     @override
     def do_POST(self) -> None:
-        """Answer a POST (its form body is read and ignored)."""
+        """Answer a POST; a route with "record" appends the body to that file (what Sentry was sent)."""
         length = int(self.headers.get("Content-Length") or 0)
-        self.rfile.read(length)
-        self._answer("POST")
+        body = self.rfile.read(length)
+        route = self._find("POST")
+        if route is not None and "record" in route:
+            with Path(route["record"]).open("ab") as record:
+                record.write(body + b"\n")
+        self._send(route)
 
     def _find(self, method: str) -> dict[str, Any] | None:
         parts = urlsplit(self.path)
@@ -76,8 +81,7 @@ class FakeHandler(BaseHTTPRequestHandler):
             return route
         return None
 
-    def _answer(self, method: str) -> None:
-        route = self._find(method)
+    def _send(self, route: dict[str, Any] | None) -> None:
         if route is None:
             route = {"status": 404, "body": "not found"}
         body = route.get("body", "").replace("{base}", self.base).encode()

@@ -44,8 +44,9 @@ if ($ResultPath) {
 # tests/Probe.Tests.ps1 and the end-to-end run against the fake station server (tests/Refresh.E2E.Tests.ps1).
 $updater = @(
     'scripts/Test-StationStreams.ps1', 'scripts/Update-StationUrls.ps1', 'scripts/Update-StationLogos.ps1',
-    'scripts/New-RefreshNote.ps1', 'scripts/Publish-Refresh.ps1', 'scripts/lib/Net.ps1', 'scripts/lib/Names.ps1',
-    'scripts/lib/Probe.ps1'
+    'scripts/New-RefreshNote.ps1', 'scripts/Publish-Refresh.ps1', 'scripts/Update-StationLifecycle.ps1',
+    'scripts/Invoke-Refresh.ps1', 'scripts/Sync-RefreshData.ps1', 'scripts/lib/Net.ps1', 'scripts/lib/Names.ps1',
+    'scripts/lib/Probe.ps1', 'scripts/lib/Catalog.ps1', 'scripts/lib/Resilience.ps1', 'scripts/lib/Telemetry.ps1'
 )
 $configuration.CodeCoverage.Enabled = $true
 $configuration.CodeCoverage.Path = @($updater | ForEach-Object { Join-Path $root $_ })

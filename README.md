@@ -180,6 +180,64 @@ is unprotected.
 commit, pull request or issue), or locally `./scripts/Update-StationUrls.ps1 -ReplaceOnlyDead -WhatIf -ReportPath
 report.md`.
 
+### Retired stations
+
+A station that is dead and for which no source finds anything, not even a suggestion, in every run for 30 days is
+**retired** by `Update-StationLifecycle.ps1`:
+
+- Its block leaves `RadioStationsData.json` and goes verbatim to `RetiredStations.json`, with:
+  - its category, and the station it followed;
+  - its last url and logo;
+  - since when it failed, when it was retired, and the evidence.
+- Retired stations are **rechecked** 30 days after retirement, then 60 days after that check, then 90, then 120.
+  A recheck tries the old url and every source.
+- A url that plays in two probes **restores** the station, in its old place.
+- The date each station started failing lives in `state/failing.json` on the `refresh-data` branch, so the count
+  survives between runs.
+- Nothing is retired or rechecked in a run where more than 10% of the stations fail: that is a source or the
+  network, not the stations.
+- Retirements and restorations are listed in the pull request, the release note and the tracking issue.
+
+**Removed stations are safe for listeners.** RoRadio keeps a removed station's favorite and last-station GUID, so a
+restored station is a favorite again. To retire a station by hand, add an entry to `RetiredStations.json` with
+`GUID`, `Title`, `Url`, `Category` and `NextCheck` (`yyyy-MM-dd`), and optionally `After`, `Block`, `Retired` and
+`Checks`. It is then rechecked on the same schedule.
+
+### Resilience, Sentry and metrics
+
+`scripts/Invoke-Refresh.ps1` runs the whole refresh in three parts. Only the publish part gets a token: the search
+contacts untrusted broadcaster servers.
+
+| Failure | What the refresh does |
+| :--- | :--- |
+| A source is down, slow or rate-limited | curl retries with a growing pause. The other sources still run, and the report names the unreadable source. |
+| The GitHub API fails | Every gh command is tried three times with a growing pause. |
+| master moved during the run | The commit is rebased onto the newest master before it is pushed. A real conflict is reported. |
+| An earlier refresh pull request is still open | It is reused (no second pull request). It is closed when this run changes nothing. |
+| The refresh's own pull request fails CI | It stays open, and the issue says which checks fail. The next run pushes to the same pull request. |
+| A run was cut short | Every file is written whole or not at all, the branch is force-pushed, and the data is pushed last: the next run starts clean. |
+| The station list is corrupt or cut short | The run stops before probing, and nothing is written. |
+| The runner's network is blocked (over half the stations fail) | Nothing is searched or written. With over 10% failing, nothing is retired. |
+| `REFRESH_TOKEN` is missing or expired | The run falls back to the workflow token. Sentry and the summary say so. Without any working token it stops with that reason. |
+| A probe or a step hangs | Each probe has its own timeout, each step and the job have one too. |
+| A run fails | A daily retry (Tuesday to Saturday) runs the refresh again until one succeeds. Run workflow reruns it by hand. |
+
+**Sentry:** every failure and unhandled exception goes to the Sentry project `roradioresources-updater`
+(organization 77bits), through the envelope API. The DSN is the `SENTRY_DSN` secret. Each event carries:
+
+- the run id, the stage, the station and the source as tags;
+- the run's steps as breadcrumbs;
+- no secrets: tokens are removed from every text.
+
+**Metrics:** each run appends one JSON line to `metrics/runs.jsonl` on the `refresh-data` branch, with:
+
+- the stations probed, failing, dead, fixed, unresolved, retired and restored;
+- per source: the queries, the fixes found, the candidates and the milliseconds;
+- each stage's seconds, the retries, and how many days each failing station has failed.
+
+The tracking issue shows the trend of the last eight runs and each source's hit rate. The strong sources are tried
+in the order of their hit rate over the last 12 runs.
+
 It does **not** merge when more than 15 urls or 20 logos changed at once: a wave of urls that size is more likely
 the runner's network than fifteen stations moving in one week, and that many logos is worth a look first. That
 pull request stays open for someone to check.
