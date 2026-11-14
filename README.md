@@ -10,9 +10,10 @@ The station list of [RoRadio](https://github.com/ventura8/RoRadio), in one place
 | `scripts/Update-StationUrls.ps1` | Finds a verified current url for every broken station and writes it into the list. |
 | `scripts/Update-StationLogos.ps1` | Finds a logo for every station without one, checks it and adds it to `RadioLogos/` and the list. |
 | `scripts/New-RefreshNote.ps1` | Writes a weekly refresh's release note from the two reports. |
-| `scripts/lib/` | What the scripts share: checked and pinned requests (`Net.ps1`), name matching (`Names.ps1`), the logo check (`normalize_logo.py`, Pillow). |
+| `scripts/Publish-Refresh.ps1` | The refresh's last step: the release note, the pull request (opened and merged), the issue of the stations it could not fix. |
+| `scripts/lib/` | What the scripts share: checked and pinned requests (`Net.ps1`), the stream probe (`Probe.ps1`), name matching (`Names.ps1`), the logo check (`normalize_logo.py`, Pillow). |
 | `docs/releases/` | One release note per change to the list: what changed, where each url or logo was found, the logos themselves. |
-| `tests/` | The list's integrity and the scripts' helpers (Pester), the logo check (Python `unittest`). |
+| `tests/` | The list's integrity and the scripts' helpers (Pester), the probe and the whole refresh end to end against a fake station server (`tests/e2e/`), the logo check (Python, pytest). |
 | `.github/workflows/ci.yml` | Every linter and every test on each pull request and push to `master`. |
 | `.github/workflows/refresh-stations.yml` | Runs the refresh every Monday, opens a pull request with the release note and merges it. |
 
@@ -61,8 +62,22 @@ developer runs:
 
 ```powershell
 ./scripts/ci/Invoke-Lint.ps1    # every linter at its strictest, no inline suppressions
-./scripts/ci/Invoke-Tests.ps1   # the list's integrity, the helpers, the logo check
+./scripts/ci/Invoke-Tests.ps1   # the list's integrity, the helpers, the refresh end to end, the logo check
 ```
+
+The weekly refresh's code is held to **100% coverage**: every command of `Test-StationStreams.ps1`,
+`Update-StationUrls.ps1`, `Update-StationLogos.ps1`, `New-RefreshNote.ps1`, `Publish-Refresh.ps1` and `scripts/lib/*.ps1`
+(Pester code coverage), and every line of `scripts/lib/*.py` (pytest-cov `--cov-fail-under=100`). Below that the
+test run fails and lists the commands no test reached. Most of it comes from `tests/Refresh.E2E.Tests.ps1`, which runs
+the real scripts against `tests/e2e/fake_station_server.py`: a server on 127.0.0.1 that serves a fake station list's
+streams (audio, ICY, HLS, redirects, HTML, HTTP errors, dead ports, a stream that answers once and then fails) and
+the pages the refresh reads (myradioonline.ro, radio-browser.info, the Shoutcast directory, radio.net, Icecast and
+Shoutcast status pages, logos), with a fake GitHub CLI (`tests/e2e/fake-gh.ps1`) and a real git remote. It checks
+that the refresh finds the broken stations and their replacements, writes only urls that played twice, never
+removes, renames or reorders a station, and produces the release note, the pull request and the issue. The scripts
+refuse loopback addresses; the tests open them with `RORADIO_REFRESH_ALLOW_LOOPBACK=1`, which no workflow sets.
+`tests/Probe.Tests.ps1` calls the probe in its own runspace, because `Test-StationStreams.ps1` runs it in parallel
+runspaces that coverage cannot see.
 
 The linters are PSScriptAnalyzer (every rule, every severity), ruff (every rule, lint and format), yamllint
 (strict), actionlint, zizmor, markdownlint, cspell, editorconfig-checker and gitleaks (working tree and history).
@@ -122,9 +137,21 @@ What the manual revival of 2026-09-29 (137 failing stations, two rounds) taught,
    when that page plays from the station's own host; otherwise a suggestion). A logo must be an image of at least
    128 px, logo-shaped and not blank; the same image for several stations is a placeholder and is not used. It is
    written as `<slug>.png`, at most 400 px. An existing logo is never replaced or renamed by the workflow.
-5. Runs the tests (`scripts/ci/Invoke-Tests.ps1`), writes the release note `docs/releases/<date>-refresh.md`,
-   commits the list, the logos and the note to `automation/station-refresh`, opens (or updates) a pull request
-   whose body is the note (logos shown from that commit), squash-merges it, and asks Pages to rebuild.
+5. Runs the tests (`scripts/ci/Invoke-Tests.ps1`), then `Publish-Refresh.ps1` writes the release note
+   `docs/releases/<date>-refresh.md`, commits the list, the logos and the note to `automation/station-refresh`,
+   opens (or updates) a pull request whose body is the note (logos shown from that commit), squash-merges it, and
+   asks Pages to rebuild.
+6. Keeps the issue **"Stations the weekly refresh could not fix"** current: the stations that need review, the
+   unresolved ones and any source that could not be read (a source that was down means its stations were not
+   searched there). The first run that leaves nothing closes it.
+
+A candidate is written only when it played twice (in the candidate probe and again just before it is chosen), and
+the written list is checked against the old one: the same stations in the same order, only the fixed urls changed.
+Two stations are never given the same new stream in one run.
+
+**Dry run against the live list:** Run workflow with `dry_run` checked (the report goes to the run's summary; no
+commit, pull request or issue), or locally `./scripts/Update-StationUrls.ps1 -ReplaceOnlyDead -WhatIf -ReportPath
+report.md`.
 
 It does **not** merge when more than 15 urls or 20 logos changed at once: a wave of urls that size is more likely
 the runner's network than fifteen stations moving in one week, and that many logos is worth a look first. That

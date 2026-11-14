@@ -2,9 +2,11 @@ name: Refresh station urls and logos
 
 # Broadcasters move their streams and change their logos without notice. Once a week this probes every station,
 # finds a verified current url for the broken ones (scripts/Update-StationUrls.ps1) and a logo for the stations
-# without one (scripts/Update-StationLogos.ps1), checks the list (scripts/ci/Invoke-Tests.ps1), writes the release
-# note docs/releases/<date>-refresh.md, opens a pull request with it and merges it, so GitHub Pages serves the fixed
-# list and logos to every RoRadio install within minutes.
+# without one (scripts/Update-StationLogos.ps1), checks the list (scripts/ci/Invoke-Tests.ps1), then
+# scripts/Publish-Refresh.ps1 writes the release note docs/releases/<date>-refresh.md, opens a pull request with it
+# and merges it, so GitHub Pages serves the fixed list and logos to every RoRadio install within minutes, and keeps
+# the issue "Stations the weekly refresh could not fix" current. The whole flow runs end to end against a fake
+# station server in tests/Refresh.E2E.Tests.ps1.
 on:
   workflow_dispatch:
     inputs:
@@ -12,6 +14,10 @@ on:
         description: Merge the pull request when the fix is small enough
         type: boolean
         default: true
+      dry_run:
+        description: Dry run against the live station list (report only; no commit, pull request or issue)
+        type: boolean
+        default: false
   schedule:
     - cron: '17 4 * * 1'  # Mondays 04:17 UTC
 
@@ -29,18 +35,13 @@ jobs:
     permissions:
       contents: write       # push the refresh branch and merge it
       pull-requests: write  # open and merge the pull request
+      issues: write         # keep the issue of the stations it could not fix current
       pages: write          # request a Pages build after the merge
       actions: write        # re-enable this workflow so GitHub does not disable it after 60 quiet days
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      BRANCH: automation/station-refresh
-      # More fixes than this in one run means the runner's network, not the stations, is the problem
-      # (a US runner blocked by Romanian geo-restrictions): the pull request stays open for a human.
-      MAX_AUTO_MERGE: '15'
-      # More new logos than this at once is worth a look before every listener sees them.
-      MAX_AUTO_MERGE_LOGOS: '20'
-      MERGE: ${{ github.event_name == 'schedule' || inputs.merge }}
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -50,7 +51,11 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Install Pillow and Pester (pinned)
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: '24'
+
+      - name: Install the Python tools and Pester (pinned)
         shell: pwsh
         run: |
           python -m pip install --quiet -r scripts/ci/requirements.txt
@@ -61,7 +66,8 @@ jobs:
         shell: pwsh
         # Only outright dead streams: from a US runner an HTTP error can be geo-blocking (see the script's help).
         run: |
-          $results = ./scripts/Update-StationUrls.ps1 -ReplaceOnlyDead -ReportPath "$env:RUNNER_TEMP/urls.md"
+          $dryRun = $env:DRY_RUN -eq 'true'
+          $results = ./scripts/Update-StationUrls.ps1 -ReplaceOnlyDead -ReportPath "$env:RUNNER_TEMP/urls.md" -WhatIf:$dryRun
           "count=$(@($results | Where-Object NewUrl).Count)" >> $env:GITHUB_OUTPUT
 
       - name: Find logos for the stations without one
@@ -72,63 +78,33 @@ jobs:
         if: vars.REFRESH_LOGOS == 'true'
         shell: pwsh
         run: |
-          $results = ./scripts/Update-StationLogos.ps1 -Python python -ReportPath "$env:RUNNER_TEMP/logos.md"
+          $dryRun = $env:DRY_RUN -eq 'true'
+          $results = ./scripts/Update-StationLogos.ps1 -Python python -ReportPath "$env:RUNNER_TEMP/logos.md" -WhatIf:$dryRun
           "count=$(@($results | Where-Object File).Count)" >> $env:GITHUB_OUTPUT
 
+      - name: Dry run report
+        if: env.DRY_RUN == 'true'
+        shell: pwsh
+        run: |
+          Get-Content "$env:RUNNER_TEMP/urls.md" | Add-Content $env:GITHUB_STEP_SUMMARY
+          if (Test-Path "$env:RUNNER_TEMP/logos.md") { Get-Content "$env:RUNNER_TEMP/logos.md" | Add-Content $env:GITHUB_STEP_SUMMARY }
+
       - name: Check the list before committing (a pull request opened by this workflow starts no CI)
+        if: env.DRY_RUN != 'true'
         shell: pwsh
         run: ./scripts/ci/Invoke-Tests.ps1 -Python python
 
-      - name: Write the release note, open and merge the pull request
-        shell: bash
+      - name: Write the release note, open and merge the pull request, update the issue
+        if: env.DRY_RUN != 'true'
+        shell: pwsh
         env:
           URLS: ${{ steps.urls.outputs.count }}
           LOGOS: ${{ steps.logos.outputs.count || '0' }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          MERGE: ${{ github.event_name == 'schedule' || inputs.merge }}
         run: |
-          set -euo pipefail
-          day=$(date -u +%F)
-          note="docs/releases/${day}-refresh.md"
-          logo_report=()
-          if [ -f "$RUNNER_TEMP/logos.md" ]; then logo_report=(-LogoReport "$RUNNER_TEMP/logos.md"); fi
-          pwsh -NoProfile -File scripts/New-RefreshNote.ps1 -UrlReport "$RUNNER_TEMP/urls.md" "${logo_report[@]}" \
-            -Path "$note" -Date "$day" -RunUrl "$RUN_URL"
-          cat "$note" >> "$GITHUB_STEP_SUMMARY"
-          if [ "$URLS" = '0' ] && [ "$LOGOS" = '0' ]; then
-            echo "Nothing changed." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git switch -C "$BRANCH"
-          git add RadioStationsData.json RadioLogos "$note"
-          git commit -q -m "Refresh $URLS station url(s) and $LOGOS logo(s) ($day)"
-          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GH_REPO}.git" "HEAD:refs/heads/$BRANCH"
-
-          # The pull request body is the same note, its logos read from this commit (a relative path does not
-          # render there; the commit stays reachable through the pull request after the branch is deleted).
-          sha=$(git rev-parse HEAD)
-          pwsh -NoProfile -File scripts/New-RefreshNote.ps1 -UrlReport "$RUNNER_TEMP/urls.md" "${logo_report[@]}" \
-            -Path "$RUNNER_TEMP/body.md" -Date "$day" -RunUrl "$RUN_URL" \
-            -ImageBase "https://raw.githubusercontent.com/${GH_REPO}/${sha}/RadioLogos/"
-          title="Refresh $URLS station url(s) and $LOGOS logo(s) ($day)"
-          if gh pr view "$BRANCH" --json state --jq .state 2>/dev/null | grep -qx OPEN; then
-            gh pr edit "$BRANCH" --title "$title" --body-file "$RUNNER_TEMP/body.md"
-          else
-            gh pr create --base master --head "$BRANCH" --title "$title" --body-file "$RUNNER_TEMP/body.md"
-          fi
-
-          if [ "$MERGE" != 'true' ]; then
-            echo "Merge not requested: the pull request stays open." >> "$GITHUB_STEP_SUMMARY"
-          elif [ "$URLS" -gt "$MAX_AUTO_MERGE" ] || [ "$LOGOS" -gt "$MAX_AUTO_MERGE_LOGOS" ]; then
-            reason="$URLS urls and $LOGOS logos changed, more than $MAX_AUTO_MERGE urls or $MAX_AUTO_MERGE_LOGOS logos:"
-            reason="$reason not merged automatically."
-            gh pr comment "$BRANCH" --body "$reason Check the urls from Romania and look at the logos before merging."
-          else
-            gh pr merge "$BRANCH" --squash --delete-branch
-            gh api -X POST "repos/$GH_REPO/pages/builds" --silent || echo "::warning::Could not request a Pages build."
-          fi
+          ./scripts/Publish-Refresh.ps1 -UrlReport "$env:RUNNER_TEMP/urls.md" -LogoReport "$env:RUNNER_TEMP/logos.md" `
+            -UrlCount $env:URLS -LogoCount $env:LOGOS -Merge:($env:MERGE -eq 'true') -RunUrl $env:RUN_URL
 
       - name: Keep the schedule alive
         if: always()

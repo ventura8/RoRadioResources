@@ -59,6 +59,8 @@ if ($LogoReport -and (Test-Path $LogoReport)) {
 
 $note = ($parts -join "`n`n") -replace "(`n){3,}", "`n`n"
 if ($ImageBase) { $note = $note.Replace('../../RadioLogos/', $ImageBase) }
+# A relative -Path is relative to PowerShell's location; .NET would take the process's start folder instead.
+$Path = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
 $folder = Split-Path $Path -Parent
 if ($folder) { New-Item -ItemType Directory -Force -Path $folder | Out-Null }
 [IO.File]::WriteAllText($Path, "$note`n", [Text.UTF8Encoding]::new($false))
