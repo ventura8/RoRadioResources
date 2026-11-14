@@ -107,6 +107,7 @@ for name, colour, size in [("blue", "#1060c0", 256), ("green", "#10a040", 256), 
         @{ path = '/sbin/tunein-station.pls'; query = 'id=9'; type = 'audio/x-scpls'; body = "[playlist]`n" }
         @{ path = '/stations/search'; query = 'query=Radio%20Eta'; type = 'application/json'; body = '{"playables": [{"name": "Radio Eta", "country": "Germany", "id": "eta-de", "streams": [{"url": "{base}/stream/gamma-us"}]}, {"name": "Radio Eta", "country": "Romania", "id": "eta-ro", "streams": [{"url": "{base}/stream/eta"}]}]}' }
         @{ path = '/stations/search'; type = 'application/json'; body = '{"playables": []}' }
+        @{ path = '/broken/stations/search'; type = 'text/html'; body = '<html>Service unavailable</html>' }
 
         # Logos.
         foreach ($name in 'blue', 'green', 'red', 'purple', 'orange', 'same', 'teal', 'small', 'text') {
@@ -276,6 +277,18 @@ Describe 'The dry run, a source that is down, and a run with nothing to fix' {
         [IO.File]::ReadAllBytes($catalog) | Should -Be $originalBytes
     }
 
+    It 'reports radio.net when it answers no JSON, and survives a malformed old url' {
+        $broken = Join-Path $work 'broken.json'
+        Write-TestCatalog $broken @(@{ Title = 'Radio Broken'; Url = 'http://[broken' }) | Out-Null
+        $report = Join-Path $work 'broken.md'
+        $arguments = $sources.Clone()
+        $arguments.RadioNetUrl = "$base/broken"
+        $results = Invoke-Quiet 'Update-StationUrls.ps1' (@{ Catalog = $broken; ReportPath = $report; WhatIf = $true } + $arguments + $fast)
+        $results.OldVerdict | Should -Be 'dead'
+        $results.Tried | Should -Be 0
+        Get-Content $report -Raw | Should -Match ([regex]::Escape("- ``$base/broken/stations/search?count=10&query=Radio%20Broken``"))
+    }
+
     It 'reads the real list by default (only the stations named: none here, so nothing is requested)' {
         $results = Invoke-Quiet 'Update-StationUrls.ps1' @{ Title = 'Nowhere At All'; WhatIf = $true }
         $results | Should -BeNullOrEmpty
@@ -429,6 +442,19 @@ Describe 'The logo refresh (Update-StationLogos.ps1)' {
         $results | Should -BeNullOrEmpty
     }
 
+    It 'keeps CRLF line endings when it adds an ImageUrl line (a Windows checkout)' {
+        $crlf = Join-Path $work 'crlf.json'
+        $folder = New-Item -ItemType Directory -Path (Join-Path $work 'crlf-logos')
+        Write-TestCatalog $crlf @(@{ Title = 'Radio Fav'; Url = "$base/stream/fav" }) | Out-Null
+        $text = [IO.File]::ReadAllText($crlf) -replace "`r?`n", "`r`n"
+        [IO.File]::WriteAllText($crlf, $text, [Text.UTF8Encoding]::new($true))
+        $results = Invoke-Quiet 'Update-StationLogos.ps1' @{ Catalog = $crlf; LogoFolder = $folder.FullName; Python = $python; MyRadioOnlineUrl = $base; RadioBrowserUrl = $base }
+        $results.File | Should -Be 'radio-fav.png'
+        $written = [IO.File]::ReadAllText($crlf)
+        $written | Should -Match '"ImageUrl": "radio-fav.png"'
+        ($written -replace "`r`n", '') | Should -Not -Match "`n" -Because 'every line still ends in CRLF'
+    }
+
     It 'stops without Pillow, and when an ImageUrl cannot be written' {
         # pwsh stands in for a Python without Pillow: "-c 'import PIL'" fails there too.
         { Invoke-Quiet 'Update-StationLogos.ps1' @{ Catalog = $catalog; LogoFolder = $logos; Python = 'pwsh' } } | Should -Throw '*Pillow*'
@@ -441,6 +467,7 @@ Describe 'The logo refresh (Update-StationLogos.ps1)' {
 Describe 'Publishing the refresh (Publish-Refresh.ps1: the release note, the pull request, the issue)' {
     BeforeAll {
         $script:fakeGh = Join-Path $PSScriptRoot 'e2e/fake-gh.ps1'
+        $script:repo = ' --repo ventura8/RoRadioResources'
         $script:urlReport = Join-Path $work 'publish-urls.md'
         $script:logoReport = Join-Path $work 'publish-logos.md'
         Set-Content -Path $urlReport -Encoding utf8 -Value @(
@@ -486,8 +513,8 @@ Describe 'Publishing the refresh (Publish-Refresh.ps1: the release note, the pul
     It 'commits the list, the logos and the note, pushes, opens the pull request, merges it and asks Pages to rebuild' {
         $checkout = Initialize-Checkout 'merge'
         $log = Invoke-Publish $checkout @{ UrlCount = 1; LogoCount = 1; Merge = $true }
-        $log | Should -Contain ('pr create --base master --head automation/station-refresh --title Refresh 1 station url(s) and 1 logo(s) (2026-11-16) --body-file ' + (Join-Path $checkout.Temp 'refresh-body.md'))
-        $log | Should -Contain 'pr merge automation/station-refresh --squash --delete-branch'
+        $log | Should -Contain ('pr create --base master --head automation/station-refresh --title Refresh 1 station url(s) and 1 logo(s) (2026-11-16) --body-file ' + (Join-Path $checkout.Temp 'refresh-body.md') + $repo)
+        $log | Should -Contain "pr merge automation/station-refresh --squash --delete-branch$repo"
         $log | Should -Contain 'api -X POST repos/ventura8/RoRadioResources/pages/builds --silent'
         $files = @(git --git-dir $checkout.Remote ls-tree -r --name-only automation/station-refresh)
         $files | Should -Contain 'docs/releases/2026-11-16-refresh.md'
@@ -504,7 +531,8 @@ Describe 'Publishing the refresh (Publish-Refresh.ps1: the release note, the pul
     It 'opens the issue of the stations it could not fix, with what needs a human only' {
         $checkout = Initialize-Checkout 'issue'
         $log = Invoke-Publish $checkout @{ UrlCount = 0; LogoCount = 0 }
-        $log | Should -Contain ('issue create --title Stations the weekly refresh could not fix --body-file ' + (Join-Path $checkout.Temp 'refresh-issue.md'))
+        $log | Should -Contain ('issue create --title Stations the weekly refresh could not fix --body-file ' + (Join-Path $checkout.Temp 'refresh-issue.md') + $repo)
+        $log | Should -Contain "issue list --state open --limit 100 --json number,title$repo" -Because 'every gh call names the repository'
         $issue = Get-Content (Join-Path $checkout.Temp 'refresh-issue.md') -Raw
         $issue | Should -Match '## Unresolved'
         $issue | Should -Match 'Radio Iota'
@@ -518,16 +546,17 @@ Describe 'Publishing the refresh (Publish-Refresh.ps1: the release note, the pul
         $env:FAKE_GH_ISSUES = '[{"number": 41, "title": "Stations the weekly refresh could not fix"}, {"number": 3, "title": "Other"}]'
         $env:FAKE_GH_PR_STATE = 'OPEN'
         $log = Invoke-Publish $checkout @{ UrlCount = 16; LogoCount = 0; Merge = $true }
-        $log | Should -Contain ('issue edit 41 --body-file ' + (Join-Path $checkout.Temp 'refresh-issue.md'))
+        $log | Should -Contain ('issue edit 41 --body-file ' + (Join-Path $checkout.Temp 'refresh-issue.md') + $repo)
         ($log | Where-Object { $_ -like 'pr edit automation/station-refresh *' }) | Should -Not -BeNullOrEmpty
+        $log | Should -Contain "pr merge automation/station-refresh --disable-auto$repo" -Because 'an earlier run may have turned auto-merge on'
         ($log | Where-Object { $_ -like 'pr comment automation/station-refresh --body 16 urls and 0 logos changed*' }) | Should -Not -BeNullOrEmpty
-        $log | Should -Not -Contain 'pr merge automation/station-refresh --squash --delete-branch'
+        $log | Should -Not -Contain "pr merge automation/station-refresh --squash --delete-branch$repo"
     }
 
     It 'turns on auto-merge instead of merging, so that master''s required checks decide' {
         $checkout = Initialize-Checkout 'auto'
         $log = Invoke-Publish $checkout @{ UrlCount = 1; LogoCount = 0; Merge = $true; AutoMerge = $true }
-        $log | Should -Contain 'pr merge automation/station-refresh --auto --squash --delete-branch'
+        $log | Should -Contain "pr merge automation/station-refresh --auto --squash --delete-branch$repo"
         ($log | Where-Object { $_ -like 'api *' }) | Should -BeNullOrEmpty -Because 'Pages rebuilds from the merge itself'
         Get-Content $checkout.Summary -Raw | Should -Match 'Auto-merge is on'
     }
@@ -537,8 +566,8 @@ Describe 'Publishing the refresh (Publish-Refresh.ps1: the release note, the pul
         Set-Content -Path $urlReport -Encoding utf8 -Value @('Probed 3 stations; 1 failed twice; 1 fixed.', '', '## Fixed', '', '| Station |', '| :--- |', '| Radio Beta |')
         $env:FAKE_GH_ISSUES = '[{"number": 41, "title": "Stations the weekly refresh could not fix"}]'
         $log = Invoke-Publish $checkout @{ UrlCount = 1; LogoCount = 0; RunUrl = ''; LogoReport = (Join-Path $work 'no-such-report.md') }
-        $log | Should -Contain 'issue close 41 --comment The refresh of 2026-11-16 left nothing to fix.'
-        $log | Should -Not -Contain 'pr merge automation/station-refresh --squash --delete-branch'
+        $log | Should -Contain "issue close 41 --comment The refresh of 2026-11-16 left nothing to fix.$repo"
+        $log | Should -Not -Contain "pr merge automation/station-refresh --squash --delete-branch$repo"
         Get-Content $checkout.Summary -Raw | Should -Match 'Merge not requested'
     }
 

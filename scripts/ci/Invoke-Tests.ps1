@@ -51,6 +51,8 @@ $configuration.CodeCoverage.Enabled = $true
 $configuration.CodeCoverage.Path = @($updater | ForEach-Object { Join-Path $root $_ })
 $configuration.CodeCoverage.OutputPath = Join-Path ([IO.Path]::GetTempPath()) "roradio-coverage-$PID.xml"
 $configuration.CodeCoverage.CoveragePercentTarget = 100
+# The end-to-end tests run the fake server and draw their logos with this same Python (Greptile and CodeRabbit, #38).
+$env:RORADIO_TEST_PYTHON = $Python
 $pesterResult = Invoke-Pester -Configuration $configuration
 $updaterCoverage = $pesterResult.CodeCoverage
 $missed = @($updaterCoverage.CommandsMissed)

@@ -122,6 +122,12 @@ function Invoke-Tool([string]$Command, [string[]]$Arguments) {
     $output
 }
 
+# Every issue and pull request command names -Repository: gh would otherwise take GH_REPO or the current folder's
+# remote, while git works on -RepositoryPath (Greptile and CodeRabbit, #38).
+function Invoke-Gh([string[]]$Arguments) {
+    Invoke-Tool $Gh ($Arguments + @('--repo', $Repository))
+}
+
 $summaryFile = $SummaryPath
 $noteArguments = @{ UrlReport = $UrlReport; Date = $Date; RunUrl = $RunUrl }
 if ($LogoReport -and (Test-Path $LogoReport)) { $noteArguments.LogoReport = $LogoReport }
@@ -148,7 +154,7 @@ Write-Note (Join-Path $RepositoryPath $note) ''
 Add-Summary (Get-Content -Path (Join-Path $RepositoryPath $note) -Raw -Encoding utf8)
 
 # 2: the issue.
-$open = @(Invoke-Tool $Gh @('issue', 'list', '--state', 'open', '--limit', '100', '--json', 'number,title') | ConvertFrom-Json |
+$open = @(Invoke-Gh @('issue', 'list', '--state', 'open', '--limit', '100', '--json', 'number,title') | ConvertFrom-Json |
     Where-Object title -eq $issueTitle)
 $work = Get-OpenWork
 if ($work) {
@@ -157,13 +163,13 @@ if ($work) {
     $intro = "What $run of $Date could not fix. A station here keeps its url until someone fixes it: RoRadio's fix-failing-stations skill, or a pull request that changes RadioStationsData.json. This issue is rewritten by every refresh and closed by the first one that leaves nothing here."
     [IO.File]::WriteAllText($issueBody, "$intro`n`n$work`n", [Text.UTF8Encoding]::new($false))
     if ($open) {
-        Invoke-Tool $Gh @('issue', 'edit', "$($open[0].number)", '--body-file', $issueBody) | Out-Null
+        Invoke-Gh @('issue', 'edit', "$($open[0].number)", '--body-file', $issueBody) | Out-Null
     } else {
-        Invoke-Tool $Gh @('issue', 'create', '--title', $issueTitle, '--body-file', $issueBody) | Out-Null
+        Invoke-Gh @('issue', 'create', '--title', $issueTitle, '--body-file', $issueBody) | Out-Null
     }
     Add-Summary "Stations left for a human: issue '$issueTitle'."
 } elseif ($open) {
-    Invoke-Tool $Gh @('issue', 'close', "$($open[0].number)", '--comment', "The refresh of $Date left nothing to fix.") | Out-Null
+    Invoke-Gh @('issue', 'close', "$($open[0].number)", '--comment', "The refresh of $Date left nothing to fix.") | Out-Null
 }
 
 if ($UrlCount -eq 0 -and $LogoCount -eq 0) {
@@ -185,24 +191,27 @@ Invoke-Tool $Git @('-C', $RepositoryPath, 'push', '-q', '--force', $Remote, "HEA
 $sha = "$(Invoke-Tool $Git @('-C', $RepositoryPath, 'rev-parse', 'HEAD'))".Trim()
 $body = Join-Path $TempFolder 'refresh-body.md'
 Write-Note $body "https://raw.githubusercontent.com/$Repository/$sha/RadioLogos/"
-$state = "$(& $Gh pr view $Branch --json state --jq .state 2>$null)".Trim()
+$state = "$(& $Gh pr view $Branch --json state --jq .state --repo $Repository 2>$null)".Trim()
 if ($state -eq 'OPEN') {
-    Invoke-Tool $Gh @('pr', 'edit', $Branch, '--title', $title, '--body-file', $body) | Out-Null
+    Invoke-Gh @('pr', 'edit', $Branch, '--title', $title, '--body-file', $body) | Out-Null
+    # An earlier run may have left auto-merge on: this run decides again, from its own change (CodeRabbit, #38).
+    # gh fails when auto-merge was off, which is fine.
+    & $Gh pr merge $Branch --disable-auto --repo $Repository 2>$null | Out-Null
 } else {
-    Invoke-Tool $Gh @('pr', 'create', '--base', $Base, '--head', $Branch, '--title', $title, '--body-file', $body) | Out-Null
+    Invoke-Gh @('pr', 'create', '--base', $Base, '--head', $Branch, '--title', $title, '--body-file', $body) | Out-Null
 }
 
 if (-not $Merge) {
     Add-Summary 'Merge not requested: the pull request stays open.'
 } elseif ($UrlCount -gt $MaxUrls -or $LogoCount -gt $MaxLogos) {
     $reason = "$UrlCount urls and $LogoCount logos changed, more than $MaxUrls urls or $MaxLogos logos: not merged automatically."
-    Invoke-Tool $Gh @('pr', 'comment', $Branch, '--body', "$reason Check the urls from Romania and look at the logos before merging.") | Out-Null
+    Invoke-Gh @('pr', 'comment', $Branch, '--body', "$reason Check the urls from Romania and look at the logos before merging.") | Out-Null
     Add-Summary $reason
 } elseif ($AutoMerge) {
-    Invoke-Tool $Gh @('pr', 'merge', $Branch, '--auto', '--squash', '--delete-branch') | Out-Null
+    Invoke-Gh @('pr', 'merge', $Branch, '--auto', '--squash', '--delete-branch') | Out-Null
     Add-Summary 'Auto-merge is on: GitHub merges the pull request once the required checks (Lint, Tests) pass.'
 } else {
-    Invoke-Tool $Gh @('pr', 'merge', $Branch, '--squash', '--delete-branch') | Out-Null
+    Invoke-Gh @('pr', 'merge', $Branch, '--squash', '--delete-branch') | Out-Null
     & $Gh api -X POST "repos/$Repository/pages/builds" --silent
     if ($LASTEXITCODE -ne 0) {
         Write-Warning 'Could not request a Pages build.'

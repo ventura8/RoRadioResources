@@ -16,17 +16,14 @@
 function Invoke-Probe([string]$Url, [int]$TimeoutSeconds) {
     $format = '%{http_code}|%{content_type}|%{time_connect}|%{time_starttransfer}|%{size_download}|%{redirect_url}'
     $invariant = [Globalization.CultureInfo]::InvariantCulture
+    # The body is discarded: a stream that ignores the byte range keeps sending until the timeout (Greptile, #38).
+    $discard = ('/dev/null', 'NUL')[[int][bool]$IsWindows]
     $current = $Url
     foreach ($hop in 0..5) {
         Write-Debug "Hop ${hop}: $current"
         $pin = Get-PinnedTarget $current
         if ($null -eq $pin) { break }
-        $body = [IO.Path]::GetTempFileName()
-        try {
-            $line = & $script:Curl -s @pin -o $body -r 0-4095 --max-time $TimeoutSeconds -A 'RoRadio-station-probe' -w $format $current 2>$null
-        } finally {
-            Remove-Item -LiteralPath $body -Force -ErrorAction SilentlyContinue -WhatIf:$false
-        }
+        $line = & $script:Curl -s @pin -o $discard -r 0-4095 --max-time $TimeoutSeconds -A 'RoRadio-station-probe' -w $format $current 2>$null
         # curl prints every field even when it got no answer ("000||0.000000|...").
         $parts = "$line".Split('|')
         $result = [pscustomobject]@{
@@ -99,9 +96,11 @@ function Get-StreamVerdict([object]$Station, [int]$TimeoutSeconds) {
     $checked = $Station.Url
     $reached = $true
 
-    # An HLS playlist answering proves little: follow it to the first variant and the first segment. A playlist
-    # that leads to no segment within two levels (an empty one, or playlists all the way down) is not audio: before
-    # 2026-11-14 the last playlist's own content type made it "alive".
+    # An HLS playlist answering proves little: follow it to the first variant and the first segment. What an entry
+    # is comes from its own answer, never its name: an entry that answers with a playlist type is another playlist,
+    # whatever its extension (Greptile and CodeRabbit, #38). A playlist that leads to no segment within two levels
+    # (an empty one, or playlists all the way down) is not audio: before 2026-11-14 the last playlist's own content
+    # type made it "alive".
     if ($probe.Code -eq '200' -and ($Station.Url -match '\.m3u8(\?|$)' -or $probe.ContentType -match 'mpegurl')) {
         $reached = $false
         $base = $Station.Url
@@ -111,12 +110,12 @@ function Get-StreamVerdict([object]$Station, [int]$TimeoutSeconds) {
             $next = $playlist.Body -split "`r?`n" | Where-Object { $_ -and -not $_.StartsWith('#') } | Select-Object -First 1
             if (-not $next) { break }
             $base = ([Uri]::new([Uri]$playlist.Final, $next.Trim())).AbsoluteUri
-            $reached = $base -notmatch '\.m3u8(\?|$)'
+            $probe = Invoke-Probe $base $TimeoutSeconds
+            $reached = $probe.ContentType -notmatch 'mpegurl'
             if ($reached) { break }
         }
 
         $checked = $base
-        $probe = Invoke-Probe $base $TimeoutSeconds
     }
 
     $isAudio = $reached -and ($probe.ContentType -match '^(audio/|application/(octet-stream|ogg|x-mpegurl|vnd\.apple\.mpegurl))|mpegurl|aac|mpeg' -or

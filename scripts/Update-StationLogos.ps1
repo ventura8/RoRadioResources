@@ -232,7 +232,7 @@ foreach ($result in $added) {
 $bytes = [IO.File]::ReadAllBytes($Catalog)
 $hasBom = $bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
 $text = [Text.UTF8Encoding]::new($false).GetString($bytes).TrimStart([char]0xFEFF)
-$newline = if ($text.Contains("`r`n")) { "`r`n" } else { "`n" }
+$newline = ("`n", "`r`n")[[int]$text.Contains("`r`n")]
 foreach ($result in $added) {
     $block = '("GUID":\s*"' + [regex]::Escape($result.Guid) + '"[^}]*?'
     $value = ($result.File | ConvertTo-Json).Replace('$', '$$')

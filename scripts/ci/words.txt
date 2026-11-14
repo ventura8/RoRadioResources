@@ -20,6 +20,7 @@ gamertag
 getchannel
 getcolors
 getextrema
+Greptile
 gstatic
 htmlvalidate
 icecast

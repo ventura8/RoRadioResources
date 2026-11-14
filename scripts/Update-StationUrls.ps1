@@ -122,7 +122,8 @@ function Invoke-StreamProbe([object[]]$Entries, [string]$Name) {
 #    only marks that match exactly one mount count. One match is the station (strong); several are channels the
 #    marks cannot separate, and go to review (CodeRabbit, RoRadioResources#2).
 function Get-SameServerCandidate([string]$OldUrl, [string[]]$Marks) {
-    $old = [Uri]$OldUrl
+    # A malformed old url has no server to ask; the station still gets the other sources (CodeRabbit, #38).
+    try { $old = [Uri]$OldUrl } catch { return }
     $bases = @("$($old.Scheme)://$($old.Host):$($old.Port)") + @("http://$($old.Host):8000" | Where-Object { $old.Port -ne 8000 })
     $mounts = @(foreach ($base in $bases) {
         $icecast = Get-OptionalJson "$base/status-json.xsl"
@@ -169,7 +170,16 @@ function Get-ShoutcastCandidate([string]$StationTitle, [string]$DirectoryUrl, [s
 #    without the station's name, so this too is only a suggestion.
 function Get-RadioNetCandidate([string]$StationTitle, [string]$SearchUrl) {
     $plainTitle = ConvertTo-PlainTitle $StationTitle
-    $found = Get-OptionalJson "$SearchUrl/stations/search?count=10&query=$([Uri]::EscapeDataString($StationTitle))"
+    # Read like the other directories: a download that fails, or an answer that is not JSON, goes to the report's
+    # unreadable sources (Greptile, #38); an empty search result is just no candidate.
+    $search = "$SearchUrl/stations/search?count=10&query=$([Uri]::EscapeDataString($StationTitle))"
+    $found = $null
+    try {
+        $found = Get-Text $search | ConvertFrom-Json
+    } catch {
+        Write-Warning "Could not read $search ($($_.Exception.Message))"
+        $script:UnreadableSource.Add($search)
+    }
     foreach ($entry in @($found.playables | Where-Object { (ConvertTo-PlainTitle $_.name) -eq $plainTitle -and $_.country -in 'Romania', 'Moldova' })) {
         foreach ($stream in @($entry.streams | Select-Object -First 1)) {
             [pscustomobject]@{ Url = $stream.url; Source = "radio.net ($($entry.id))"; Strong = $false }
