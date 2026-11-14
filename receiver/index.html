@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!--
         Content Security Policy: scripts only from the Cast framework on www.gstatic.com (and the Shaka player it loads,
-        protocol-relative, from ajax.googleapis.com: https on a device, as the page is https) and this page's own inline
-        script, by its hash (tests/receiver.test.js recomputes it, so a script change without a new hash fails CI); no
-        eval, no plugins, no forms, no base. Pictures and streams are the station's own, on any http(s) host.
+        protocol-relative, from ajax.googleapis.com: https on a device, as the page is https) and the page's own
+        receiver.js ('self'); no inline script, no eval, no plugins, no forms, no base. Pictures and streams are the
+        station's own, on any http(s) host.
     -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-/FgAlM5ixk1wc8NLGYtuh4gyBm9UNOSwKWuqR21pdw4=' https://www.gstatic.com ajax.googleapis.com; style-src 'unsafe-inline' https://www.gstatic.com https://fonts.googleapis.com; font-src https://fonts.gstatic.com https://www.gstatic.com data:; img-src https: http: data: blob:; media-src https: http: data: blob:; connect-src https: http: wss: ws://localhost:8008; worker-src blob: https://www.gstatic.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.gstatic.com ajax.googleapis.com; style-src 'unsafe-inline' https://www.gstatic.com https://fonts.googleapis.com; font-src https://fonts.gstatic.com https://www.gstatic.com data:; img-src https: http: data: blob:; media-src https: http: data: blob:; connect-src https: http: wss: ws://localhost:8008; worker-src blob: https://www.gstatic.com; object-src 'none'; base-uri 'none'; form-action 'none'">
     <title>RoRadio</title>
     <!--
         The RoRadio Cast receiver (2.4.5). A Chromecast, a TV or a smart display loads this page when the app casts a
@@ -417,8 +417,8 @@
         <img id="cover" alt="">
         <section id="song" aria-live="polite">
             <div id="station" class="empty"><img alt=""><span id="stationName"></span></div>
-            <h1 id="title"></h1>
-            <h2 id="artist"></h2>
+            <p id="title"></p>
+            <p id="artist"></p>
             <p id="release"><span id="album"></span><span id="year"></span></p>
         </section>
         <nav id="controls" aria-label="Playback">

@@ -94,8 +94,13 @@ function probe() {
         record.playback = [];
         player.pause = () => record.playback.push('pause');
         player.play = () => record.playback.push('play');
+        // Every status says what the screen shows (record.shown, the last one); step presses are also in broadcasts.
         player.broadcastStatus = (includeMedia, requestId, customData) => {
-            record.broadcasts.push(customData);
+            record.shown = customData.shown;
+            record.statusRequestIds = [...new Set([...(record.statusRequestIds || []), requestId])];
+            if (customData.step) {
+                record.broadcasts.push(customData);
+            }
         };
         // No media session off a device: the media information the page gives the player is kept here.
         let playing = null;
@@ -129,7 +134,7 @@ function serve(withPage) {
             const probeScript = `(${probe})();`;
             const probeHash = crypto.createHash('sha256').update(probeScript, 'utf8').digest('base64');
             const html = withPage
-                .replace("script-src 'sha256-", `script-src 'sha256-${probeHash}' 'sha256-`)
+                .replace("script-src 'self'", `script-src 'sha256-${probeHash}' 'self'`)
                 .replace(sdkTag, `${sdkTag}\n<script>${probeScript}</script>`);
             response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
             response.end(html);
@@ -665,6 +670,31 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
         }
         const steps = (await evaluate('window.probe.broadcasts')).slice(before);
         assert.deepEqual(steps.map((s) => s.step), ['next']);
+    });
+
+    await t.test('the media status tells the senders what the screen shows, pictures once loaded', async () => {
+        const data = JSON.stringify({ caption: 'Live words', previous: true, next: false, station: 'Pro FM' });
+        const m = media(origin, { title: 'A song', artist: 'A band', cover: 'cover', logo: 'logo', customData: data });
+        await evaluate(intercept('QUEUE_UPDATE', updateRequest(m)));
+        const shown = await waitFor(
+            async () => {
+                const s = (await evaluate('window.probe')).shown;
+                return s && s.cover && s.logo && s.title === 'A song' ? s : null;
+            },
+            'the pictures in the reported screen',
+            10000,
+        );
+        assert.deepEqual(shown, {
+            title: 'A song',
+            artist: 'A band',
+            station: 'Pro FM',
+            caption: 'Live words',
+            logo: true,
+            cover: true,
+            steps: { previous: true, next: false },
+            defaultTitle: false,
+        });
+        assert.deepEqual((await evaluate('window.probe')).statusRequestIds, [0]);
     });
 
     await t.test('a double tap on the touch next button is one step', async () => {

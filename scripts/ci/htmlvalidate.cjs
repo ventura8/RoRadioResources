@@ -1,16 +1,21 @@
 // html-validate for the Cast receiver's page (receiver/index.html), scripts/ci/Invoke-Lint.ps1: the recommended and
-// accessibility presets, every finding an error.
+// accessibility presets, every rule on, every finding an error.
 'use strict';
 
 module.exports = {
     extends: ['html-validate:recommended', 'html-validate:a11y'],
+    elements: [
+        'html5',
+        {
+            // The cover and the logo get their src from receiver.js once the picture has loaded (a src before that
+            // would show a broken picture); every <img> still needs its alt.
+            img: { attributes: { src: { required: false } } },
+        },
+    ],
     rules: {
         'no-inline-style': 'error',
-        // The page loads Google's Cast framework, which Google updates in place at a fixed url: no hash can be pinned.
-        'require-sri': 'off',
-        // The song's title and artist headings, and the cover and logo pictures, are empty until receiver.js fills
-        // them from the station: a src before the picture loaded would show a broken image.
-        'empty-heading': 'off',
-        'element-required-attributes': 'off',
+        // Google's Cast framework is served at a fixed url that Google updates in place: it cannot carry an
+        // integrity hash. Every other script is the page's own (receiver.js, same origin).
+        'require-sri': ['error', { target: 'crossorigin', exclude: ['https://www.gstatic.com/cast/'] }],
     },
 };

@@ -17,6 +17,19 @@ idle screen carries the app's icon. Merge this before RoRadio 2.4.5 ships.
   unplated icon) on a tile, the name, "Ready to play" and a short line, over a soft accent glow. It is sized for a
   1920 x 1080 TV and a 2560 x 1600 tablet alike.
 
+- **One press is one step.** One tap on the Pixel Tablet's next went from Pro FM to Radio 7, seven stations on.
+  The device's controller sends again a queue jump it got no answer to, and every repeat broadcast a new step. The
+  page now takes a jump with a request id it has seen (sender and id) as the same press, and any step within 600 ms
+  of the last as the same press too. The touch buttons go through the same check.
+- **The logo beside the cover.** With a song's cover, the station's logo shows beside it, from the item's second
+  image or the `customData` `logo`.
+- **The screen, reported.** Every media status the page sends carries `{"shown": {"artist", "caption", "cover",
+  "defaultTitle", "logo", "station", "steps": {"next", "previous"}, "title"}}`, updated on every change and once
+  a picture has loaded. An E2E test reads what the screen shows without OCR. A step press keeps its `step` and
+  `stepId` beside it, so older apps still read the press.
+- **Merged with the security audit (#37).** `imageUrl()` (http(s) only, normalized through `new URL().href`) lives
+  in `receiver.js` and guards the cover, the logo and the backdrop. The CSP allows `'self'` (receiver.js) instead
+  of the inline script's hash, with `default-src 'none'` and no `unsafe-eval` or `unsafe-inline` for scripts.
 - **A failed stream says so.** When the stream fails (`MEDIA_FINISHED` with `ERROR`, or the player's `ERROR`), the
   idle screen comes back and says the station's stream could not be played. The next station clears it.
 - **The script is its own file, at 100 % coverage.** `receiver/receiver.js` holds the whole script. The unit tests

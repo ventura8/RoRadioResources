@@ -6,7 +6,6 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
@@ -15,6 +14,48 @@ const script = path.join(__dirname, '..', 'receiver', 'receiver.js');
 const html = fs.readFileSync(path.join(__dirname, '..', 'receiver', 'index.html'), 'utf8');
 assert.ok(html.includes('<script src="receiver.js"></script>'), 'receiver/index.html loads receiver.js');
 assert.ok(!/<script>/.test(html), 'receiver/index.html has no inline script');
+const source = fs.readFileSync(script, 'utf8');
+
+test('metadata that looks like markup is drawn as text, never parsed as HTML', () => {
+    const markup = '<img src=x onerror=alert(1)>';
+    const data = JSON.stringify({ caption: markup, station: markup });
+    const did = run([
+        { type: 'LOAD', request: { media: { metadata: { title: markup, artist: markup }, customData: data } } },
+    ]);
+    assert.equal(did.title, markup);
+    assert.equal(did.artist, markup);
+    assert.equal(did.caption, markup);
+    assert.equal(did.stationName, markup);
+    // No API that parses HTML or code anywhere in the page's script.
+    for (const sink of ['innerHTML', 'outerHTML', 'insertAdjacentHTML', 'document.write', 'eval(', 'new Function', "setTimeout('"]) {
+        assert.ok(!source.includes(sink), `receiver/receiver.js uses ${sink}`);
+    }
+});
+
+test('only http(s) pictures are shown, and a quote cannot break out of the backdrop url', () => {
+    for (const bad of ['javascript:alert(1)', 'data:image/svg+xml,<svg onload=alert(1)>', 'not a url', 42]) {
+        const did = run([loadWith([bad], JSON.stringify({ logo: bad }))]);
+        assert.equal(did.cover, undefined, String(bad));
+        assert.equal(did.logo, undefined, String(bad));
+        assert.equal(did.backdrop, '', String(bad));
+    }
+
+    const did = run([loadWith(['https://x/a.jpg?q=")"; background:red'], '')]);
+    assert.equal(did.cover, 'https://x/a.jpg?q=%22)%22;%20background:red');
+    assert.equal(did.backdrop, 'url("https://x/a.jpg?q=%22)%22;%20background:red")');
+});
+
+test('the Content-Security-Policy allows the page\'s own receiver.js, no inline script and never eval', () => {
+    const csp = html.match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)">/);
+    assert.ok(csp, 'receiver/index.html declares a Content-Security-Policy');
+    const scriptSrc = csp[1].match(/script-src ([^;]*)/)[1];
+    assert.match(csp[1], /^default-src 'none';/);
+    assert.ok(scriptSrc.split(' ').includes("'self'"), "script-src allows 'self' (receiver.js)");
+    assert.match(scriptSrc, /https:\/\/www\.gstatic\.com/);
+    assert.ok(!scriptSrc.includes("'sha256-"), 'no inline-script hash: the page has no inline script');
+    assert.ok(!scriptSrc.includes("'unsafe-inline'"));
+    assert.ok(!csp[1].includes('unsafe-eval'));
+});
 
 // The framework's own values (cast.framework.messages.Command).
 const Command = { PAUSE: 1, SEEK: 2, STREAM_VOLUME: 4, STREAM_MUTE: 8, QUEUE_NEXT: 64, QUEUE_PREV: 128 };
@@ -40,9 +81,13 @@ function element() {
             add: (name) => classes.add(name),
             remove: (name) => classes.delete(name),
             has: (name) => classes.has(name),
+            contains: (name) => classes.has(name),
         },
         removeAttribute(name) {
             delete this[name];
+        },
+        hasAttribute(name) {
+            return this[name] !== undefined;
         },
     };
 }
@@ -58,7 +103,7 @@ function run(
     station.querySelector = () => stationImage;
     elements.station = station;
     const interceptors = {};
-    const did = { commands: [], broadcasts: [], mediaInformation: [], results: [] };
+    const did = { commands: [], broadcasts: [], statuses: [], mediaInformation: [], results: [] };
     // The device starts with QUEUE_PREV on: the page must drop it unless the station has a previous one.
     let supported = BASE | QUEUE_PREV;
     let playing = playingMedia === undefined ? { metadata: { title: 'Before' }, customData: '' } : playingMedia;
@@ -68,7 +113,14 @@ function run(
             supported = commands;
             did.commands.push({ commands, broadcast });
         },
-        broadcastStatus: (includeMedia, requestId, customData) => did.broadcasts.push({ includeMedia, customData }),
+        // Every status the page sends says what it shows (did.shown, the last one); a step press is also in did.broadcasts.
+        broadcastStatus: (includeMedia, requestId, customData) => {
+            did.statuses.push({ includeMedia, requestId, customData });
+            did.shown = customData.shown;
+            if (customData.step) {
+                did.broadcasts.push({ includeMedia, customData });
+            }
+        },
         getMediaInformation: () => playing,
         setMediaInformation: (media, broadcast) => {
             playing = media;
@@ -199,6 +251,9 @@ function finish(did, elements, stationImage, sandbox, supported) {
     did.stationName = elements.stationName ? elements.stationName.textContent : '';
     did.logo = elements.station ? stationImage.src : undefined;
     did.stationShown = elements.station ? !elements.station.classList.has('empty') : false;
+    did.cover = elements.cover ? elements.cover.src : undefined;
+    did.backdrop = elements.backdrop ? elements.backdrop.style.backgroundImage : undefined;
+    did.artist = elements.artist ? elements.artist.textContent : '';
     did.supported = supported();
     return did;
 }
@@ -293,6 +348,43 @@ test('one press is one step: a jump resent with its request id, or repeated at o
         both.broadcasts.map((entry) => entry.customData.step),
         ['next', 'previous'],
     );
+});
+
+test('every status tells the senders what the screen shows: song, station, caption, pictures, steps', () => {
+    const data = JSON.stringify({ caption: 'Words', previous: true, next: false, station: 'Pro FM' });
+    const did = run([
+        {
+            type: 'LOAD',
+            request: { media: { metadata: { title: 'Song', artist: 'Band', images: [{ url: 'https://x/c.jpg' }, { url: 'https://x/l.png' }] }, customData: data } },
+        },
+    ]);
+    assert.deepEqual(did.shown, {
+        title: 'Song',
+        artist: 'Band',
+        station: 'Pro FM',
+        caption: 'Words',
+        logo: true,
+        cover: true,
+        steps: { previous: true, next: false },
+        defaultTitle: false,
+    });
+    assert.ok(did.statuses.every((s) => s.requestId === 0 && s.includeMedia === false));
+});
+
+test('the station alone, before its song: defaultTitle, and no picture that did not load', () => {
+    const named = run([load(JSON.stringify({ station: 'Pro FM' }), 'Pro FM')], { pictures: 'error' });
+    assert.equal(named.shown.defaultTitle, true);
+    assert.equal(named.shown.cover, false);
+    assert.equal(named.shown.logo, false);
+    assert.equal(run([{ type: 'LOAD', request: { media: {} } }]).shown.defaultTitle, true);
+});
+
+test('a step press carries the screen too, and an older app still reads its step and id', () => {
+    const did = run([load(appData('', true, true)), { type: 'QUEUE_UPDATE', request: { jump: 1 } }]);
+    const press = did.broadcasts[0].customData;
+    assert.equal(press.step, 'next');
+    assert.equal(typeof press.stepId, 'number');
+    assert.equal(press.shown.title, 'Song');
 });
 
 test('a double tap on a touch button within a moment is one step', () => {

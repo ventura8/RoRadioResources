@@ -1,5 +1,5 @@
 // ESLint for the Cast receiver's script and its tests (scripts/ci/Invoke-Lint.ps1). The receiver's script gets every
-// core rule (eslint:all); only rules that contradict how the script must be written are off, each with its reason.
+// core rule (eslint:all). Two are off, each with its reason; a few take an option instead of their default.
 // The tests get the recommended rules plus the strict ones that catch real mistakes.
 import js from '@eslint/js';
 import globals from 'globals';
@@ -16,38 +16,26 @@ export default [
         },
         rules: {
             ...js.configs.all.rules,
-            // The Cast framework's media commands are a bit mask: the script adds and removes bits.
+            // Off: the Cast framework's supported media commands are a bit mask (Command.QUEUE_PREV | ...), which the
+            // script sets with | and & as the framework defines them.
             'no-bitwise': 'off',
-            // The framework's numbers and the page's sizes are named where they are used; constants would only rename.
-            'no-magic-numbers': 'off',
-            // Comments are sentences that may start with a code name (`customData`, `cast-media-player`).
-            'capitalized-comments': 'off',
-            // The app's JSON is built in the order the page reads it; the keys are not a list to sort.
-            'sort-keys': 'off',
-            // One declaration a line reads better beside its comment.
-            'one-var': 'off',
-            // Short ternaries for a label or a fallback are the clearest form.
+            // Off: a ternary is the clearest form for the page's two-way labels and fallbacks (play / pause, a year
+            // or nothing); `no-nested-ternary` stays on, so none grows into a chain.
             'no-ternary': 'off',
-            // `id`, `e`: the DOM's own names.
-            'id-length': 'off',
+            // Options, not off: 0, 1 and -1 (indexes, a jump of one) are not magic; every other number is a named const.
+            'no-magic-numbers': ['error', { ignore: [-1, 0, 1], ignoreArrayIndexes: true, enforceConst: true }],
+            // A comment's later lines continue its sentence.
+            'capitalized-comments': ['error', 'always', { ignoreConsecutiveComments: true }],
+            // One declaration a line, each beside its comment.
+            'one-var': ['error', 'never'],
             // Named functions with JSDoc for the page's steps, arrows for the small callbacks.
-            'func-style': 'off',
-            // The script is a sequence of registrations in the page's order; size limits would only split it.
-            'max-statements': 'off',
-            'max-lines-per-function': 'off',
-            'max-lines': 'off',
-            // The framework's broadcastStatus takes `undefined` for "no request id".
-            'no-undefined': 'off',
-            // `const { x } = y` where it reads better, `y.x` where the name would change.
-            'prefer-destructuring': 'off',
-            // `let x = null` until it is known is the clearest state.
-            'init-declarations': 'off',
-            'no-inline-comments': 'off',
-            'line-comment-position': 'off',
-            // Functions are declared where they are read, after the helpers they use.
+            'func-style': ['error', 'declaration', { allowArrowFunctions: true }],
+            // Ten statements a function; the one function around the whole script is the script itself.
+            'max-statements': ['error', 10, { ignoreTopLevelFunctions: true }],
+            // 300 lines of code; the comments that explain the device findings do not count against it.
+            'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
+            // Functions are declared where they are read, after the helpers they use (they are hoisted).
             'no-use-before-define': ['error', { functions: false }],
-            // The ternary for a play / pause label and the empty-string fallbacks are intended.
-            'no-nested-ternary': 'error',
         },
     },
     {
