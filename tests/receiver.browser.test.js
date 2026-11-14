@@ -504,6 +504,36 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
         assert.equal(await evaluate('document.getElementById("media").tagName'), 'AUDIO');
     });
 
+    await t.test('on a touch display the buttons stay on screen, under the song, with a full song and a caption, and tap', async () => {
+        const long = 'A song title long enough to wrap over two lines on any screen the receiver meets';
+        const data = JSON.stringify({ caption: `${long} ${long}`, previous: true, next: true, station: 'Pro FM' });
+        const m = media(origin, { title: long, artist: long, album: long, releaseDate: '2025', cover: 'cover', logo: 'logo', customData: data });
+        await evaluate('document.body.classList.add("touch")');
+        await evaluate(intercept('LOAD', loadRequest(m)));
+        await settle(session, (s) => s.logo !== null, 'the logo');
+        const placed = await evaluate(`(() => {
+            // Their own row in the safe area, under the song and clear of the caption band.
+            const main = document.querySelector('main').getBoundingClientRect();
+            const song = document.getElementById('song').getBoundingClientRect();
+            const captions = document.getElementById('captions').getBoundingClientRect();
+            return ['previous', 'playPause', 'next'].map((id) => {
+                const r = document.getElementById(id).getBoundingClientRect();
+                const inside = r.top >= song.bottom - 0.5 && r.bottom <= captions.top + 0.5 && r.bottom <= main.bottom + 0.5;
+                return { id, width: r.width, inside };
+            });
+        })()`);
+        for (const button of placed) {
+            assert.ok(button.width > 0, `${button.id} is drawn`);
+            assert.equal(button.inside, true, `${button.id} is under the song, above the captions, in the safe area`);
+        }
+
+        const before = (await evaluate('window.probe')).broadcasts.length;
+        await evaluate('document.getElementById("next").click(); document.getElementById("previous").click()');
+        const steps = (await evaluate('window.probe')).broadcasts.slice(before).map((b) => b.step);
+        assert.deepEqual(steps, ['next', 'previous']);
+        await evaluate('document.body.classList.remove("touch")');
+    });
+
     await t.test('a LOAD with the old bare-string caption shows the song and the caption, with no steps', async () => {
         const m = media(origin, { title: 'Old song', artist: 'Old artist', customData: 'Hello from an old build' });
         assert.equal(await evaluate(intercept('LOAD', loadRequest(m))), 'request');

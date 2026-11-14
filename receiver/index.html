@@ -282,11 +282,23 @@
             color: rgb(255 255 255 / 60%);
         }
 
-        /* Previous / pause / next to tap, on a touch display only (a TV has its remote and the device's own controls). */
+        /*
+         * Previous / pause / next to tap, on a touch display only (a TV has its remote and the device's own controls):
+         * a row of their own under the song, so a long song can never push them out of the clipped song column.
+         */
         #controls {
+            grid-area: controls;
             display: none;
             column-gap: clamp(24px, 5vmin, 72px);
-            margin-top: clamp(16px, 4vmin, 56px);
+            padding-top: clamp(12px, 2.4vmin, 32px);
+        }
+
+        body.touch main {
+            grid-template-rows: minmax(0, 1fr) auto auto;
+            grid-template-areas:
+                "cover song"
+                "cover controls"
+                "captions captions";
         }
 
         body.touch #controls {
@@ -351,6 +363,15 @@
                 text-align: center;
             }
 
+            body.touch main {
+                grid-template-rows: auto minmax(0, 1fr) auto auto;
+                grid-template-areas:
+                    "cover"
+                    "song"
+                    "controls"
+                    "captions";
+            }
+
             /* The cover, the logo, a two-line title and a two-line caption, stacked within the height (800 x 1280). */
             body,
             body.captioned {
@@ -392,12 +413,12 @@
             <h1 id="title"></h1>
             <h2 id="artist"></h2>
             <p id="release"><span id="album"></span><span id="year"></span></p>
-            <nav id="controls" aria-label="Playback">
-                <button id="previous" type="button" class="hidden" aria-label="Previous station">&#x23EE;</button>
-                <button id="playPause" type="button" aria-label="Pause">&#x23F8;</button>
-                <button id="next" type="button" class="hidden" aria-label="Next station">&#x23ED;</button>
-            </nav>
         </section>
+        <nav id="controls" aria-label="Playback">
+            <button id="previous" type="button" class="hidden" aria-label="Previous station">&#x23EE;</button>
+            <button id="playPause" type="button" aria-label="Pause">&#x23F8;</button>
+            <button id="next" type="button" class="hidden" aria-label="Next station">&#x23ED;</button>
+        </nav>
         <div id="captions" class="empty" aria-live="polite"><span id="captionText"></span></div>
     </main>
     <script>
