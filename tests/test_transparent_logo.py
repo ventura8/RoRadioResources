@@ -32,7 +32,8 @@ transparent_logo = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(transparent_logo)
 
 LOGOS = ROOT / "RadioLogos"
-RECEIVER = (ROOT / "receiver" / "receiver.js").read_text(encoding="utf-8")
+# The receiver's logo measure (receiver/logo-tone.js), whose constants must be this test's.
+RECEIVER = (ROOT / "receiver" / "logo-tone.js").read_text(encoding="utf-8")
 
 
 def square(colour: tuple, size: int = 40, mark: tuple | None = None) -> Image.Image:

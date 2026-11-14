@@ -63,10 +63,10 @@ try {
     # The Python tests, and the updater's Python (scripts/lib: the logo check) measured at 100%.
     & $Python -m pytest tests --cov=scripts/lib --cov-report=term-missing --cov-fail-under=100 -q
     $pythonFailed = $LASTEXITCODE -ne 0
-    # The Cast receiver (receiver/receiver.js): unit tests and the real framework in Chrome. Below 100 % line, branch
-    # or function coverage of the script, Node's runner fails the run.
+    # The Cast receiver (receiver/*.js): unit tests and the real framework in Chrome. Below 100 % line, branch or
+    # function coverage of its scripts, Node's runner fails the run.
     $coverage = @(
-        '--experimental-test-coverage', '--test-coverage-include=receiver/receiver.js',
+        '--experimental-test-coverage', '--test-coverage-include=receiver/*.js',
         '--test-coverage-lines=100', '--test-coverage-branches=100', '--test-coverage-functions=100'
     )
     & node --test @coverage (Get-ChildItem tests -Filter '*.test.js' | ForEach-Object FullName)

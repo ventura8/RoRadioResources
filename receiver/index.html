@@ -179,7 +179,17 @@
             font-weight: 700;
             line-height: 1.1;
             letter-spacing: -0.01em;
+        }
+
+        /*
+         * The title, the artist and the album take up to two lines each. receiver.js shrinks a text that needs more
+         * in steps, down to 24 px at 1080p, before the second line ends in an ellipsis.
+         */
+        #title,
+        #artist,
+        #release {
             white-space: normal;
+            overflow-wrap: anywhere;
             display: -webkit-box;
             -webkit-box-orient: vertical;
             -webkit-line-clamp: 2;
@@ -434,7 +444,8 @@
         </section>
         <div id="captions" class="empty" aria-live="polite"><span id="captionText"></span></div>
     </main>
-    <!-- The page's script (receiver.js): after the elements it draws in, as the framework above. -->
+    <!-- The page's scripts: after the elements they draw in, as the framework above; the logo measure first. -->
+    <script src="logo-tone.js"></script>
     <script src="receiver.js"></script>
 </body>
 </html>

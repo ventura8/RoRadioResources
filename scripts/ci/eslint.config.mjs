@@ -6,7 +6,7 @@ import globals from 'globals';
 
 export default [
     {
-        files: ['receiver/receiver.js'],
+        files: ['receiver/*.js'],
         ...js.configs.all,
         languageOptions: {
             ecmaVersion: 2022,

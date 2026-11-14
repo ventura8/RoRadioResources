@@ -11,6 +11,13 @@ Merge this before RoRadio 2.4.5 ships.
   previous, next or a second previous after another press gave nothing.
 - **Fix.** A request id now marks a resend for 5 s only, and an id of 0 (or none) never does. Two presses within
   600 ms are still one press, so a resent or doubled jump steps once.
+- **Two lines for the title, the artist and the album** (owner). Each takes up to two lines. A text that needs
+  more shrinks in steps, down to 24 px at 1080p, before its second line ends in an ellipsis. When the three
+  together pass the station's line at the bottom of the song's column, all three shrink a step more. They are
+  fitted again once the logo has loaded and when the screen's size changes. A short text stays on one line at
+  full size. The fixed layout stays: nothing moves between states, and nothing goes under the system bar.
+- The logo darkness measure moved to its own file, `receiver/logo-tone.js`, loaded before `receiver.js`.
+  Coverage of both is gated at 100 %.
 - Each step's media status names the request it came by (`via`). In test mode (`"rects": true`) a press the page
   took for a repeat is reported too (`skipped`). Apps read only `step` and `stepId`.
 

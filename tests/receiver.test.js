@@ -11,8 +11,13 @@ const path = require('node:path');
 const test = require('node:test');
 
 const script = path.join(__dirname, '..', 'receiver', 'receiver.js');
+const logoTone = path.join(__dirname, '..', 'receiver', 'logo-tone.js');
 const html = fs.readFileSync(path.join(__dirname, '..', 'receiver', 'index.html'), 'utf8');
 assert.ok(html.includes('<script src="receiver.js"></script>'), 'receiver/index.html loads receiver.js');
+assert.ok(
+    html.indexOf('<script src="logo-tone.js"></script>') < html.indexOf('<script src="receiver.js"></script>'),
+    'receiver/index.html loads logo-tone.js before receiver.js',
+);
 assert.ok(!/<script>/.test(html), 'receiver/index.html has no inline script');
 const source = fs.readFileSync(script, 'utf8');
 
@@ -77,6 +82,14 @@ function element() {
             this.attributes[name] = value;
         },
         style: {},
+        // Text fitting: a text `textHeight` line widths long at 40 px wraps to fewer lines as it shrinks; a line is
+        // 1.25 times its font size.
+        textHeight: 0,
+        clientHeight: 0,
+        get scrollHeight() {
+            const size = parseFloat(this.style.fontSize || '40px');
+            return Math.ceil((this.textHeight * size) / 40) * size * 1.25;
+        },
         classList: {
             toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)),
             add: (name) => classes.add(name),
@@ -109,6 +122,9 @@ function run(
         capabilities,
         playingMedia,
         logoPixels = [255, 255, 255, 255],
+        textHeights = {},
+        roundFont = 0,
+        boxes = {},
     } = {},
 ) {
     const elements = {};
@@ -212,9 +228,14 @@ function run(
             devicePixelRatio: 2,
             innerWidth: 1280,
             innerHeight: 800,
+            addEventListener: (type, handler) => (did.windowEvents[type] = handler),
             ...(coarse === undefined ? {} : { matchMedia: (query) => ({ matches: coarse && query === '(pointer: coarse)' }) }),
         },
-        getComputedStyle: () => ({ color: 'rgb(255, 255, 255)' }),
+        // `roundFont`: a browser's rounding, a hair above the size it was given.
+        getComputedStyle: (e) => {
+            const fontSize = e.style.fontSize ? `${parseFloat(e.style.fontSize) + roundFont}px` : '40px';
+            return { color: 'rgb(255, 255, 255)', fontSize, lineHeight: `${parseFloat(fontSize) * 1.25}px` };
+        },
         document: {
             getElementById: (id) => (elements[id] ??= element()),
             body: element(),
@@ -241,7 +262,19 @@ function run(
     did.clock = 1000;
     Object.assign(globalThis, sandbox);
     Date.now = () => did.clock;
+    did.windowEvents = {};
+    for (const [id, height] of Object.entries(textHeights)) {
+        sandbox.document.getElementById(id).textHeight = height;
+    }
+
+    for (const [id, drawn] of Object.entries(boxes)) {
+        sandbox.document.getElementById(id).box = drawn;
+    }
+
     try {
+        // The page's two scripts, in its order: the logo measure, then the receiver.
+        delete require.cache[logoTone];
+        require(logoTone);
         delete require.cache[script];
         require(script);
         play(messages, interceptors, did);
@@ -412,6 +445,10 @@ test('test mode reports a press taken for a repeat, and why; other apps never se
     assert.deepEqual(did.statuses.at(-1).customData.skipped, 'next');
     assert.equal(did.statuses.at(-1).customData.via, 'tablet/9');
 
+    // A resend after the device set its clock back is no resend: it steps.
+    const setBack = run([load(appData('', true, true)), resent, { ...resent, gap: -60000 }]);
+    assert.equal(setBack.broadcasts.length, 2);
+
     const plain = run([load(appData('', true, true)), resent, resent]);
     assert.ok(plain.statuses.every((s) => s.customData.skipped === undefined));
 });
@@ -569,6 +606,40 @@ test('a slow tone measure of an old logo never marks the new one', () => {
     }
 
     assert.equal(did.stationImage.classList.has('light'), false);
+});
+
+test('a text that fits two lines keeps its full size; a longer one shrinks in steps, never under 24 px at 1080p', () => {
+    // Lengths in line widths at 40 px. At 800 px high the readable minimum is 24 * 800 / 1080 = 17.8 px.
+    const did = run([load('', 'Song')], { textHeights: { title: 0.9, artist: 2.6, release: 30 } });
+    assert.equal(did.elements.title.style.fontSize, '');
+    // 2.6 lines at 40 px: 2.34 at 36 px, 2.1 at 32.4 px, 1.9 at 29.16 px: two lines.
+    assert.equal(parseFloat(did.elements.artist.style.fontSize).toFixed(2), '29.16');
+    // Far too long: down to the minimum, and no further (the styles then end its second line in an ellipsis).
+    assert.equal(parseFloat(did.elements.release.style.fontSize).toFixed(2), (24 * 800 / 1080).toFixed(2));
+
+    // The song's column too full for its three texts (a constant 50 px over its height): all shrink together, to
+    // the minimum at most.
+    const full = run([load('', 'Song')], { textHeights: { title: 1, artist: 1, release: 1, song: 1 } });
+    for (const id of ['title', 'artist', 'release']) {
+        assert.equal(parseFloat(full.elements[id].style.fontSize).toFixed(2), (24 * 800 / 1080).toFixed(2), id);
+    }
+
+    // The album line reaching into the station's line under it (tablet, a long song): all shrink too. With no
+    // station's line (none sent), only the column's own height counts.
+    const box = (top, bottom) => ({ left: 0, right: 10, width: 10, top, bottom, height: bottom - top });
+    const into = run([load(JSON.stringify({ station: 'Pro FM' }), 'Song')], { boxes: { release: box(300, 420), station: box(400, 500) } });
+    assert.equal(parseFloat(into.elements.release.style.fontSize).toFixed(2), (24 * 800 / 1080).toFixed(2));
+    const noStation = run([load('', 'Song')], { boxes: { release: box(300, 420), station: box(400, 500) } });
+    assert.equal(noStation.elements.release.style.fontSize, '');
+
+    // A size the browser rounded a little above the minimum is the minimum: no endless shrinking to the same size.
+    const rounded = run([load('', 'Song')], { textHeights: { release: 30 }, roundFont: 0.0001 });
+    assert.ok(parseFloat(rounded.elements.release.style.fontSize) < 24 * 800 / 1080 + 0.5);
+
+    // The screen changes size: fitted again from the full size.
+    did.elements.artist.textHeight = 1.5;
+    did.within(() => did.windowEvents.resize());
+    assert.equal(did.elements.artist.style.fontSize, '');
 });
 
 test('no song (the station alone): its name once, never repeated as the title or the artist', () => {

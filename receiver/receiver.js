@@ -64,77 +64,8 @@ function showImage(image, url, onShown) {
     probe.src = url;
 }
 
-/** The contrast a logo's pixel needs on the receiver's background to be seen (as in transparent_logo.py). */
-const VISIBLE_CONTRAST = 2;
-/** A logo with more than this share of its opaque pixels too dark to see gets the light treatment. */
-const DARK_SHARE = 0.5;
-/** The size logos are measured at: the decision needs shapes, not detail. */
-const MEASURED = 64;
-/** A pixel at least this opaque is part of the logo's mark. */
-const OPAQUE = 128;
-/** One RGBA pixel's bytes. */
-const RGBA = 4;
-
-/** WCAG 2.x relative luminance, and the receiver's background (#08090c) by it. */
-const WCAG = {
-    background: 0.0029,
-    blue: 0.0722,
-    channel: 255,
-    flare: 0.05,
-    gamma: 2.4,
-    green: 0.7152,
-    knee: 0.03928,
-    offset: 0.055,
-    red: 0.2126,
-    scale: 1.055,
-    slope: 12.92,
-};
-
-/** The linear light of one sRGB channel value, 0-255. */
-function linear(value) {
-    const channel = value / WCAG.channel;
-    return channel <= WCAG.knee ? channel / WCAG.slope : ((channel + WCAG.offset) / WCAG.scale) ** WCAG.gamma;
-}
-
-/** Whether one RGBA pixel is part of the mark and too dark to see on the receiver's background: [mark, dark]. */
-function darkPixel([red, green, blue, alpha]) {
-    if (alpha < OPAQUE) {
-        return [0, 0];
-    }
-
-    const luminance = WCAG.red * linear(red) + WCAG.green * linear(green) + WCAG.blue * linear(blue);
-    return [1, (luminance + WCAG.flare) / (WCAG.background + WCAG.flare) < VISIBLE_CONTRAST ? 1 : 0];
-}
-
-/** The share of a picture's mark that is too dark, from its RGBA bytes; 0 when nothing is opaque. */
-function darkShare(data) {
-    let mark = 0;
-    let dark = 0;
-    for (let index = 0; index < data.length; index += RGBA) {
-        const [isMark, isDarkPixel] = darkPixel(data.slice(index, index + RGBA));
-        mark += isMark;
-        dark += isDarkPixel;
-    }
-
-    return mark > 0 ? dark / mark : 0;
-}
-
-/**
- * Whether a loaded logo is mostly too dark to see on the receiver's dark background (dark lettering on
- * transparency). A picture from a host without CORS cannot be read: it is taken as readable.
- */
-function isDark(picture) {
-    const canvas = document.createElement('canvas');
-    canvas.width = MEASURED;
-    canvas.height = MEASURED;
-    const context2d = canvas.getContext('2d');
-    try {
-        context2d.drawImage(picture, 0, 0, MEASURED, MEASURED);
-        return darkShare(context2d.getImageData(0, 0, MEASURED, MEASURED).data) > DARK_SHARE;
-    } catch {
-        return false;
-    }
-}
+/** Whether a logo is too dark for the screen (receiver/logo-tone.js, loaded before this script). */
+const { isDark } = window.logoTone;
 
 /**
  * The light treatment for a dark logo (class "light", a white glow in the page's styles; never a plate behind it),
@@ -233,31 +164,27 @@ function pressKey(request) {
     return request && request.requestId ? `${request.senderId}/${request.requestId}` : '';
 }
 
-/** Whether `key` was stepped on less than RETRY_MS before `now` (a resend of that press). */
-function isResend(key, now) {
-    const at = seenRequests.get(key);
-    return at !== undefined && now >= at && now - at < RETRY_MS;
+/**
+ * Whether a press with `key` at `now` repeats one already stepped on: the same request within RETRY_MS, or any press
+ * within STEP_GAP_MS. A clock set back (the device synced its time) is no repeat.
+ */
+function isRepeat(key, now) {
+    const within = (at, span) => now >= at && now - at < span;
+    const resent = Boolean(key) && seenRequests.has(key) && within(seenRequests.get(key), RETRY_MS);
+    return resent || within(lastStepAt, STEP_GAP_MS);
 }
 
 /** A previous / next press, for the app: a media status whose customData names it, numbered upwards. */
 function step(name, request) {
     const key = pressKey(request);
     const now = Date.now();
-    // A clock set back (the device synced its time) is no repeat: only a press just after the last one is.
-    const repeat = now >= lastStepAt && now - lastStepAt < STEP_GAP_MS;
-    if ((key && isResend(key, now)) || repeat) {
+    if (isRepeat(key, now)) {
         // Test mode: a press taken for a repeat is reported too, so the device test sees what was dropped and why.
-        if (withRects) {
-            report({ skipped: name, via: key });
-        }
-
+        report(withRects ? { skipped: name, via: key } : {});
         return;
     }
 
-    if (key) {
-        seenRequests.set(key, now);
-    }
-
+    seenRequests.set(key, now);
     lastStepAt = now;
     lastStepId = Math.max(now, lastStepId + 1);
     // "via" names the request that made the step, for the on-device test (older apps read only step and stepId).
@@ -330,6 +257,61 @@ function showBackdrop(url) {
     report();
 }
 
+/** A text shrinks by this much a step, down to 24 px at 1080p (10-foot UI), before its second line is cut. */
+const FIT_STEP = 0.9;
+const READABLE_AT_1080P = 24;
+const FULL_HD_HEIGHT = 1080;
+const FITTED = ['title', 'artist', 'release'];
+const TOO_TALL = 2.5;
+const HALF_PIXEL = 0.5;
+
+/**
+ * Up to two lines for a text (the styles clamp it at two): it keeps its full size while it fits, and shrinks in
+ * steps to the readable minimum while it needs more; only then does its second line end in an ellipsis.
+ */
+function fitText(element, minimum) {
+    element.style.fontSize = '';
+    // More than two lines: its full height passes two and a half lines (a line's glyphs may overhang it a little).
+    const tooTall = () => element.scrollHeight > TOO_TALL * parseFloat(getComputedStyle(element).lineHeight);
+    while (tooTall() && shrink(element, minimum)) {
+        // Shrunk one step; measured again.
+    }
+}
+
+/** One step smaller, never under `minimum`; whether it could shrink at all. */
+function shrink(element, minimum) {
+    const size = parseFloat(getComputedStyle(element).fontSize);
+    // Within half a pixel of it is the minimum: the browser rounds a size it was given (35.5556 for 35.55555), and
+    // an exact test shrank to the same size forever (tablet, 2026-11-14).
+    if (size <= minimum + HALF_PIXEL) {
+        return false;
+    }
+
+    element.style.fontSize = `${Math.max(size * FIT_STEP, minimum)}px`;
+    return true;
+}
+
+/**
+ * The song's texts fitted to their two lines, then together to the song's column: while the column's texts pass the
+ * station's line at its bottom, all three shrink a step (again when the screen's size changes).
+ */
+function fitSong() {
+    const minimum = (READABLE_AT_1080P * window.innerHeight) / FULL_HD_HEIGHT;
+    const texts = FITTED.map(byId);
+    texts.forEach((element) => fitText(element, minimum));
+    while (crowded(texts) && texts.map((element) => shrink(element, minimum)).includes(true)) {
+        // All three shrunk a step; measured again.
+    }
+}
+
+/** Whether the song's texts need more than their column: past its bottom, or into the station's line under them. */
+function crowded(texts) {
+    const song = byId('song');
+    const station = byId('station');
+    const line = station.classList.contains('empty') ? Infinity : station.getBoundingClientRect().top;
+    return song.scrollHeight > song.clientHeight + 1 || texts.some((element) => element.getBoundingClientRect().bottom > line + 1);
+}
+
 /** The song's text, the station's name and the caption. */
 function showText(metadata, data) {
     // The station's name once (owner, 2026-11-14): with no song the app sends it as title and artist too, and "Pro FM"
@@ -377,7 +359,11 @@ function showPictures(metadata, data) {
 function showLogo(logo, station, coverLogo) {
     const image = byId('station').querySelector('img');
     byId('station').classList.toggle('empty', !logo && !station);
-    showImage(image, logo, () => report());
+    // The logo's line takes its full height once the logo has loaded: the song's texts are fitted again above it.
+    showImage(image, logo, () => {
+        fitSong();
+        report();
+    });
     markTone(image, logo);
     markTone(byId('cover'), coverLogo);
 }
@@ -390,6 +376,7 @@ function show(media) {
     showText(metadata, data);
     showSteps(data.previous, data.next);
     showPictures(metadata, data);
+    fitSong();
     document.body.classList.remove('failed');
     document.body.classList.add('playing');
     report();
@@ -474,6 +461,8 @@ function isTouch() {
 const markTouch = () => document.body.classList.toggle('touch', isTouch());
 context.addEventListener(cast.framework.system.EventType.READY, markTouch);
 markTouch();
+// The touch layout and the screen's size change the room a text has: fitted again.
+window.addEventListener('resize', fitSong);
 
 // The page's own media element: with Google's cast-media-player a touch display drew its default audio UI (the
 // station's name twice, no logo) over this page (Pixel Tablet, 2026-11-14).
