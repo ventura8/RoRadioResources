@@ -64,6 +64,11 @@ function run(messages) {
             did.mediaInformation.push({ customData: media.customData, title: media.metadata.title, broadcast });
         },
         setMessageInterceptor: (type, handler) => {
+            // As the real framework (2026-11-14): these are message types, but no interceptor may take them.
+            if (type === 'QUEUE_NEXT' || type === 'QUEUE_PREV') {
+                throw new Error(`Unknown message type - ${type}`);
+            }
+
             interceptors[type] = handler;
         },
         addEventListener: () => undefined,
@@ -72,7 +77,7 @@ function run(messages) {
     const sandbox = {
         cast: {
             framework: {
-                CastReceiverContext: { getInstance: () => ({ getPlayerManager: () => player, start: () => undefined }) },
+                CastReceiverContext: { getInstance: () => ({ getPlayerManager: () => player, start: () => (did.started = true) }) },
                 CastReceiverOptions: function CastReceiverOptions() {},
                 messages: { Command, MessageType: Object.fromEntries(types.map((type) => [type, type])) },
                 events: { EventType: { MEDIA_FINISHED: 'MEDIA_FINISHED' } },
@@ -158,8 +163,13 @@ test('a later item without steps removes the buttons the earlier one declared', 
     );
 });
 
-test("the device's QUEUE_NEXT / QUEUE_PREV broadcast steps with rising ids, and play nothing", () => {
-    const did = run([load(appData('', true, true)), { type: 'QUEUE_NEXT' }, { type: 'QUEUE_PREV' }, { type: 'QUEUE_NEXT' }]);
+test('the page starts the receiver, or the launch is never answered and the app falls back', () => {
+    assert.equal(run([]).started, true);
+});
+
+test('repeated jumps broadcast steps with rising ids, and play nothing', () => {
+    const jump = (by) => ({ type: 'QUEUE_UPDATE', request: { jump: by } });
+    const did = run([load(appData('', true, true)), jump(1), jump(-1), jump(1)]);
     assert.deepEqual(did.results, ['request', null, null, null]);
     assert.deepEqual(
         did.broadcasts.map((entry) => entry.customData.step),

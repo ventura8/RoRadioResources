@@ -503,15 +503,13 @@
             return request;
         });
 
-        /** The device's own previous / next (a smart display's touch controls, Google TV's remote, the Assistant). */
-        for (const [type, name] of [['QUEUE_NEXT', 'next'], ['QUEUE_PREV', 'previous']]) {
-            if (cast.framework.messages.MessageType[type]) {
-                player.setMessageInterceptor(cast.framework.messages.MessageType[type], () => {
-                    step(name);
-                    return null;
-                });
-            }
-        }
+        /*
+         * The device's own previous / next (a smart display's touch controls, Google TV's remote, the Assistant) reach
+         * the page as a QUEUE_UPDATE jump, above. No interceptor for QUEUE_NEXT / QUEUE_PREV: the framework names them in
+         * MessageType but throws "Unknown message type" for an interceptor, which stopped this script before
+         * context.start(), so the page never answered the launch and the app fell back to the Default Media Receiver
+         * after 30 s (Pixel Tablet, 2026-11-14).
+         */
 
         player.addEventListener(cast.framework.events.EventType.MEDIA_FINISHED, () => document.body.classList.remove('playing'));
 

@@ -5,6 +5,14 @@ The receiver page (`receiver/index.html`) names the station and shows its logo b
 
 ## What changed
 
+- **The page starts again (the cause of "Default Media Receiver" on the Pixel Tablet).** Since the previous / next
+  change (#33), the page set an interceptor for `QUEUE_NEXT` / `QUEUE_PREV`. The framework names those types but throws
+  "Unknown message type - QUEUE_NEXT" for an interceptor. The script stopped before `context.start()`, so the page never
+  answered the app's launch. After 30 s the app gave up and launched Google's Default Media Receiver, whose own screen
+  says "Default Media Receiver" top left. The tablet's log showed it: F38F9694 loaded at 17:38:14, never connected, and
+  was replaced by CC1AD845 at 17:38:44. The device's previous / next still arrive as a `QUEUE_UPDATE` jump, which the
+  page already handles.
+
 - **The station's name beside its logo.** The item's `customData` may carry `"station"`, the station's name. The page
   shows it next to the logo. When the app sends no name, the page shows nothing there, never a placeholder.
 - **The logo with the cover.** The `customData` may carry `"logo"`, the station logo's url. The page shows it beside the
