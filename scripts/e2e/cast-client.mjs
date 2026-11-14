@@ -209,12 +209,20 @@ async function main() {
             // heard is counted (one press must be one step), and the last "shown" says what the screen shows.
             app();
             const steps = [];
+            const vias = [];
+            const skipped = [];
             let shown = null;
             cast.listeners.push((message) => {
                 const status = message.payload && message.payload.status && message.payload.status[0];
                 const data = status && status.customData;
                 if (data && data.step) {
                     steps.push(data.step);
+                    vias.push(data.via);
+                }
+
+                // Test mode: a press the page took for a repeat, and the request it came by.
+                if (data && data.skipped) {
+                    skipped.push(`${data.skipped} (${data.via})`);
                 }
 
                 if (data && data.shown) {
@@ -224,7 +232,7 @@ async function main() {
             const { execFileSync } = await import('node:child_process');
             execFileSync('adb', ['-s', input.device, 'shell', 'input', 'tap', String(input.x), String(input.y)]);
             await new Promise((resolve) => setTimeout(resolve, 4000));
-            answer = { steps, shown };
+            answer = { steps, vias, skipped, shown };
             break;
         }
         case 'status': {

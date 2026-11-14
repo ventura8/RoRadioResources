@@ -214,30 +214,54 @@ function showSteps(previous, next) {
 /*
  * One press is one step. A device's controller sends again a jump it got no answer to, with the same request id, and a
  * press could fire twice within a moment: one tap on the Pixel Tablet's next went seven stations on (2026-11-14). A
- * request id seen before is the same press, and a step within STEP_GAP_MS of the last one is the same press too.
+ * request id seen within RETRY_MS is the same press, and a step within STEP_GAP_MS of the last one is the same press
+ * too. A request id counts for a few seconds only, and 0 (or none) not at all: the tablet's own media bar sends every
+ * press with the same request id, and a remembered id took every later previous / next for the first one's repeat
+ * (one previous worked, then nothing, 2026-11-14).
  */
 const STEP_GAP_MS = 600;
-const seenRequests = new Set();
+const RETRY_MS = 5000;
+
+/** Test mode, asked for by a test sender only ({"rects": true} in its customData). */
+let withRects = false;
+const seenRequests = new Map();
 let lastStepAt = -Infinity;
 let lastStepId = 0;
 
+/** The press a request is: its sender and request id, or '' when it carries no id to tell a resend by. */
+function pressKey(request) {
+    return request && request.requestId ? `${request.senderId}/${request.requestId}` : '';
+}
+
+/** Whether `key` was stepped on less than RETRY_MS before `now` (a resend of that press). */
+function isResend(key, now) {
+    const at = seenRequests.get(key);
+    return at !== undefined && now >= at && now - at < RETRY_MS;
+}
+
 /** A previous / next press, for the app: a media status whose customData names it, numbered upwards. */
 function step(name, request) {
-    const key = request && 'requestId' in request ? `${request.senderId}/${request.requestId}` : '';
+    const key = pressKey(request);
     const now = Date.now();
     // A clock set back (the device synced its time) is no repeat: only a press just after the last one is.
     const repeat = now >= lastStepAt && now - lastStepAt < STEP_GAP_MS;
-    if (seenRequests.has(key) || repeat) {
+    if ((key && isResend(key, now)) || repeat) {
+        // Test mode: a press taken for a repeat is reported too, so the device test sees what was dropped and why.
+        if (withRects) {
+            report({ skipped: name, via: key });
+        }
+
         return;
     }
 
     if (key) {
-        seenRequests.add(key);
+        seenRequests.set(key, now);
     }
 
     lastStepAt = now;
     lastStepId = Math.max(now, lastStepId + 1);
-    report({ step: name, stepId: lastStepId });
+    // "via" names the request that made the step, for the on-device test (older apps read only step and stepId).
+    report({ step: name, stepId: lastStepId, via: key });
 }
 
 /** The idle screen's status line: ready, or why the last station stopped. */
@@ -248,9 +272,6 @@ function showStatus(failed) {
         ? 'The station stopped: its stream could not be played. Pick it again, or another one, in RoRadio.'
         : 'Ready to play';
 }
-
-/** Asked for by a test sender only ({"rects": true} in its customData). */
-let withRects = false;
 
 /**
  * What the screen shows, for the senders: {"title", "artist", "station", "caption", "logo", "cover", "steps",

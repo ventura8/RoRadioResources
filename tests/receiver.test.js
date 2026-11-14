@@ -389,6 +389,33 @@ test('one press is one step: a jump resent with its request id, or repeated at o
     );
 });
 
+test('the tablet bar sends every press with one request id: later presses still step (one previous worked, then nothing)', () => {
+    const bar = (jump, gap) => ({ type: 'QUEUE_UPDATE', request: { jump, requestId: 1, senderId: 'local' }, gap });
+    const did = run([load(appData('', true, true)), bar(1), bar(-1, 7000), bar(1, 7000), bar(-1, 6000)]);
+    assert.deepEqual(
+        did.broadcasts.map((entry) => entry.customData.step),
+        ['next', 'previous', 'next', 'previous'],
+    );
+    assert.equal(did.broadcasts[0].customData.via, 'local/1');
+
+    // Request id 0 (or none) tells no resend: only the moment between presses does.
+    const zero = (gap) => ({ type: 'QUEUE_UPDATE', request: { jump: -1, requestId: 0, senderId: 'local' }, gap });
+    const zeros = run([load(appData('', true, true)), zero(), zero(1000), zero(1000)]);
+    assert.equal(zeros.broadcasts.length, 3);
+    assert.equal(zeros.broadcasts[0].customData.via, '');
+});
+
+test('test mode reports a press taken for a repeat, and why; other apps never see it', () => {
+    const data = JSON.stringify({ rects: true, previous: true, next: true });
+    const resent = { type: 'QUEUE_UPDATE', request: { jump: 1, requestId: 9, senderId: 'tablet' } };
+    const did = run([load(data), resent, resent]);
+    assert.deepEqual(did.statuses.at(-1).customData.skipped, 'next');
+    assert.equal(did.statuses.at(-1).customData.via, 'tablet/9');
+
+    const plain = run([load(appData('', true, true)), resent, resent]);
+    assert.ok(plain.statuses.every((s) => s.customData.skipped === undefined));
+});
+
 test('every status tells the senders what the screen shows: song, station, caption, pictures, steps', () => {
     const data = JSON.stringify({ caption: 'Words', previous: true, next: false, station: 'Pro FM' });
     const did = run([

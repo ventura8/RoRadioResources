@@ -696,6 +696,17 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
         assert.deepEqual((await evaluate('window.probe')).statusRequestIds, [0]);
     });
 
+    await t.test('the system bar\'s presses all carry one request id: next, then previous 6 s later, both step', async () => {
+        await pause(700);
+        const before = (await evaluate('window.probe.broadcasts')).length;
+        await evaluate(intercept('QUEUE_UPDATE', { jump: 1, requestId: 1, senderId: 'local' }));
+        await pause(6000);
+        await evaluate(intercept('QUEUE_UPDATE', { jump: -1, requestId: 1, senderId: 'local' }));
+        const steps = (await evaluate('window.probe.broadcasts')).slice(before);
+        assert.deepEqual(steps.map((s) => s.step), ['next', 'previous']);
+        assert.deepEqual(steps.map((s) => s.via), ['local/1', 'local/1']);
+    });
+
     await t.test('a double press on the system bar (two jumps at once, new ids) is one step', async () => {
         await pause(700);
         const before = (await evaluate('window.probe.broadcasts')).length;
