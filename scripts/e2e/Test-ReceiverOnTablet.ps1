@@ -1,6 +1,7 @@
 ﻿<#
 .SYNOPSIS
-    End-to-end check of the RoRadio Cast receiver (F38F9694) on a real touch display: a Pixel Tablet over adb.
+    End-to-end check of the RoRadio Cast receiver (F38F9694) on a real Cast device over adb: a touch display (the
+    Pixel Tablet) or a TV (the Google TV Streamer).
 
 .DESCRIPTION
     Plays the receiver's user flows on the device and saves an adb screenshot after each, then checks the device's own
@@ -8,34 +9,46 @@
       1. launch     the RoRadio receiver starts (not the Default Media Receiver) and shows its splash with the icon
       2. load       a station with its logo, name and previous / next (the app's customData)
       3. song       a song update: title, artist, album, year, cover beside the station's logo
-      4. touch      the system media bar's next / previous / pause, tapped; exactly one step per press is read back
-                    from the media status, as the app reads it, with what the page says it shows ("shown")
-      5. pause/play the stream pauses and resumes
-      6. switch     another station: the old song, cover and caption are gone
-      7. stop       the receiver closes
-    After the run: `dumpsys media_session` names the receiver's session and the song, and logcat has no uncaught
-    error from the receiver page and no fallback to the Default Media Receiver (CC1AD845).
+      4. theme      the app's cover colour theme on, then off, read back from the page's "shown" status
+      5. layout     the page's reported boxes against the device's real screenshot: no overlap, readable contrast,
+                    and on a touch display nothing under its system media bar
+      6. steps      next, previous, next again and pause: exactly one step per press, read back from the media
+                    status as the app reads it. On a touch display they are taps on its system media bar; on a device
+                    without a touch screen (a TV, found in `dumpsys input`, or -NoTouch) they are the presses a remote
+                    or a sender makes, queue jumps and a PAUSE over Cast.
+      7. play       the stream plays again
+      8. switch     another station: the old song, cover and caption are gone
+      9. stop       the receiver closes
+    After the run: `dumpsys media_session` names the receiver's session, and logcat has no uncaught error from the
+    receiver page and no fallback to the Default Media Receiver (CC1AD845).
 
-    The cast plays at volume 10 / 100. Run it only when the tablet is yours to use (its lock file in local-ai is free):
+    The cast plays at volume 10 / 100. Run it only when the device is yours to use (its lock file in local-ai is free):
     it launches an app on the device and plays audio.
 
 .PARAMETER Device
-    The adb serial of the tablet.
+    The device's adb serial.
 
 .PARAMETER Address
-    The tablet's IP address for Cast; read from the device's wlan0 when omitted.
+    The device's IP address for Cast; read from its wlan0 when omitted.
 
 .PARAMETER OutDir
     Where the screenshots and logs go (default: logs/receiver-e2e/<time> under the repository).
 
+.PARAMETER NoTouch
+    Treat the device as one without a touch screen even if `dumpsys input` lists one.
+
 .EXAMPLE
     ./scripts/e2e/Test-ReceiverOnTablet.ps1 -Device adb-3406105H801UJL-TonHNR._adb-tls-connect._tcp
+
+.EXAMPLE
+    ./scripts/e2e/Test-ReceiverOnTablet.ps1 -Device adb-52141HFAG0JYZ9-3pyAfV._adb-tls-connect._tcp -Address 192.168.1.107
 #>
 [CmdletBinding()]
 param(
     [string]$Device = 'adb-3406105H801UJL-TonHNR._adb-tls-connect._tcp',
     [string]$Address,
-    [string]$OutDir
+    [string]$OutDir,
+    [switch]$NoTouch
 )
 
 $ErrorActionPreference = 'Stop'
@@ -80,9 +93,9 @@ function Test-Step([string]$Name, [scriptblock]$Check) {
     Save-Screen ($Name -replace '[^a-z0-9]+', '-')
 }
 
-# The device's system media bar: uiautomator sees only the receiver's web view (the bar is drawn inside it), so its
-# buttons are tapped where the Pixel Tablet draws them, as shares of the screen (2560 x 1600, 2026-11-14): previous,
-# pause, next on one row at 89 % of the height.
+# A touch display's system media bar: uiautomator sees only the receiver's web view (the bar is drawn inside it), so
+# its buttons are tapped where the Pixel Tablet draws them, as shares of the screen (2560 x 1600, 2026-11-14):
+# previous, pause, next on one row at 89 % of the height; the bar covers the bottom 28 %.
 $bar = @{ previous = 0.401; pause = 0.5; next = 0.599; row = 0.888; reserve = 0.28 }
 
 # The screen as it is turned now: `wm size` gives the natural (portrait) size, so it is read from a screenshot.
@@ -94,11 +107,19 @@ function Get-ScreenSize {
     try { @{ width = $image.Width; height = $image.Height } } finally { $image.Dispose(); Remove-Item $file }
 }
 
-# Taps a system bar button while a sender listens; returns the steps the page broadcast and what it says it shows.
-function Invoke-Tap([string]$Button) {
-    $screen = Get-ScreenSize
-    $tap = @{ device = $Device; x = [int]($screen.width * $bar[$Button]); y = [int]($screen.height * $bar.row) }
-    Invoke-Cast 'tap' $tap
+# A press while a sender listens; returns the steps the page broadcast and what it says it shows. On a touch display
+# a tap on its system bar; without a touch screen what a remote or a sender sends: a queue jump, or PAUSE.
+function Invoke-Press([string]$Button) {
+    if ($script:Touch) {
+        $screen = Get-ScreenSize
+        return Invoke-Cast 'tap' @{ device = $Device; x = [int]($screen.width * $bar[$Button]); y = [int]($screen.height * $bar.row) }
+    }
+
+    if ($Button -eq 'pause') {
+        return Invoke-Cast 'pause'
+    }
+
+    Invoke-Cast 'jump' @{ jump = $(if ($Button -eq 'next') { 1 } else { -1 }) }
 }
 
 # The WCAG relative luminance of a colour, and the contrast of two.
@@ -113,21 +134,27 @@ function Get-Contrast([double[]]$A, [double[]]$B) {
     ([math]::Max($la, $lb) + 0.05) / ([math]::Min($la, $lb) + 0.05)
 }
 
-# The page's own report (test mode, "rects") against the device's real screenshot: no two boxes overlap, none
-# reaches under the system bar, and every text's colour stands out from the pixels along its box's edges (WCAG AA
-# for large text, 3:1; all the page's text is large). Returns $true when all hold; the findings go to $failures.
+# The page's own report (test mode, "rects") against the device's real screenshot: no two boxes overlap, on a touch
+# display none reaches under its system bar, and every text's colour stands out from the median pixel of its box
+# (WCAG AA for large text, 3:1; all the page's text is large). Returns $true when all hold; findings go to $failures.
 function Test-Layout($Shown, [string]$Png) {
+    if (-not $Shown -or -not $Shown.viewport -or -not $Shown.rects) {
+        $failures.Add('the page reported no layout (its "shown" status has no rects)')
+        return $false
+    }
+
     Add-Type -AssemblyName System.Drawing
     $image = [Drawing.Bitmap]::new($Png)
     try {
-        # CSS px to the screenshot's pixels.
-        $s = $image.Height / $Shown.viewport[1]
+        # CSS px to the screenshot's pixels (a 1920 x 1080 TV draws a 960 x 540 viewport at scale 2).
+        $s = $image.Height / [double]$Shown.viewport[1]
         $boxes = @($Shown.rects.PSObject.Properties | ForEach-Object {
-                [pscustomobject]@{ id = $_.Name; box = @($_.Value.box | ForEach-Object { $_ * $s }); color = $_.Value.color }
+                [pscustomobject]@{ id = $_.Name; box = @($_.Value.box | ForEach-Object { [double]$_ * $s }); color = $_.Value.color }
             })
+        $floor = $image.Height * $(if ($script:Touch) { 1 - $bar.reserve } else { 1 })
         $ok = $true
         foreach ($b in $boxes) {
-            if ($b.box[3] -gt $image.Height * (1 - $bar.reserve)) { $failures.Add("$($b.id) reaches under the system bar"); $ok = $false }
+            if ($b.box[3] -gt $floor + 1) { $failures.Add("$($b.id) reaches under the system bar or off the screen"); $ok = $false }
         }
         for ($i = 0; $i -lt $boxes.Count; $i++) {
             for ($j = $i + 1; $j -lt $boxes.Count; $j++) {
@@ -150,6 +177,7 @@ function Test-Layout($Shown, [string]$Png) {
                     $samples.Add(@{ rgb = @([double]$p.R, [double]$p.G, [double]$p.B); l = Get-Luminance @($p.R, $p.G, $p.B) })
                 }
             }
+            if ($samples.Count -eq 0) { continue }
             $median = ($samples | Sort-Object { $_.l })[[int]($samples.Count / 2)]
             $worst = Get-Contrast $rgb $median.rgb
             if ($worst -lt 3) {
@@ -166,9 +194,12 @@ function Test-Layout($Shown, [string]$Png) {
 if (-not $Address) {
     $inet = Invoke-Adb @('shell', 'ip', '-f', 'inet', 'addr', 'show', 'wlan0')
     $Address = ([regex]::Match(($inet -join ' '), 'inet (\d+\.\d+\.\d+\.\d+)')).Groups[1].Value
-    if (-not $Address) { throw 'The tablet has no wlan0 address: pass -Address.' }
+    if (-not $Address) { throw 'The device has no wlan0 address: pass -Address.' }
 }
 $script:Address = $Address
+# A touch display lists a touchscreen input source; a TV has its remote, and its presses come over Cast instead.
+$script:Touch = -not $NoTouch -and ((Invoke-Adb @('shell', 'dumpsys', 'input')) -join "`n") -match 'TOUCHSCREEN'
+Write-Information "Device $Device at $Address, $(if ($script:Touch) { 'a touch display' } else { 'no touch screen' })" -InformationAction Continue
 Remove-Item (Join-Path ([IO.Path]::GetTempPath()) 'roradio-cast-e2e.json') -ErrorAction SilentlyContinue
 Invoke-Adb @('logcat', '-c') | Out-Null
 Invoke-Adb @('shell', 'input', 'keyevent', 'KEYCODE_WAKEUP') | Out-Null
@@ -205,20 +236,18 @@ Test-Step 'theme off' {
     $plain.images = @("$pages/90er-stream.png", "$pages/Profm.png")
     Invoke-Cast 'song' $plain | Out-Null
     Start-Sleep -Seconds 2
-    $null -eq (Invoke-Cast 'shown').theme
+    $script:layout = Invoke-Cast 'shown'
+    $null -eq $script:layout.theme -and $script:layout.cover -and $script:layout.logo -and $script:layout.title -eq 'Test song'
 }
-# One press is exactly one step, and the screen shows the song's cover with the station's logo beside it.
-Test-Step 'touch next' {
-    $heard = Invoke-Tap 'next'
-    $script:layout = $heard.shown
-    ($heard.steps -join ',') -eq 'next' -and $heard.shown.cover -and $heard.shown.logo -and $heard.shown.title -eq 'Test song'
-}
-Test-Step 'layout on the screenshot' { Test-Layout $script:layout (Join-Path $OutDir 'touch-next.png') }
-# The bar sends every press with one request id: previous after next, and next again, must each still step.
-Test-Step 'touch previous' { ((Invoke-Tap 'previous').steps -join ',') -eq 'previous' }
-Test-Step 'touch next again' { ((Invoke-Tap 'next').steps -join ',') -eq 'next' }
-Test-Step 'touch pause' {
-    Invoke-Tap 'pause' | Out-Null
+# The screen as the page reports it (read in 'theme off'), on that step's screenshot.
+Test-Step 'layout on the screenshot' { Test-Layout $script:layout (Join-Path $OutDir 'theme-off.png') }
+# One press is exactly one step. A touch display's bar sends every press with one request id: previous after next,
+# and next again, must each still step.
+Test-Step 'next' { ((Invoke-Press 'next').steps -join ',') -eq 'next' }
+Test-Step 'previous' { ((Invoke-Press 'previous').steps -join ',') -eq 'previous' }
+Test-Step 'next again' { ((Invoke-Press 'next').steps -join ',') -eq 'next' }
+Test-Step 'pause' {
+    Invoke-Press 'pause' | Out-Null
     (Invoke-Cast 'status').playerState -eq 'PAUSED'
 }
 Test-Step 'play' { (Invoke-Cast 'play').playerState -in @('PLAYING', 'BUFFERING') }
@@ -245,6 +274,6 @@ if ($sessions -notmatch 'mediashell|cast') { $failures.Add('no Cast media sessio
 
 Write-Information "Screenshots and logs: $OutDir" -InformationAction Continue
 if ($failures.Count -gt 0) {
-    Write-Error "Receiver E2E on the tablet failed: $($failures -join '; ')"
+    Write-Error "Receiver E2E on the device failed: $($failures -join '; ')"
 }
-Write-Information 'Receiver E2E on the tablet passed.' -InformationAction Continue
+Write-Information 'Receiver E2E on the device passed.' -InformationAction Continue
