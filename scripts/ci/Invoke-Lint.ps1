@@ -75,8 +75,8 @@ try {
     Invoke-Check 'ruff (format)' { & $Python -m ruff format --check . | Out-Host }
     Invoke-Check 'yamllint' { & $Python -m yamllint --strict . | Out-Host }
     Invoke-Check 'actionlint' { & actionlint | Out-Host }
-    # --min-severity low leaves out only zizmor's informational notes.
-    Invoke-Check 'zizmor (workflow security)' { & zizmor --persona regular --min-severity low .github/workflows | Out-Host }
+    # The strictest persona, informational notes included, over the workflows and dependabot.yml (its cooldown).
+    Invoke-Check 'zizmor (workflow security)' { & zizmor --persona pedantic .github | Out-Host }
     Invoke-Check 'markdownlint' { & (Get-NodeTool 'markdownlint-cli2') | Out-Host }
     Invoke-Check 'cspell' { & (Get-NodeTool 'cspell') --no-progress --config cspell.json '**' | Out-Host }
     Invoke-Check 'editorconfig-checker' { & (Get-Tool 'editorconfig-checker') | Out-Host }

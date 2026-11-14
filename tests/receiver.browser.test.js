@@ -12,6 +12,7 @@
 
 const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const http = require('node:http');
 const os = require('node:os');
@@ -38,6 +39,10 @@ function probe() {
     };
     window.probe = record;
     window.interceptors = {};
+    record.cspViolations = [];
+    document.addEventListener('securitypolicyviolation', (e) => {
+        record.cspViolations.push(`${e.effectiveDirective} ${e.blockedURI}`);
+    });
     const Context = cast.framework.CastReceiverContext;
     const getInstance = Context.getInstance.bind(Context);
     let wrapped = null;
@@ -109,7 +114,12 @@ function serve(withPage) {
     );
     const server = http.createServer((request, response) => {
         if (request.url === '/receiver/') {
-            const html = withPage.replace(sdkTag, `${sdkTag}\n<script>(${probe})();</script>`);
+            // The page's Content-Security-Policy stays in force; the injected probe is allowed by its own hash.
+            const probeScript = `(${probe})();`;
+            const probeHash = crypto.createHash('sha256').update(probeScript, 'utf8').digest('base64');
+            const html = withPage
+                .replace("script-src 'sha256-", `script-src 'sha256-${probeHash}' 'sha256-`)
+                .replace(sdkTag, `${sdkTag}\n<script>${probeScript}</script>`);
             response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
             response.end(html);
         } else if (request.url.startsWith('/img/')) {
@@ -439,6 +449,11 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
 
     await t.test('loads with no uncaught error and no console error from our script', () => {
         assert.deepEqual(session.errors, []);
+    });
+
+    await t.test('runs under its Content-Security-Policy with nothing blocked', async () => {
+        const record = await evaluate('window.probe');
+        assert.deepEqual(record.cspViolations, []);
     });
 
     await t.test('reaches context.start(), with the receiver kept for an hour of inactivity', async () => {

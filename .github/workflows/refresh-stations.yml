@@ -24,6 +24,7 @@ concurrency:
 
 jobs:
   refresh:
+    name: Refresh the station urls and logos
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
@@ -31,8 +32,9 @@ jobs:
       pull-requests: write  # open and merge the pull request
       pages: write          # request a Pages build after the merge
       actions: write        # re-enable this workflow so GitHub does not disable it after 60 quiet days
+    # The write token (GH_TOKEN) is given only to the two steps that push, merge and re-enable: the probing steps run
+    # the station scripts against untrusted broadcaster servers and need no token.
     env:
-      GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       BRANCH: automation/station-refresh
       # More fixes than this in one run means the runner's network, not the stations, is the problem
@@ -82,6 +84,7 @@ jobs:
       - name: Write the release note, open and merge the pull request
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           URLS: ${{ steps.urls.outputs.count }}
           LOGOS: ${{ steps.logos.outputs.count || '0' }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -133,4 +136,6 @@ jobs:
       - name: Keep the schedule alive
         if: always()
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: gh api -X PUT "repos/$GH_REPO/actions/workflows/refresh-stations.yml/enable" --silent

@@ -1,14 +1,21 @@
 version: 2
+# A week's cooldown: a freshly published (possibly compromised) release is proposed only after 7 days in public.
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
   - package-ecosystem: pip
     directory: /scripts/ci
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
   - package-ecosystem: npm
     directory: /scripts/ci
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
