@@ -177,7 +177,12 @@ function Test-Layout($Shown, [string]$Png) {
                     $samples.Add(@{ rgb = @([double]$p.R, [double]$p.G, [double]$p.B); l = Get-Luminance @($p.R, $p.G, $p.B) })
                 }
             }
-            if ($samples.Count -eq 0) { continue }
+            # A text box with no pixel on the screenshot is off the screen: a failure, never a skip (Greptile, #48).
+            if ($samples.Count -eq 0) {
+                $failures.Add("$($b.id) is off the screenshot")
+                $ok = $false
+                continue
+            }
             $median = ($samples | Sort-Object { $_.l })[[int]($samples.Count / 2)]
             $worst = Get-Contrast $rgb $median.rgb
             if ($worst -lt 3) {
