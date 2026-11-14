@@ -141,13 +141,17 @@ function Test-Layout($Shown, [string]$Png) {
         }
         foreach ($b in $boxes | Where-Object { $_.id -notin @('cover', 'station') }) {
             $rgb = @([regex]::Matches($b.color, '[\d.]+') | Select-Object -First 3 | ForEach-Object { [double]$_.Value })
-            $worst = [double]::MaxValue
-            for ($x = [int]$b.box[0]; $x -lt [int]$b.box[2]; $x += 4) {
-                foreach ($y in @([int]$b.box[1], ([int]$b.box[3] - 1))) {
-                    $p = $image.GetPixel([math]::Min($x, $image.Width - 1), [math]::Min([math]::Max($y, 0), $image.Height - 1))
-                    $worst = [math]::Min($worst, (Get-Contrast $rgb @($p.R, $p.G, $p.B)))
+            # The background under the text: the median pixel of its box (the glyphs are the minority of a text box;
+            # its edges, sampled first, ran through the glyphs and measured the text against itself).
+            $samples = [Collections.Generic.List[object]]::new()
+            for ($x = [int]$b.box[0]; $x -lt [math]::Min([int]$b.box[2], $image.Width); $x += 4) {
+                for ($y = [int]$b.box[1]; $y -lt [math]::Min([int]$b.box[3], $image.Height); $y += 4) {
+                    $p = $image.GetPixel($x, $y)
+                    $samples.Add(@{ rgb = @([double]$p.R, [double]$p.G, [double]$p.B); l = Get-Luminance @($p.R, $p.G, $p.B) })
                 }
             }
+            $median = ($samples | Sort-Object { $_.l })[[int]($samples.Count / 2)]
+            $worst = Get-Contrast $rgb $median.rgb
             if ($worst -lt 3) {
                 $failures.Add("$($b.id) contrast $([math]::Round($worst, 2)):1 under 3:1")
                 $ok = $false

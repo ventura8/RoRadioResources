@@ -221,6 +221,15 @@
             background: none;
         }
 
+        /*
+         * A dark logo (dark lettering on transparency, measured by receiver.js) on the dark screen: a white glow
+         * around its own shapes makes it readable, with no plate or tile behind it.
+         */
+        #station img.light,
+        #cover.light {
+            filter: drop-shadow(0 0 0.3vmin rgb(255 255 255 / 95%)) drop-shadow(0 0 1.2vmin rgb(255 255 255 / 70%));
+        }
+
         /* The station's name beside its logo: never a placeholder, nothing when the app sends none. */
         #stationName {
             min-width: 0;
