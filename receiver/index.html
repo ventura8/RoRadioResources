@@ -69,15 +69,20 @@
             display: none;
         }
 
+        /*
+         * The whole screen behind the song: its cover (the station's logo when it has none), very blurred, under a dark
+         * scrim that keeps the white text readable (WCAG AA, measured on the real pixels). A new song or station
+         * crossfades into the last one.
+         */
         #backdrop {
             position: fixed;
-            inset: -10%;
+            inset: -15%;
             background-position: center;
             background-size: cover;
-            filter: blur(60px) saturate(1.3);
-            transform: scale(1.1);
+            filter: blur(14vmin) saturate(1.4);
+            transform: scale(1.2);
             opacity: 0;
-            transition: opacity 600ms ease;
+            transition: opacity 800ms ease, background-image 800ms ease;
         }
 
         #backdrop.shown {
@@ -88,6 +93,18 @@
             position: fixed;
             inset: 0;
             background: linear-gradient(180deg, var(--scrim), rgb(8 10 14 / 88%));
+            transition: background-color 800ms ease;
+        }
+
+        /*
+         * The app's cover colour theme (opt-in in the app): the scrim takes the app's tint, the colour white text reads
+         * on (AppColorHelper.ReadableTint), and the accent colours the page's highlights. Off: the default look.
+         * Only where relative colours work: an older receiver engine keeps the default scrim, never none (CodeRabbit, #46).
+         */
+        @supports (color: rgb(from red r g b / 50%)) {
+            body.themed #scrim {
+                background: linear-gradient(180deg, rgb(from var(--theme-tint) r g b / 80%), rgb(from var(--theme-tint) r g b / 92%));
+            }
         }
 
         main {
@@ -446,6 +463,8 @@
     </main>
     <!-- The page's scripts: after the elements they draw in, as the framework above; the logo measure first. -->
     <script src="logo-tone.js"></script>
+    <script src="theme.js"></script>
+    <script src="layout-report.js"></script>
     <script src="receiver.js"></script>
 </body>
 </html>

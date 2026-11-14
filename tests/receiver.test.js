@@ -12,6 +12,8 @@ const test = require('node:test');
 
 const script = path.join(__dirname, '..', 'receiver', 'receiver.js');
 const logoTone = path.join(__dirname, '..', 'receiver', 'logo-tone.js');
+const themeScript = path.join(__dirname, '..', 'receiver', 'theme.js');
+const layoutScript = path.join(__dirname, '..', 'receiver', 'layout-report.js');
 const html = fs.readFileSync(path.join(__dirname, '..', 'receiver', 'index.html'), 'utf8');
 assert.ok(html.includes('<script src="receiver.js"></script>'), 'receiver/index.html loads receiver.js');
 assert.ok(
@@ -172,7 +174,7 @@ function run(
     };
     did.playerEvents = {};
     did.calls = [];
-    const types = ['LOAD', 'QUEUE_UPDATE', 'QUEUE_NEXT', 'QUEUE_PREV'];
+    const types = ['LOAD', 'QUEUE_UPDATE', 'QUEUE_NEXT', 'QUEUE_PREV', 'MEDIA_STATUS'];
     const context = {
         getPlayerManager: () => player,
         start: (options) => {
@@ -239,6 +241,18 @@ function run(
         document: {
             getElementById: (id) => (elements[id] ??= element()),
             body: element(),
+            // The root's CSS variables (the theme's colours).
+            documentElement: {
+                style: {
+                    vars: {},
+                    setProperty(name, value) {
+                        this.vars[name] = value;
+                    },
+                    removeProperty(name) {
+                        delete this.vars[name];
+                    },
+                },
+            },
             // A canvas that reads back `logoPixels` (RGBA), or throws as a picture without CORS does.
             createElement: () => ({
                 getContext: () => ({
@@ -272,9 +286,13 @@ function run(
     }
 
     try {
-        // The page's two scripts, in its order: the logo measure, then the receiver.
+        // The page's scripts, in its order: the logo measure, the theme, then the receiver.
         delete require.cache[logoTone];
         require(logoTone);
+        delete require.cache[themeScript];
+        require(themeScript);
+        delete require.cache[layoutScript];
+        require(layoutScript);
         delete require.cache[script];
         require(script);
         play(messages, interceptors, did);
@@ -288,6 +306,8 @@ function run(
     }
 
     did.body = sandbox.document.body;
+    did.root = sandbox.document.documentElement.style;
+    did.interceptors = interceptors;
     did.stationImage = stationImage;
     // Later work in the same page (more messages, a framework event, a picture that settles), with its globals.
     did.within = (work) => {
@@ -482,6 +502,7 @@ test('every status tells the senders what the screen shows: song, station, capti
         cover: true,
         steps: { previous: true, next: false },
         defaultTitle: false,
+        theme: null,
     });
     assert.ok(did.statuses.every((s) => s.requestId === 0 && s.includeMedia === false));
 });
@@ -720,11 +741,51 @@ test('a cover that loads is the backdrop; one that fails leaves no picture and n
     assert.equal(shown.elements.backdrop.style.backgroundImage, 'url("https://x/cover.jpg")');
     assert.equal(shown.elements.cover.classList.has('logo'), true);
 
-    const failed = run([loadWith(['https://x/cover.jpg', 'https://x/logo.png'], '')], { pictures: 'error' });
+    // A cover that fails, with no logo: no picture and no backdrop.
+    const failed = run([loadWith(['https://x/cover.jpg'], '')], { pictures: 'error' });
     assert.equal(failed.elements.cover.src, undefined);
-    assert.equal(failed.logo, undefined);
     assert.equal(failed.elements.backdrop.style.backgroundImage, '');
     assert.equal(failed.elements.backdrop.classList.has('shown'), false);
+
+    // A cover that fails, with the station's logo: the logo is the backdrop (CodeRabbit, #46).
+    const toLogo = run([loadWith(['https://x/cover.jpg', 'https://x/logo.png'], '')], { pictures: 'error' });
+    assert.equal(toLogo.elements.cover.src, undefined);
+    assert.equal(toLogo.elements.backdrop.style.backgroundImage, 'url("https://x/logo.png")');
+
+    // No picture in the cover's place: the station's logo is the backdrop.
+    const logoOnly = run([loadWith([], JSON.stringify({ logo: 'https://x/logo.png' }))]);
+    assert.equal(logoOnly.elements.backdrop.style.backgroundImage, 'url("https://x/logo.png")');
+});
+
+test('every outgoing media status, a GET_STATUS answer too, says what the screen shows; a step press keeps its data', () => {
+    const did = run([load(JSON.stringify({ station: 'Pro FM' }), 'Song')]);
+    const status = did.within(() => did.interceptors.MEDIA_STATUS({ playerState: 'PLAYING' }));
+    assert.equal(status.customData.shown.title, 'Song');
+    const press = { step: 'next', stepId: 5 };
+    assert.equal(did.within(() => did.interceptors.MEDIA_STATUS({ customData: press })).customData, press);
+});
+
+test("the app's cover colour theme: its colours on the page and in the status; off, the default look", () => {
+    const themed = JSON.stringify({ theme: { accent: '#F0E040', tint: '#5A5418' } });
+    const did = run([load(themed)]);
+    assert.equal(did.body.classList.has('themed'), true);
+    assert.deepEqual(did.root.vars, { '--theme-tint': '#5a5418', '--accent': '#f0e040' });
+    assert.deepEqual(did.shown.theme, { accent: '#f0e040', tint: '#5a5418' });
+
+    // Switched off in the app: the next song comes without a theme, and the page is back to its own look.
+    did.within((more) => more([update('', 'Next')]));
+    assert.equal(did.body.classList.has('themed'), false);
+    assert.deepEqual(did.root.vars, {});
+    assert.equal(did.shown.theme, null);
+
+    // Anything but two #rrggbb colours is no theme (never CSS from a sender).
+    for (const bad of [{ accent: 'red', tint: '#000000' }, { accent: '#000000' }, { accent: ['#f0e040'], tint: '#000000' }, 'dark', null, 5]) {
+        const plain = run([load(JSON.stringify({ theme: bad, station: 'Pro FM', next: true }), 'Song')]);
+        assert.equal(plain.body.classList.has('themed'), false, JSON.stringify(bad));
+        // A bad theme costs nothing else of the item: its station and steps stay (#46).
+        assert.equal(plain.stationName, 'Pro FM', JSON.stringify(bad));
+        assert.equal(plain.supported, BASE | QUEUE_NEXT, JSON.stringify(bad));
+    }
 });
 
 test('a slow old picture never replaces a newer one, loaded or failed', () => {

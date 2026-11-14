@@ -5,7 +5,8 @@
 // media status, PAUSE / PLAY, STOP.
 //
 //   node cast-client.mjs <address> <step> [json]
-//   steps: launch | load | song | pause | play | status | stop
+//   steps: launch | load | song | tap | pause | play | status | shown | stop
+//   "shown" needs no session of its own: it reads what the receiver shows in whichever session runs it (the app's).
 // Prints one JSON line: what the device answered. The session (transport id, media session id) is kept in
 // %TEMP%/roradio-cast-e2e.json between calls, so each step is its own call and the script screenshots in between.
 import fs from 'node:fs';
@@ -239,6 +240,21 @@ async function main() {
             const status = await cast.request(app(), NS.media, { type: 'GET_STATUS' });
             const media = status.status && status.status[0];
             answer = { playerState: media && media.playerState, customData: media && media.customData };
+            break;
+        }
+        case 'shown': {
+            // What the RoRadio receiver shows now, from any sender's session (the app's own cast too): the running
+            // app's transport from the device, then its media status, whose customData carries "shown".
+            const device = await cast.request('receiver-0', NS.receiver, { type: 'GET_STATUS' });
+            const running = (device.status.applications || []).find((a) => a.appId === APP_ID);
+            if (!running) {
+                throw new Error(`${APP_ID} is not running`);
+            }
+
+            cast.send(running.transportId, NS.connection, { type: 'CONNECT' });
+            const status = await cast.request(running.transportId, NS.media, { type: 'GET_STATUS' });
+            const media = status.status && status.status[0];
+            answer = (media && media.customData && media.customData.shown) || null;
             break;
         }
         case 'stop': {

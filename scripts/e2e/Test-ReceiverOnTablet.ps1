@@ -189,6 +189,24 @@ Test-Step 'song' {
     $song.images = @("$pages/90er-stream.png", "$pages/Profm.png")
     Invoke-Cast 'song' $song | Out-Null
 }
+# The app's cover colour theme on, then off: the receiver reports the colours it took, then none.
+Test-Step 'theme on' {
+    $themed = $station.Clone()
+    $themed.title = 'Test song'; $themed.artist = 'Test artist'; $themed.images = @("$pages/90er-stream.png", "$pages/Profm.png")
+    $themed.data = $station.data.Clone()
+    $themed.data.theme = @{ accent = '#f0e040'; tint = '#4d4813' }
+    Invoke-Cast 'song' $themed | Out-Null
+    Start-Sleep -Seconds 2
+    (Invoke-Cast 'shown').theme.tint -eq '#4d4813'
+}
+Test-Step 'theme off' {
+    $plain = $station.Clone()
+    $plain.title = 'Test song'; $plain.artist = 'Test artist'; $plain.album = 'Test album'; $plain.year = '2025'
+    $plain.images = @("$pages/90er-stream.png", "$pages/Profm.png")
+    Invoke-Cast 'song' $plain | Out-Null
+    Start-Sleep -Seconds 2
+    $null -eq (Invoke-Cast 'shown').theme
+}
 # One press is exactly one step, and the screen shows the song's cover with the station's logo beside it.
 Test-Step 'touch next' {
     $heard = Invoke-Tap 'next'
