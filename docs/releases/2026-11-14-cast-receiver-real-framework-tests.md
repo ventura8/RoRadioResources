@@ -9,8 +9,15 @@ the stubs only knew what we had told them.
 - **`tests/receiver.browser.test.js`.** It loads `receiver/index.html` in headless Chrome with the real framework
   (`cast_receiver_framework.js` from gstatic.com, as a device loads it). Node's own test runner, HTTP server and
   WebSocket drive Chrome over the DevTools protocol, so there is nothing to install. The page is served unchanged. One
-  probe script after the framework's tag records what the page asks of the real context and player, and passes every
-  call on to the framework.
+  probe script after the framework's tag records what the page asks of the real context and player. `start()`,
+  `setMessageInterceptor()`, `setSupportedMediaCommands()` and `addEventListener()` reach the real framework.
+- **Its limits.** Off a device there is no sender and no media session. So the probe replaces `broadcastStatus()`,
+  `getMediaInformation()` and `setMediaInformation()` with recorders. The behaviour tests call the LOAD, QUEUE_UPDATE
+  and `MEDIA_FINISHED` handlers the page registered directly, rather than through the framework's message dispatch.
+  What the framework rejects at registration (#33) is caught; how it delivers messages on a device is not.
+- **A failed start never hangs the run.** If Chrome cannot start, exits, or drops its DevTools connection, every
+  waiting request is rejected, every wait ends at its deadline, and the server and Chrome are closed. A test points
+  `CHROME_PATH` at a missing file and checks that the run fails at once with no handle left open.
 - **What it checks.** The page loads with no uncaught error and no console error from our script. It reaches
   `context.start()` and registers its LOAD and QUEUE_UPDATE interceptors on the real framework without an error. Then
   it checks the page's behaviour:
