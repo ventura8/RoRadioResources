@@ -18,6 +18,7 @@ const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
+const { problems, resize, contrast } = require('./receiver-layout');
 
 const SDK = 'https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js';
 const page = fs.readFileSync(path.join(__dirname, '..', 'receiver', 'index.html'), 'utf8');
@@ -142,6 +143,11 @@ function serve(withPage) {
             // The page's own files as GitHub Pages serves them: a missing one is a 404 here too.
             response.writeHead(200, { 'content-type': ownFiles[request.url] });
             response.end(fs.readFileSync(path.join(__dirname, '..', request.url)));
+        } else if (request.url.startsWith('/logos/')) {
+            // A real station logo (a bright, busy picture for the layout and contrast checks).
+            const name = path.basename(request.url);
+            response.writeHead(200, { 'content-type': 'image/png' });
+            response.end(fs.readFileSync(path.join(__dirname, '..', 'RadioLogos', name)));
         } else if (request.url.startsWith('/img/')) {
             response.writeHead(200, { 'content-type': 'image/png' });
             response.end(png);
@@ -387,7 +393,7 @@ async function open(withPage = page) {
         throw e;
     }
 
-    return { errors, evaluate, close, origin: `http://127.0.0.1:${server.address().port}` };
+    return { errors, evaluate, close, send: browser.send, origin: `http://127.0.0.1:${server.address().port}` };
 }
 
 /** What the page shows. */
@@ -414,6 +420,13 @@ const SCREEN = `(() => {
         backdrop: document.getElementById('backdrop').style.backgroundImage,
     };
 })()`;
+
+/** The background, padding and shadow behind an element: a logo has none, with a cover or without. */
+const PLATE = (selector) => `(() => {
+    const s = getComputedStyle(document.querySelector(${JSON.stringify(selector)}));
+    return { background: s.backgroundColor, image: s.backgroundImage, shadow: s.boxShadow, padding: s.padding };
+})()`;
+const NO_PLATE = { background: 'rgba(0, 0, 0, 0)', image: 'none', shadow: 'none', padding: '0px' };
 
 /** Runs the interceptor the page registered for `type` with `request`; returns whether it passed the request on. */
 const intercept = (type, request) =>
@@ -519,44 +532,24 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
         assert.equal(await evaluate('document.getElementById("media").tagName'), 'AUDIO');
     });
 
-    await t.test('on a touch display the buttons stay on screen, under the song, with a full song and a caption, and tap', async () => {
+    await t.test('on a touch display a full song, its cover and a caption all end above the system media bar', async () => {
         const long = 'A song title long enough to wrap over two lines on any screen the receiver meets';
         const data = JSON.stringify({ caption: `${long} ${long}`, previous: true, next: true, station: 'Pro FM' });
         const m = media(origin, { title: long, artist: long, album: long, releaseDate: '2025', cover: 'cover', logo: 'logo', customData: data });
         await evaluate('document.body.classList.add("touch")');
         await evaluate(intercept('LOAD', loadRequest(m)));
         await settle(session, (s) => s.logo !== null, 'the logo');
-        const placed = await evaluate(`(() => {
-            // Their own row in the safe area, under the song and clear of the caption band.
-            const main = document.querySelector('main').getBoundingClientRect();
-            const song = document.getElementById('song').getBoundingClientRect();
-            const captions = document.getElementById('captions').getBoundingClientRect();
-            return ['previous', 'playPause', 'next'].map((id) => {
-                const r = document.getElementById(id).getBoundingClientRect();
-                const inside = r.top >= song.bottom - 0.5 && r.bottom <= captions.top + 0.5 && r.bottom <= main.bottom + 0.5;
-                return { id, width: r.width, inside };
-            });
-        })()`);
-        for (const button of placed) {
-            assert.ok(button.width > 0, `${button.id} is drawn`);
-            assert.equal(button.inside, true, `${button.id} is under the song, above the captions, in the safe area`);
+        // The Pixel Tablet's system media bar covers the page from 73 % of its height down: nothing of ours goes there.
+        const placed = await evaluate(`(() => ['cover', 'song', 'captions', 'title', 'station'].map((id) => {
+            const r = document.getElementById(id).getBoundingClientRect();
+            return { id, height: r.height, bottom: r.bottom / innerHeight };
+        }))()`);
+        for (const box of placed) {
+            assert.ok(box.height > 0, `${box.id} is drawn`);
+            assert.ok(box.bottom <= 0.72, `${box.id} ends at ${(box.bottom * 100).toFixed(1)} % of the height, above the bar`);
         }
 
-        await pause(700);
-        const before = (await evaluate('window.probe')).broadcasts.length;
-        await evaluate('document.getElementById("next").click()');
-        await pause(700);
-        await evaluate('document.getElementById("previous").click()');
-        const steps = (await evaluate('window.probe')).broadcasts.slice(before).map((b) => b.step);
-        assert.deepEqual(steps, ['next', 'previous']);
-
-        // Pause and resume: a tap pauses while it plays; the player's PAUSE shows play, and a tap then plays.
-        await evaluate('document.getElementById("playPause").click()');
-        await evaluate('window.events[cast.framework.events.EventType.PAUSE]({})');
-        assert.equal(await evaluate('document.getElementById("playPause").getAttribute("aria-label")'), 'Play');
-        await evaluate('window.events[cast.framework.events.EventType.PLAYING]({})');
-        assert.equal(await evaluate('document.getElementById("playPause").getAttribute("aria-label")'), 'Pause');
-        assert.deepEqual((await evaluate('window.probe')).playback, ['pause']);
+        assert.equal(await evaluate('document.querySelectorAll("button").length'), 0);
         await evaluate('document.body.classList.remove("touch")');
     });
 
@@ -630,6 +623,7 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
         assert.equal(screen.logo, null);
         assert.equal(screen.stationName, 'Radio Test');
         assert.equal(screen.stationShown, true);
+        assert.deepEqual(await evaluate(PLATE('#cover')), NO_PLATE);
     });
 
     await t.test('the station name and logo with a cover from the images [cover, logo]', async () => {
@@ -638,6 +632,11 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
         const screen = await settle(session, (s) => s.cover === img('cover2') && s.logo === img('logo2'), 'cover and logo');
         assert.equal(screen.coverIsLogo, false);
         assert.equal(screen.stationName, 'Radio Two');
+        // The cover and the logo sit directly on the page: no tile, plate, card, colour fill or shadow behind either.
+        assert.deepEqual(await evaluate(PLATE('#cover')), NO_PLATE);
+        assert.deepEqual(await evaluate(PLATE('#song')), NO_PLATE);
+        assert.deepEqual(await evaluate(PLATE('#station img')), NO_PLATE);
+        assert.deepEqual(await evaluate(PLATE('#station')), NO_PLATE);
     });
 
     await t.test('previous / next jumps broadcast {step, stepId} with rising ids and are not passed on', async () => {
@@ -697,10 +696,11 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
         assert.deepEqual((await evaluate('window.probe')).statusRequestIds, [0]);
     });
 
-    await t.test('a double tap on the touch next button is one step', async () => {
+    await t.test('a double press on the system bar (two jumps at once, new ids) is one step', async () => {
         await pause(700);
         const before = (await evaluate('window.probe.broadcasts')).length;
-        await evaluate('document.getElementById("next").click(); document.getElementById("next").click()');
+        await evaluate(intercept('QUEUE_UPDATE', { jump: 1, requestId: 51, senderId: 'tablet' }));
+        await evaluate(intercept('QUEUE_UPDATE', { jump: 1, requestId: 52, senderId: 'tablet' }));
         const steps = (await evaluate('window.probe.broadcasts')).slice(before);
         assert.deepEqual(steps.map((s) => s.step), ['next']);
     });
@@ -776,4 +776,81 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
     await t.test('no error from our script after every message', () => {
         assert.deepEqual(session.errors, []);
     });
+});
+
+test('layout and accessibility in every state, at 1920 x 1080, on the tablet (2560 x 1600) and at 1280 x 720', { timeout: 600000 }, async (t) => {
+    const session = await open();
+    t.after(() => session.close());
+    const { origin, evaluate } = session;
+    const logo = (name) => `${origin}/logos/${name}.png`;
+    const long = 'A song title long enough to wrap over two lines and then some more on any screen the receiver meets';
+    const song = (title, artist, data, images) => ({
+        metadata: { title, artist, albumName: data.album, releaseDate: '2025', images: images.map((url) => ({ url })) },
+        customData: JSON.stringify(data),
+    });
+    const states = {
+        'idle (splash)': ['window.events[cast.framework.events.EventType.MEDIA_FINISHED]({})'],
+        error: ['window.events[cast.framework.events.EventType.MEDIA_FINISHED]({ endedReason: "ERROR" })'],
+        'loading (the station, no song yet)': [intercept('LOAD', { media: song('Pro FM', 'Pro FM', { station: 'Pro FM', previous: true, next: true }, []) })],
+        'a song with a cover, steps on': [
+            intercept('LOAD', { media: song('A summer song', 'A band featuring a singer', { station: 'Pro FM', previous: true, next: true, album: 'Single' }, [logo('90er-stream'), logo('Profm')]) }),
+        ],
+        'the station only (logo as cover), steps off': [
+            intercept('LOAD', { media: song('Europa FM', 'Europa FM', { station: 'Europa FM', logo: logo('EuropaFM') }, [logo('EuropaFM')]) }),
+        ],
+        'long title, artist, album and caption': [
+            intercept('LOAD', {
+                media: song(long, long, { station: 'A station with a long name too', caption: `${long} ${long}`, album: long, previous: true, next: false }, [logo('90er-stream'), logo('Profm')]),
+            }),
+        ],
+    };
+    const sizes = [
+        { name: '1920 x 1080', width: 1920, height: 1080, touch: false },
+        { name: 'Pixel Tablet 2560 x 1600', width: 2560, height: 1600, touch: true },
+        { name: '1280 x 720', width: 1280, height: 720, touch: false },
+    ];
+    for (const size of sizes) {
+        for (const [state, steps] of Object.entries(states)) {
+            await t.test(`${size.name}: ${state}`, async () => {
+                await resize(session, size.width, size.height);
+                await evaluate(`document.body.classList.toggle('touch', ${size.touch})`);
+                for (const expression of steps) {
+                    await evaluate(expression);
+                }
+
+                // The pictures loaded and the backdrop faded in (600 ms) before the screen is measured.
+                await pause(1200);
+                assert.deepEqual(await problems(session, size), []);
+            });
+        }
+    }
+
+    const where = `(() => {
+        const box = (s) => document.querySelector(s).getBoundingClientRect();
+        return { title: box('#title').top, cover: box('#cover').bottom, station: box('#station').bottom, song: box('#song').top };
+    })()`;
+    for (const size of sizes) {
+        await t.test(`${size.name}: a fixed layout, the title where it was, the station's line level with the cover's bottom`, async () => {
+            await resize(session, size.width, size.height);
+            await evaluate(`document.body.classList.toggle('touch', ${size.touch})`);
+            await evaluate(states['a song with a cover, steps on'][0]);
+            await pause(800);
+            const withCover = await evaluate(where);
+            await evaluate(states['the station only (logo as cover), steps off'][0]);
+            await pause(800);
+            const stationOnly = await evaluate(where);
+            assert.ok(Math.abs(withCover.title - stationOnly.title) < 1, `title at ${withCover.title} and ${stationOnly.title}`);
+            assert.ok(Math.abs(withCover.station - withCover.cover) < 2, `station line ends ${withCover.station}, cover ${withCover.cover}`);
+            assert.ok(Math.abs(stationOnly.station - stationOnly.cover) < 2, `station line ends ${stationOnly.station}, cover ${stationOnly.cover}`);
+        });
+    }
+
+    await t.test('no error from our script in any state', () => {
+        assert.deepEqual(session.errors, []);
+    });
+});
+
+test('the contrast measure matches WCAG: black on white 21:1, a colour on itself 1:1', () => {
+    assert.equal(Math.round(contrast([0, 0, 0], [255, 255, 255])), 21);
+    assert.equal(contrast([120, 40, 200], [120, 40, 200]), 1);
 });

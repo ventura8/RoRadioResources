@@ -179,7 +179,15 @@ async function main() {
             const media = load(input.url, input.title, input.artist, input);
             const status = await cast.request(app(), NS.media, { type: 'LOAD', media, autoplay: true }, 40000);
             state.mediaSessionId = status.status && status.status[0] && status.status[0].mediaSessionId;
-            answer = { type: status.type, playerState: status.status && status.status[0] && status.status[0].playerState };
+            // The LOAD's own answer can still be IDLE (the Pixel Tablet, 2026-11-14): the stream starts a moment
+            // later. The player state is asked again until it plays, for up to 20 s.
+            let playerState = status.status && status.status[0] && status.status[0].playerState;
+            for (let tries = 0; tries < 20 && !['PLAYING', 'BUFFERING'].includes(playerState); tries += 1) {
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+                const now = await cast.request(app(), NS.media, { type: 'GET_STATUS' });
+                playerState = now.status && now.status[0] && now.status[0].playerState;
+            }
+            answer = { type: status.type, playerState };
             break;
         }
         case 'song': {
@@ -196,21 +204,27 @@ async function main() {
             break;
         }
         case 'tap': {
-            // A tap on the page's own button, made while this sender listens: the page broadcasts the step as a media
-            // status ({"step", "stepId"}), which only a connected sender hears.
+            // A tap on the device's system media bar, made while this sender listens for 4 s: the page broadcasts each
+            // step as a media status ({"step", "stepId", "shown"}), which only a connected sender hears. Every step
+            // heard is counted (one press must be one step), and the last "shown" says what the screen shows.
             app();
-            const heard = new Promise((resolve) => {
-                cast.listeners.push((message) => {
-                    const status = message.payload && message.payload.status && message.payload.status[0];
-                    if (status && status.customData && status.customData.step) {
-                        resolve(status.customData.step);
-                    }
-                });
-                setTimeout(() => resolve(null), 8000);
+            const steps = [];
+            let shown = null;
+            cast.listeners.push((message) => {
+                const status = message.payload && message.payload.status && message.payload.status[0];
+                const data = status && status.customData;
+                if (data && data.step) {
+                    steps.push(data.step);
+                }
+
+                if (data && data.shown) {
+                    ({ shown } = data);
+                }
             });
             const { execFileSync } = await import('node:child_process');
             execFileSync('adb', ['-s', input.device, 'shell', 'input', 'tap', String(input.x), String(input.y)]);
-            answer = { step: await heard };
+            await new Promise((resolve) => setTimeout(resolve, 4000));
+            answer = { steps, shown };
             break;
         }
         case 'status': {
