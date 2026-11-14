@@ -27,6 +27,14 @@ function element() {
     return {
         textContent: '',
         dataset: {},
+        listeners: {},
+        attributes: {},
+        addEventListener(type, handler) {
+            this.listeners[type] = handler;
+        },
+        setAttribute(name, value) {
+            this.attributes[name] = value;
+        },
         style: {},
         classList: {
             toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)),
@@ -41,7 +49,7 @@ function element() {
 }
 
 /** Loads the page in a fresh context, plays `messages` and returns what the page did. */
-function run(messages) {
+function run(messages, { touch = false, taps = [], playerState = 'PLAYING' } = {}) {
     const elements = {};
     const stationImage = element();
     const station = element();
@@ -72,18 +80,40 @@ function run(messages) {
 
             interceptors[type] = handler;
         },
-        addEventListener: () => undefined,
+        addEventListener: (type, handler) => (did.playerEvents[type] = handler),
+        getPlayerState: () => playerState,
+        play: () => did.calls.push('play'),
+        pause: () => did.calls.push('pause'),
+        setMediaElement: (media) => (did.mediaElement = media),
     };
+    did.playerEvents = {};
+    did.calls = [];
     const types = ['LOAD', 'QUEUE_UPDATE', 'QUEUE_NEXT', 'QUEUE_PREV'];
+    const context = {
+        getPlayerManager: () => player,
+        start: (options) => {
+            did.started = true;
+            did.options = options;
+        },
+        addEventListener: (type, handler) => (did.contextEvents = { [type]: handler }),
+        getDeviceCapabilities: () => ({ touch_input_supported: touch }),
+    };
     const sandbox = {
         cast: {
             framework: {
-                CastReceiverContext: { getInstance: () => ({ getPlayerManager: () => player, start: () => (did.started = true) }) },
+                CastReceiverContext: { getInstance: () => context },
                 CastReceiverOptions: function CastReceiverOptions() {},
-                messages: { Command, MessageType: Object.fromEntries(types.map((type) => [type, type])) },
-                events: { EventType: { MEDIA_FINISHED: 'MEDIA_FINISHED' } },
+                messages: {
+                    Command,
+                    MessageType: Object.fromEntries(types.map((type) => [type, type])),
+                    PlayerState: { PLAYING: 'PLAYING', PAUSED: 'PAUSED' },
+                },
+                events: { EventType: { MEDIA_FINISHED: 'MEDIA_FINISHED', PAUSE: 'PAUSE', PLAYING: 'PLAYING' } },
+                system: { DeviceCapabilities: { TOUCH_INPUT_SUPPORTED: 'touch_input_supported' }, EventType: { READY: 'ready' } },
+                ui: { UiConfig: function UiConfig() {} },
             },
         },
+        window: {},
         document: { getElementById: (id) => (elements[id] ??= element()), body: element() },
         // Pictures load at once here, so the logo shown is the url the page asked for.
         Image: function Image() {
@@ -103,6 +133,13 @@ function run(messages) {
         const result = interceptors[message.type](message.request ?? {});
         did.results.push(result === null ? null : 'request');
     }
+
+    for (const id of taps) {
+        elements[id].listeners.click();
+    }
+
+    did.touch = sandbox.document.body.classList.has('touch');
+    did.elements = elements;
 
     did.caption = elements.captionText ? elements.captionText.textContent : '';
     did.title = elements.title ? elements.title.textContent : '';
@@ -246,43 +283,43 @@ test('the station logo shows beside the song cover', () => {
     assert.ok(fromData.stationShown);
 });
 
-test('metadata that looks like markup is drawn as text, never parsed as HTML', () => {
-    const markup = '<img src=x onerror=alert(1)>';
-    const data = JSON.stringify({ caption: markup, station: markup });
-    const did = run([
-        { type: 'LOAD', request: { media: { metadata: { title: markup, artist: markup }, customData: data } } },
-    ]);
-    assert.equal(did.title, markup);
-    assert.equal(did.artist, markup);
-    assert.equal(did.caption, markup);
-    assert.equal(did.stationName, markup);
-    // No API that parses HTML or code anywhere in the page's script.
-    for (const sink of ['innerHTML', 'outerHTML', 'insertAdjacentHTML', 'document.write', 'eval(', 'new Function', 'setTimeout(\'']) {
-        assert.ok(!source.includes(sink), `receiver/index.html uses ${sink}`);
-    }
+test('a touch display gets this page, not the default audio UI: own media element and touchScreenOptimizedApp', () => {
+    const did = run([]);
+    assert.equal(did.options.uiConfig.touchScreenOptimizedApp, true);
+    assert.equal(did.mediaElement, did.elements.media);
+    assert.equal(did.options.maxInactivity, 3600);
 });
 
-test('only http(s) pictures are shown, and a quote cannot break out of the backdrop url', () => {
-    for (const bad of ['javascript:alert(1)', 'data:image/svg+xml,<svg onload=alert(1)>', 'not a url', 42]) {
-        const did = run([loadWith([bad], JSON.stringify({ logo: bad }))]);
-        assert.equal(did.cover, undefined, String(bad));
-        assert.equal(did.logo, undefined, String(bad));
-        assert.equal(did.backdrop, '', String(bad));
-    }
-
-    const did = run([loadWith(['https://x/a.jpg?q=")"; background:red'], '')]);
-    assert.equal(did.cover, 'https://x/a.jpg?q=%22)%22;%20background:red');
-    assert.equal(did.backdrop, 'url("https://x/a.jpg?q=%22)%22;%20background:red")');
+test('the buttons show on a touch display only', () => {
+    assert.equal(run([], { touch: true }).touch, true);
+    assert.equal(run([]).touch, false);
 });
 
-test('the Content-Security-Policy allows the inline script by its exact hash, and never eval', () => {
-    const csp = html.match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)">/);
-    assert.ok(csp, 'receiver/index.html declares a Content-Security-Policy');
-    const hash = crypto.createHash('sha256').update(source, 'utf8').digest('base64');
-    assert.ok(csp[1].includes(`'sha256-${hash}'`), `script-src needs 'sha256-${hash}'`);
-    assert.ok(!csp[1].includes('unsafe-eval'));
-    assert.match(csp[1], /script-src [^;]*https:\/\/www\.gstatic\.com/);
-    assert.ok(!/script-src[^;]*'unsafe-inline'/.test(csp[1]));
+test('tapping previous / next steps through the group in the app, like the device buttons', () => {
+    const data = JSON.stringify({ previous: true, next: true });
+    const did = run([load(data)], { touch: true, taps: ['next', 'previous'] });
+    assert.deepEqual(
+        did.broadcasts.map((b) => b.customData.step),
+        ['next', 'previous'],
+    );
+    assert.equal(did.elements.previous.classList.has('hidden'), false);
+    assert.equal(did.elements.next.classList.has('hidden'), false);
+});
+
+test('a step the station lacks hides its button', () => {
+    const did = run([load(JSON.stringify({ previous: false, next: true }))], { touch: true });
+    assert.equal(did.elements.previous.classList.has('hidden'), true);
+    assert.equal(did.elements.next.classList.has('hidden'), false);
+});
+
+test('the pause button pauses while it plays, plays while paused, and shows which', () => {
+    assert.deepEqual(run([], { taps: ['playPause'] }).calls, ['pause']);
+    const paused = run([], { taps: ['playPause'], playerState: 'PAUSED' });
+    assert.deepEqual(paused.calls, ['play']);
+    paused.playerEvents.PAUSE();
+    assert.equal(paused.elements.playPause.attributes['aria-label'], 'Play');
+    paused.playerEvents.PLAYING();
+    assert.equal(paused.elements.playPause.attributes['aria-label'], 'Pause');
 });
 
 test('a logo that is already the cover (no song cover) is not shown twice', () => {

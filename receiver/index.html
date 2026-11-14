@@ -23,6 +23,9 @@
         group, as in the app). A press is not played here: the page broadcasts a media status whose customData is
         {"step": "previous"|"next", "stepId": n}, and the app steps through the group exactly as its own buttons do,
         then loads the new station here.
+        Touch displays (2.4.5): the page plays through its own audio element and declares uiConfig.touchScreenOptimizedApp,
+        so a Pixel Tablet or a Nest Hub shows this page, not Google's default audio UI, and the page's own previous /
+        pause / next buttons are there to tap.
         The cover fills the safe area's height on the left (the station's logo takes its place when the song has no
         cover), the station's logo heads the song's column, and the text is sized for a room away from the TV.
         Layout rules (Cast design guidelines): everything inside a 5 % safe area, text at least 24 px at 720p, white on
@@ -57,8 +60,11 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* Google's player plays the stream; this page draws its own screen. */
-        cast-media-player {
+        /*
+         * The page's own audio element plays the stream (player.setMediaElement): with Google's cast-media-player, a
+         * touch display (Pixel Tablet, Nest Hub) drew its default audio UI over this page.
+         */
+        #media {
             display: none;
         }
 
@@ -253,8 +259,61 @@
             inset: 0;
             display: grid;
             place-content: center;
+            justify-items: center;
             text-align: center;
-            row-gap: 2vmin;
+            row-gap: 2.4vmin;
+            background: radial-gradient(circle at 50% 42%, rgb(255 106 61 / 18%), transparent 55%), #08090c;
+        }
+
+        /* The app's own icon on a soft tile (1920 x 1080: 216 px; 2560 x 1600: 320 px). */
+        #appIcon {
+            width: clamp(120px, 20vmin, 320px);
+            height: clamp(120px, 20vmin, 320px);
+            padding: clamp(16px, 2.6vmin, 40px);
+            box-sizing: border-box;
+            border-radius: 22%;
+            background: rgb(255 255 255 / 8%);
+            box-shadow: 0 2vmin 6vmin rgb(0 0 0 / 50%);
+            object-fit: contain;
+        }
+
+        #idle #hint {
+            font-size: clamp(24px, 2.4vmin, 32px);
+            color: rgb(255 255 255 / 60%);
+        }
+
+        /* Previous / pause / next to tap, on a touch display only (a TV has its remote and the device's own controls). */
+        #controls {
+            display: none;
+            column-gap: clamp(24px, 5vmin, 72px);
+            margin-top: clamp(16px, 4vmin, 56px);
+        }
+
+        body.touch #controls {
+            display: flex;
+        }
+
+        #controls button {
+            width: clamp(64px, 11vmin, 140px);
+            height: clamp(64px, 11vmin, 140px);
+            border: 0;
+            border-radius: 50%;
+            background: rgb(255 255 255 / 14%);
+            color: var(--text);
+            font-size: clamp(28px, 5vmin, 64px);
+            touch-action: manipulation;
+        }
+
+        #controls button:active {
+            background: rgb(255 255 255 / 30%);
+        }
+
+        #controls #playPause {
+            background: var(--accent);
+        }
+
+        #controls button.hidden {
+            visibility: hidden;
         }
 
         #idle h1 {
@@ -303,7 +362,8 @@
                 height: clamp(56px, 12vmin, 160px);
             }
 
-            #station {
+            #station,
+            #controls {
                 justify-content: center;
             }
         }
@@ -316,12 +376,14 @@
     </style>
 </head>
 <body>
-    <cast-media-player></cast-media-player>
+    <audio id="media"></audio>
     <div id="backdrop" aria-hidden="true"></div>
     <div id="scrim" aria-hidden="true"></div>
     <div id="idle">
+        <img id="appIcon" src="icon.png" alt="">
         <h1>Ro<span>Radio</span></h1>
-        <p>Ready to play</p>
+        <p id="status">Ready to play</p>
+        <p id="hint">Romanian radio, live</p>
     </div>
     <main>
         <img id="cover" alt="">
@@ -330,6 +392,11 @@
             <h1 id="title"></h1>
             <h2 id="artist"></h2>
             <p id="release"><span id="album"></span><span id="year"></span></p>
+            <nav id="controls" aria-label="Playback">
+                <button id="previous" type="button" class="hidden" aria-label="Previous station">&#x23EE;</button>
+                <button id="playPause" type="button" aria-label="Pause">&#x23F8;</button>
+                <button id="next" type="button" class="hidden" aria-label="Next station">&#x23ED;</button>
+            </nav>
         </section>
         <div id="captions" class="empty" aria-live="polite"><span id="captionText"></span></div>
     </main>
@@ -442,6 +509,9 @@
 
             const commands = baseCommands | (previous ? Command.QUEUE_PREV : 0) | (next ? Command.QUEUE_NEXT : 0);
             player.setSupportedMediaCommands(commands, true);
+            // The page's own buttons on a touch display: exactly the steps the station has.
+            byId('previous').classList.toggle('hidden', !previous);
+            byId('next').classList.toggle('hidden', !next);
         }
 
         /** A previous / next press, for the app: a media status whose customData names it, numbered upwards. */
@@ -538,9 +608,55 @@
 
         player.addEventListener(cast.framework.events.EventType.MEDIA_FINISHED, () => document.body.classList.remove('playing'));
 
+        /** The pause button shows what a tap does: pause while it plays, play while it is paused. */
+        function showPaused(paused) {
+            const button = byId('playPause');
+            button.textContent = paused ? '▶' : '⏸';
+            button.setAttribute('aria-label', paused ? 'Play' : 'Pause');
+        }
+
+        player.addEventListener(cast.framework.events.EventType.PAUSE, () => showPaused(true));
+        player.addEventListener(cast.framework.events.EventType.PLAYING, () => showPaused(false));
+
+        // A touch display's taps: previous / next step through the group in the app, as the device's own buttons do.
+        byId('previous').addEventListener('click', () => step('previous'));
+        byId('next').addEventListener('click', () => step('next'));
+        byId('playPause').addEventListener('click', () => {
+            if (player.getPlayerState() === cast.framework.messages.PlayerState.PAUSED) {
+                player.play();
+            } else {
+                player.pause();
+            }
+        });
+
+        /** Whether this device takes touch (Pixel Tablet, Nest Hub): its buttons show on the page then. */
+        function isTouch() {
+            try {
+                const capabilities = context.getDeviceCapabilities() || {};
+                if (capabilities[cast.framework.system.DeviceCapabilities.TOUCH_INPUT_SUPPORTED]) {
+                    return true;
+                }
+            } catch (e) {
+                // Not ready yet, or off a device: the pointer decides.
+            }
+
+            return typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+        }
+
+        const markTouch = () => document.body.classList.toggle('touch', isTouch());
+        context.addEventListener(cast.framework.system.EventType.READY, markTouch);
+        markTouch();
+
+        // The page's own media element: with Google's cast-media-player a touch display drew its default audio UI (the
+        // station's name twice, no logo) over this page (Pixel Tablet, 2026-11-14).
+        player.setMediaElement(byId('media'));
+
         const options = new cast.framework.CastReceiverOptions();
         // A radio station plays until it is stopped; the receiver stays while it is idle between two stations.
         options.maxInactivity = 3600;
+        // This page is the touch UI (Cast's smart display guide): no default controls or opaque scrim over it.
+        options.uiConfig = new cast.framework.ui.UiConfig();
+        options.uiConfig.touchScreenOptimizedApp = true;
         context.start(options);
     </script>
 </body>

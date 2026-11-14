@@ -57,6 +57,7 @@ function probe() {
         context.start = (options) => {
             record.started = true;
             record.maxInactivity = options && options.maxInactivity;
+            record.touchScreenOptimizedApp = Boolean(options && options.uiConfig && options.uiConfig.touchScreenOptimizedApp);
             // Off a device the framework has no platform to answer it; reaching start() is the page's part.
             try {
                 return start(options);
@@ -122,6 +123,10 @@ function serve(withPage) {
                 .replace(sdkTag, `${sdkTag}\n<script>${probeScript}</script>`);
             response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
             response.end(html);
+        } else if (request.url === '/receiver/icon.png') {
+            // The page's own files as GitHub Pages serves them: a missing one is a 404 here too.
+            response.writeHead(200, { 'content-type': 'image/png' });
+            response.end(fs.readFileSync(path.join(__dirname, '..', 'receiver', 'icon.png')));
         } else if (request.url.startsWith('/img/')) {
             response.writeHead(200, { 'content-type': 'image/png' });
             response.end(png);
@@ -474,6 +479,29 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
         assert.equal(screen.idleVisible, true);
         assert.equal(screen.mainVisible, false);
         assert.equal(await evaluate('document.querySelector("#idle p").textContent'), 'Ready to play');
+    });
+
+    await t.test('the idle screen shows the app icon, which loads (no 404)', async () => {
+        const icon = await waitFor(
+            async () => {
+                const state = await evaluate(`(() => {
+                    const icon = document.getElementById('appIcon');
+                    return { complete: icon.complete, width: icon.naturalWidth, shown: icon.getBoundingClientRect().width > 0 };
+                })()`);
+                return state.complete ? state : null;
+            },
+            'the icon to load',
+            10000,
+        );
+        assert.equal(icon.width, 256);
+        assert.equal(icon.shown, true);
+    });
+
+    await t.test('declares the touch UI and plays through its own media element', async () => {
+        const record = await evaluate('window.probe');
+        assert.equal(record.touchScreenOptimizedApp, true);
+        assert.equal(await evaluate('document.querySelector("cast-media-player")'), null);
+        assert.equal(await evaluate('document.getElementById("media").tagName'), 'AUDIO');
     });
 
     await t.test('a LOAD with the old bare-string caption shows the song and the caption, with no steps', async () => {
