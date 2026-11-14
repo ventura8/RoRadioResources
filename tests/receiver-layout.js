@@ -20,7 +20,7 @@ const axeSource = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'ci', 'n
 const SYSTEM_BAR = 0.28;
 
 /** The page's leaves: every text and picture the listener sees. */
-const LEAVES = ['#appIcon', '#idle h1', '#status', '#hint', '#cover', '#station img', '#stationName', '#title', '#artist', '#release', '#captionText'];
+const LEAVES = ['#appIcon', '#status', '#hint', '#cover', '#station img', '#stationName', '#title', '#artist', '#release', '#yearLine', '#captionText'];
 
 /** Runs in the page: the visible leaves with their boxes, text sizes, colours and whether a text is cut. */
 const MEASURE = `(() => {
