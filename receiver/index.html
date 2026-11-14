@@ -197,6 +197,21 @@
             box-shadow: 0 1vmin 3vmin rgb(0 0 0 / 45%);
         }
 
+        /* The station's name beside its logo: never a placeholder, nothing when the app sends none. */
+        #stationName {
+            min-width: 0;
+            margin-left: clamp(10px, 2vmin, 28px);
+            overflow: hidden;
+            color: var(--muted);
+            font-size: clamp(22px, 4vmin, 56px);
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        #station img:not([src]) {
+            display: none;
+        }
+
         #captions {
             grid-area: captions;
             justify-self: center;
@@ -304,7 +319,7 @@
     <main>
         <img id="cover" alt="">
         <section id="song" aria-live="polite">
-            <div id="station" class="empty"><img alt=""></div>
+            <div id="station" class="empty"><img alt=""><span id="stationName"></span></div>
             <h1 id="title"></h1>
             <h2 id="artist"></h2>
             <p id="release"><span id="album"></span><span id="year"></span></p>
@@ -364,7 +379,8 @@
          * is the caption alone, with no steps.
          */
         function appData(customData) {
-            const none = { caption: '', previous: false, next: false };
+            const none = { caption: '', previous: false, next: false, station: '', logo: '' };
+            const text = (value) => (typeof value === 'string' ? value : '');
             if (typeof customData !== 'string') {
                 return none;
             }
@@ -373,16 +389,18 @@
                 try {
                     const data = JSON.parse(customData);
                     return {
-                        caption: typeof data.caption === 'string' ? data.caption : '',
+                        caption: text(data.caption),
                         previous: data.previous === true,
                         next: data.next === true,
+                        station: text(data.station),
+                        logo: text(data.logo),
                     };
                 } catch (e) {
                     // Not the app's JSON: a caption that starts with a brace.
                 }
             }
 
-            return { caption: customData, previous: false, next: false };
+            return { ...none, caption: customData };
         }
 
         const Command = cast.framework.messages.Command;
@@ -425,10 +443,12 @@
             document.body.classList.toggle('captioned', Boolean(caption));
 
             // The app sends [cover, station logo] when the song has a cover, and [station logo] alone when it has none:
-            // the logo then takes the cover's place, whole, and is not shown twice.
+            // the logo then takes the cover's place, whole, and is not shown twice. Since 2.4.5 the customData also
+            // names the station and its logo, so the logo shows beside the cover whatever the images hold.
             const images = metadata.images || [];
             const cover = images[0] && images[0].url;
-            const logo = images[1] && images[1].url;
+            const logo = (images[1] && images[1].url) || (data.logo !== cover ? data.logo : '');
+            byId('stationName').textContent = data.station;
             byId('cover').classList.toggle('logo', Boolean(cover) && !logo);
             const backdrop = byId('backdrop');
             const showBackdrop = (url) => {
@@ -442,7 +462,7 @@
 
             showImage(byId('cover'), cover, showBackdrop);
             const station = byId('station');
-            station.classList.toggle('empty', !logo);
+            station.classList.toggle('empty', !logo && !data.station);
             showImage(station.querySelector('img'), logo);
             document.body.classList.add('playing');
         }
@@ -483,15 +503,13 @@
             return request;
         });
 
-        /** The device's own previous / next (a smart display's touch controls, Google TV's remote, the Assistant). */
-        for (const [type, name] of [['QUEUE_NEXT', 'next'], ['QUEUE_PREV', 'previous']]) {
-            if (cast.framework.messages.MessageType[type]) {
-                player.setMessageInterceptor(cast.framework.messages.MessageType[type], () => {
-                    step(name);
-                    return null;
-                });
-            }
-        }
+        /*
+         * The device's own previous / next (a smart display's touch controls, Google TV's remote, the Assistant) reach
+         * the page as a QUEUE_UPDATE jump, above. No interceptor for QUEUE_NEXT / QUEUE_PREV: the framework names them in
+         * MessageType but throws "Unknown message type" for an interceptor, which stopped this script before
+         * context.start(), so the page never answered the launch and the app fell back to the Default Media Receiver
+         * after 30 s (Pixel Tablet, 2026-11-14).
+         */
 
         player.addEventListener(cast.framework.events.EventType.MEDIA_FINISHED, () => document.body.classList.remove('playing'));
 
