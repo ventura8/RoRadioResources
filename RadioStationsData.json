@@ -582,12 +582,6 @@
         "Description": "Aici Muzica Face Diferenta!"
       },
       {
-        "GUID": "40c7aec6-8f72-41e9-90a6-5ac382b3374d",
-        "Title": "Radio Intexfm",
-        "Url": "http://149.202.158.82:9788/;",
-        "ImageUrl": "radio-intexfm.png"
-      },
-      {
         "GUID": "c246d808-9760-4015-94ac-2f9d49e254de",
         "Title": "Dance Effect Radio",
         "Url": "http://asculta.danceeffect.ro:3333/;",
@@ -856,11 +850,6 @@
         "ImageUrl": "radio-sasnet-romania.png"
       },
       {
-        "GUID": "6a2d918b-21d3-4196-b125-fb9db4cc9deb",
-        "Title": "Hot 107.1 FM",
-        "Url": "http://192.99.34.205:8607/stream"
-      },
-      {
         "GUID": "20255cb9-c3d8-43e1-88fa-41cd0908cc62",
         "Title": "Young Urban Lifestyles Radio",
         "Url": "https://usa8.fastcast4u.com/proxy/yulradio?mp=/1",
@@ -1057,11 +1046,6 @@
         "ImageUrl": "radio-1.png"
       },
       {
-        "GUID": "b13eafe3-6b8f-486c-bf83-2d4bdab4b4b2",
-        "Title": "Radio Amma",
-        "Url": "http://54.39.28.158:8024/stream"
-      },
-      {
         "GUID": "5879fd3e-9d7e-476a-80e0-d2f1ce2b60a9",
         "Title": "Radio Atentat",
         "Url": "https://ssl.omegahost.ro/8066/stream",
@@ -1155,12 +1139,6 @@
         "Title": "Radio Filadelfia Romania",
         "Url": "http://asculta.radiofiladelfia.ro:8080/stream/2/",
         "ImageUrl": "Radio-Filadelfia.jpg"
-      },
-      {
-        "GUID": "9909e9cd-9046-47ba-bfb8-c18bfdfcce23",
-        "Title": "Atlas FM",
-        "Url": "http://5.2.168.50:8000/",
-        "ImageUrl": "AtlasFM.jpg"
       },
       {
         "GUID": "45b6c6e5-bcce-4d3c-a12a-bb78cef17b35",
