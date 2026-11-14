@@ -42,7 +42,7 @@
             --gap: clamp(16px, 3.5vmin, 48px);
             --text: #fff;
             --muted: rgb(255 255 255 / 78%);
-            --scrim: rgb(8 10 14 / 72%);
+            --scrim: rgb(8 10 14 / 64%);
             --accent: #ff6a3d;
         }
 
@@ -70,17 +70,16 @@
         }
 
         /*
-         * The whole screen behind the song: its cover (the station's logo when it has none), very blurred, under a dark
-         * scrim that keeps the white text readable (WCAG AA, measured on the real pixels). A new song or station
-         * crossfades into the last one.
+         * The whole screen behind the song: its cover (the station's logo when it has none), blurred but still known (its
+         * colours and shapes show: 14vmin left an even olive tint on the tablet), under a dark scrim that keeps the
+         * white text readable (WCAG AA, measured on the real pixels). A new song or station crossfades into the last one.
          */
         #backdrop {
             position: fixed;
-            inset: -15%;
+            inset: -6%;
             background-position: center;
             background-size: cover;
-            filter: blur(14vmin) saturate(1.4);
-            transform: scale(1.2);
+            filter: blur(3vmin) saturate(1.1);
             opacity: 0;
             transition: opacity 800ms ease, background-image 800ms ease;
         }
@@ -92,18 +91,21 @@
         #scrim {
             position: fixed;
             inset: 0;
-            background: linear-gradient(180deg, var(--scrim), rgb(8 10 14 / 88%));
+            background: linear-gradient(180deg, var(--scrim), rgb(8 10 14 / 78%));
             transition: background-color 800ms ease;
         }
 
         /*
          * The app's cover colour theme (opt-in in the app): the scrim takes the app's tint, the colour white text reads
-         * on (AppColorHelper.ReadableTint), and the accent colours the page's highlights. Off: the default look.
+         * on (AppColorHelper.ReadableTint), over a neutral dark layer, so the cover's own colours still show through
+         * (a tint at 80-92% covered them in one olive wash); the accent colours the page's highlights. Off: the default look.
          * Only where relative colours work: an older receiver engine keeps the default scrim, never none (CodeRabbit, #46).
          */
         @supports (color: rgb(from red r g b / 50%)) {
             body.themed #scrim {
-                background: linear-gradient(180deg, rgb(from var(--theme-tint) r g b / 80%), rgb(from var(--theme-tint) r g b / 92%));
+                background:
+                    linear-gradient(180deg, rgb(from var(--theme-tint) r g b / 30%), rgb(from var(--theme-tint) r g b / 45%)),
+                    linear-gradient(180deg, rgb(8 10 14 / 52%), rgb(8 10 14 / 68%));
             }
         }
 

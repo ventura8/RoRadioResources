@@ -238,7 +238,13 @@ function run(
         // `roundFont`: a browser's rounding, a hair above the size it was given.
         getComputedStyle: (e) => {
             const fontSize = e.style.fontSize ? `${parseFloat(e.style.fontSize) + roundFont}px` : '40px';
-            return { color: 'rgb(255, 255, 255)', fontSize, lineHeight: `${parseFloat(fontSize) * 1.25}px` };
+            return {
+                color: 'rgb(255, 255, 255)',
+                fontSize,
+                lineHeight: `${parseFloat(fontSize) * 1.25}px`,
+                opacity: e.style.opacity || '1',
+                visibility: e.style.visibility || 'visible',
+            };
         },
         document: {
             getElementById: (id) => (elements[id] ??= element()),
@@ -609,9 +615,20 @@ test('test mode ({"rects": true}): the drawn boxes, their colours, the pixel rat
     did.stationImage.box = { left: 0, top: 70, right: 50, bottom: 120, width: 50, height: 50 };
     did.within((more) => more([{ type: 'LOAD', request: { media: { metadata: { title: 'Song' }, customData: data } } }]));
     assert.deepEqual(did.shown.rects, {
-        title: { box: [10, 20, 110, 60], color: 'rgb(255, 255, 255)' },
-        station: { box: [0, 70, 50, 120], color: 'rgb(255, 255, 255)' },
+        title: { box: [10, 20, 110, 60], color: 'rgb(255, 255, 255)', text: 'Song' },
+        station: { box: [0, 70, 50, 120], color: 'rgb(255, 255, 255)', text: '' },
     });
+
+    // A text hidden by visibility or a zero opacity keeps its box but is not drawn: it is left out (CodeRabbit, #49).
+    did.elements.artist.box = { left: 10, top: 60, right: 110, bottom: 90, width: 100, height: 30 };
+    did.elements.artist.style.visibility = 'hidden';
+    did.elements.cover.box = { left: 0, top: 0, right: 5, bottom: 5, width: 5, height: 5 };
+    did.elements.cover.style.opacity = '0';
+    did.within((more) => more([{ type: 'LOAD', request: { media: { metadata: { title: 'Song' }, customData: data } } }]));
+    assert.deepEqual(Object.keys(did.shown.rects).sort(), ['station', 'title']);
+    did.elements.cover.style.opacity = '1';
+    did.within((more) => more([{ type: 'LOAD', request: { media: { metadata: { title: 'Song' }, customData: data } } }]));
+    assert.equal(did.shown.rects.cover.text, '');
 
     // Without the flag (every app): no rects.
     assert.equal(run([load('')]).shown.rects, undefined);

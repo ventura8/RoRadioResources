@@ -9,16 +9,23 @@
 const LEAVES = ['cover', 'stationName', 'title', 'artist', 'release', 'yearLine', 'captionText'];
 
 /**
- * Each visible leaf's box (CSS px, [left, top, right, bottom]), its text colour, the device pixel ratio and the
- * viewport.
+ * Each visible leaf's box (CSS px, [left, top, right, bottom]), its text colour and its words, the device pixel ratio
+ * and the viewport. A leaf hidden by visibility or a zero opacity keeps its box but is not drawn: it is left out, so
+ * an E2E comparing two screens sees it gone (CodeRabbit, #49).
  */
 function layoutNow() {
     const byId = (id) => document.getElementById(id);
     const rects = {};
     for (const id of [...LEAVES, 'station']) {
-        const box = (id === 'station' ? byId(id).querySelector('img') : byId(id)).getBoundingClientRect();
-        if (box.width > 0 && box.height > 0) {
-            rects[id] = { box: [box.left, box.top, box.right, box.bottom], color: getComputedStyle(byId(id)).color };
+        const element = id === 'station' ? byId(id).querySelector('img') : byId(id);
+        const box = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        if (box.width > 0 && box.height > 0 && style.visibility !== 'hidden' && style.opacity !== '0') {
+            rects[id] = {
+                box: [box.left, box.top, box.right, box.bottom],
+                color: getComputedStyle(byId(id)).color,
+                text: id === 'station' || id === 'cover' ? '' : byId(id).textContent,
+            };
         }
     }
 

@@ -136,6 +136,10 @@ function serve(withPage) {
         'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
         'base64',
     );
+    const white = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==',
+        'base64',
+    );
     const server = http.createServer((request, response) => {
         if (request.url === '/receiver/') {
             // The page's Content-Security-Policy stays in force; the injected probe is allowed by its own hash.
@@ -155,6 +159,10 @@ function serve(withPage) {
             const name = path.basename(request.url);
             response.writeHead(200, { 'content-type': 'image/png' });
             response.end(fs.readFileSync(path.join(__dirname, '..', 'RadioLogos', name)));
+        } else if (request.url.startsWith('/white/')) {
+            // A white cover: the brightest backdrop the scrim has to keep the text readable on (CodeRabbit, #49).
+            response.writeHead(200, { 'content-type': 'image/png' });
+            response.end(white);
         } else if (request.url.startsWith('/img/')) {
             response.writeHead(200, { 'content-type': 'image/png' });
             response.end(png);
@@ -873,6 +881,11 @@ test('layout and accessibility in every state, at 1920 x 1080, on the tablet (25
         return { id, lines: Math.round(e.clientHeight / parseFloat(s.lineHeight)), size: parseFloat(s.fontSize), full, cut };
     }))()`;
     const backdropNow = 'document.getElementById("backdrop").style.backgroundImage';
+    // The song's texts on screen: each one's words and whether it shows.
+    const textsShown = `(() => Object.fromEntries(['title', 'artist', 'release', 'yearLine', 'stationName'].map((id) => {
+        const e = document.getElementById(id);
+        return [id, { shown: e.checkVisibility(), text: e.textContent }];
+    })))()`;
     for (const size of sizes) {
         await t.test(`${size.name}: the blurred backdrop follows the song; the app's cover theme on and off, readable over both`, async () => {
             await resize(session, size.width, size.height);
@@ -889,10 +902,24 @@ test('layout and accessibility in every state, at 1920 x 1080, on the tablet (25
             assert.deepEqual(await problems(session, size), []);
 
             // The app's cover colour theme on: the scrim takes its tint, and the text stays readable on the real pixels.
+            // The cover's shapes stay visible behind: a blur of at most 5% of the screen's short side (14% left an even
+            // olive tint on the tablet); the text's contrast over it is checked on the pixels.
+            const look = await evaluate(`(() => ({
+                blur: parseFloat(getComputedStyle(document.getElementById('backdrop')).filter.match(/blur\\(([\\d.]+)px/u)[1]),
+                short: Math.min(innerWidth, innerHeight),
+            }))()`);
+            assert.ok(look.blur <= look.short * 0.05 + 0.5, `the backdrop's blur ${look.blur}px on ${look.short}px`);
             const theme = { accent: '#f0e040', tint: '#4d4813' };
-            await evaluate(intercept('QUEUE_UPDATE', updateRequest(song('A themed song', 'A band', { station: 'Pro FM', theme }, [logo('90er-stream'), logo('Profm')]))));
+            const album = { album: 'An album' };
+            await evaluate(intercept('QUEUE_UPDATE', updateRequest(song('A song', 'A band', { station: 'Pro FM', ...album }, [logo('90er-stream'), logo('Profm')]))));
+            await pause(1200);
+            const plainTexts = await evaluate(textsShown);
+            await evaluate(intercept('QUEUE_UPDATE', updateRequest(song('A song', 'A band', { station: 'Pro FM', theme, ...album }, [logo('90er-stream'), logo('Profm')]))));
             await pause(1200);
             assert.equal(await evaluate('document.body.classList.contains("themed")'), true);
+            // The theme never drops a text: the same texts show, with the same words, theme on and off.
+            assert.deepEqual(await evaluate(textsShown), plainTexts);
+            assert.ok(plainTexts.release.shown && plainTexts.release.text.includes('An album'), JSON.stringify(plainTexts));
             assert.deepEqual((await evaluate('window.probe')).shown.theme, theme);
             // The scrim is drawn in the tint (77, 72, 19; Chrome writes it as srgb fractions), not the default one (#46).
             const scrim = await evaluate('getComputedStyle(document.getElementById("scrim")).backgroundImage');
@@ -905,6 +932,20 @@ test('layout and accessibility in every state, at 1920 x 1080, on the tablet (25
             assert.equal(await evaluate('document.body.classList.contains("themed")'), false);
             assert.equal((await evaluate('window.probe')).shown.theme, null);
             assert.deepEqual(await problems(session, size), []);
+        });
+
+        await t.test(`${size.name}: over a white cover, shrunk album and year still read at AA, theme off and on`, async () => {
+            await resize(session, size.width, size.height);
+            await evaluate(`document.body.classList.toggle('touch', ${size.touch})`);
+            const longAlbum = 'An album with a very long name that needs the texts to shrink before it fits in its column at all';
+            const whiteCover = `${origin}/white/cover.png`;
+            for (const theme of [undefined, { accent: '#f0e040', tint: '#4d4813' }]) {
+                const data = { station: 'Pro FM', album: longAlbum, ...(theme ? { theme } : {}) };
+                await evaluate(intercept('QUEUE_UPDATE', updateRequest(song('A long song title for a white cover', 'A band', data, [whiteCover, logo('Profm')]))));
+                await pause(1200);
+                assert.match(await evaluate(backdropNow), /white/);
+                assert.deepEqual(await problems(session, size), [], `theme ${theme ? 'on' : 'off'}`);
+            }
         });
     }
 
