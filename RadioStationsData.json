@@ -1386,7 +1386,7 @@
       {
         "GUID": "e5267c33-d0eb-4331-988c-282caa56385a",
         "Title": "Radio SOS",
-        "Url": "http://5.2.180.231:8000/stream",
+        "Url": "https://radiosos.ro:8002/stream",
         "ImageUrl": "radio-sos.png"
       },
       {
@@ -1446,7 +1446,7 @@
       {
         "GUID": "ef426d99-bab2-4f63-9906-0acb660975ea",
         "Title": "Sláger Rádió",
-        "Url": "http://89.37.193.61:8000/raspi",
+        "Url": "https://slagerfm.netregator.hu:7813/slagerfm320.mp3",
         "ImageUrl": "slager-radio.png"
       },
       {
