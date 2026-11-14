@@ -99,9 +99,12 @@
         /*
          * The app's cover colour theme (opt-in in the app): the scrim takes the app's tint, the colour white text reads
          * on (AppColorHelper.ReadableTint), and the accent colours the page's highlights. Off: the default look.
+         * Only where relative colours work: an older receiver engine keeps the default scrim, never none (CodeRabbit, #46).
          */
-        body.themed #scrim {
-            background: linear-gradient(180deg, rgb(from var(--theme-tint) r g b / 80%), rgb(from var(--theme-tint) r g b / 92%));
+        @supports (color: rgb(from red r g b / 50%)) {
+            body.themed #scrim {
+                background: linear-gradient(180deg, rgb(from var(--theme-tint) r g b / 80%), rgb(from var(--theme-tint) r g b / 92%));
+            }
         }
 
         main {

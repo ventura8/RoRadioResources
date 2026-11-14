@@ -344,7 +344,8 @@ function showPictures(metadata, data) {
         showBackdrop(logo || null);
     }
 
-    showImage(byId('cover'), cover, showBackdrop);
+    // A cover that does not load leaves the station's logo as the backdrop, not none (CodeRabbit, #46).
+    showImage(byId('cover'), cover, (shown) => showBackdrop(shown || logo || null));
     showLogo(logo, data.station, byId('cover').classList.contains('logo') ? cover : '');
 }
 

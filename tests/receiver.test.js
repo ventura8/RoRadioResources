@@ -741,11 +741,16 @@ test('a cover that loads is the backdrop; one that fails leaves no picture and n
     assert.equal(shown.elements.backdrop.style.backgroundImage, 'url("https://x/cover.jpg")');
     assert.equal(shown.elements.cover.classList.has('logo'), true);
 
-    const failed = run([loadWith(['https://x/cover.jpg', 'https://x/logo.png'], '')], { pictures: 'error' });
+    // A cover that fails, with no logo: no picture and no backdrop.
+    const failed = run([loadWith(['https://x/cover.jpg'], '')], { pictures: 'error' });
     assert.equal(failed.elements.cover.src, undefined);
-    assert.equal(failed.logo, undefined);
     assert.equal(failed.elements.backdrop.style.backgroundImage, '');
     assert.equal(failed.elements.backdrop.classList.has('shown'), false);
+
+    // A cover that fails, with the station's logo: the logo is the backdrop (CodeRabbit, #46).
+    const toLogo = run([loadWith(['https://x/cover.jpg', 'https://x/logo.png'], '')], { pictures: 'error' });
+    assert.equal(toLogo.elements.cover.src, undefined);
+    assert.equal(toLogo.elements.backdrop.style.backgroundImage, 'url("https://x/logo.png")');
 
     // No picture in the cover's place: the station's logo is the backdrop.
     const logoOnly = run([loadWith([], JSON.stringify({ logo: 'https://x/logo.png' }))]);
