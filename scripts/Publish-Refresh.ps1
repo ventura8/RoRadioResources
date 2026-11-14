@@ -36,6 +36,12 @@
 .PARAMETER Merge
     Merge the pull request when the change is small enough.
 
+.PARAMETER AutoMerge
+    With -Merge: turn on GitHub's auto-merge instead of merging at once, so that the merge waits for the checks
+    master's branch protection requires (Lint, Tests). The workflow passes it when it pushes with the REFRESH_TOKEN
+    secret: a pull request pushed with GITHUB_TOKEN starts no CI, and its required checks would never report. GitHub
+    Pages rebuilds from the merge on its own.
+
 .PARAMETER MaxUrls
     More url fixes than this in one run means the runner's network, not the stations, is the problem: the pull
     request stays open for a human.
@@ -83,6 +89,7 @@ param(
     [int]$UrlCount,
     [int]$LogoCount,
     [switch]$Merge,
+    [switch]$AutoMerge,
     [int]$MaxUrls = 15,
     [int]$MaxLogos = 20,
     [string]$Repository = $env:GH_REPO,
@@ -191,6 +198,9 @@ if (-not $Merge) {
     $reason = "$UrlCount urls and $LogoCount logos changed, more than $MaxUrls urls or $MaxLogos logos: not merged automatically."
     Invoke-Tool $Gh @('pr', 'comment', $Branch, '--body', "$reason Check the urls from Romania and look at the logos before merging.") | Out-Null
     Add-Summary $reason
+} elseif ($AutoMerge) {
+    Invoke-Tool $Gh @('pr', 'merge', $Branch, '--auto', '--squash', '--delete-branch') | Out-Null
+    Add-Summary 'Auto-merge is on: GitHub merges the pull request once the required checks (Lint, Tests) pass.'
 } else {
     Invoke-Tool $Gh @('pr', 'merge', $Branch, '--squash', '--delete-branch') | Out-Null
     & $Gh api -X POST "repos/$Repository/pages/builds" --silent

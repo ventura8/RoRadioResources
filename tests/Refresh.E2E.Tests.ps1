@@ -524,6 +524,14 @@ Describe 'Publishing the refresh (Publish-Refresh.ps1: the release note, the pul
         $log | Should -Not -Contain 'pr merge automation/station-refresh --squash --delete-branch'
     }
 
+    It 'turns on auto-merge instead of merging, so that master''s required checks decide' {
+        $checkout = Initialize-Checkout 'auto'
+        $log = Invoke-Publish $checkout @{ UrlCount = 1; LogoCount = 0; Merge = $true; AutoMerge = $true }
+        $log | Should -Contain 'pr merge automation/station-refresh --auto --squash --delete-branch'
+        ($log | Where-Object { $_ -like 'api *' }) | Should -BeNullOrEmpty -Because 'Pages rebuilds from the merge itself'
+        Get-Content $checkout.Summary -Raw | Should -Match 'Auto-merge is on'
+    }
+
     It 'leaves the pull request open when no merge is asked, and closes the issue when nothing is left' {
         $checkout = Initialize-Checkout 'held'
         Set-Content -Path $urlReport -Encoding utf8 -Value @('Probed 3 stations; 1 failed twice; 1 fixed.', '', '## Fixed', '', '| Station |', '| :--- |', '| Radio Beta |')

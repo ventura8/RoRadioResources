@@ -14,6 +14,7 @@
       Workflows     actionlint, and zizmor (workflow security) from scripts/ci/requirements.txt
       Markdown      markdownlint-cli2 (.markdownlint-cli2.jsonc), from scripts/ci/package.json
       Spelling      cspell (cspell.json, scripts/ci/words.txt), from scripts/ci/package.json
+      Receiver      ESLint (eslint:all for receiver/receiver.js), html-validate and stylelint, from scripts/ci/package.json
       Whitespace    editorconfig-checker (.editorconfig), from scripts/ci/package.json
       Secrets       gitleaks, the working tree and the whole history
       Suppressions  this script: no inline suppression comment or attribute of any of the tools above
@@ -75,10 +76,20 @@ try {
     Invoke-Check 'ruff (format)' { & $Python -m ruff format --check . | Out-Host }
     Invoke-Check 'yamllint' { & $Python -m yamllint --strict . | Out-Host }
     Invoke-Check 'actionlint' { & actionlint | Out-Host }
-    # --min-severity low leaves out only zizmor's informational notes.
-    Invoke-Check 'zizmor (workflow security)' { & zizmor --persona regular --min-severity low .github/workflows | Out-Host }
+    # The strictest persona, informational notes included, over the workflows and dependabot.yml (its cooldown).
+    Invoke-Check 'zizmor (workflow security)' { & zizmor --persona pedantic .github | Out-Host }
     Invoke-Check 'markdownlint' { & (Get-NodeTool 'markdownlint-cli2') | Out-Host }
     Invoke-Check 'cspell' { & (Get-NodeTool 'cspell') --no-progress --config cspell.json '**' | Out-Host }
+    # The Cast receiver: its script (eslint:all, scripts/ci/eslint.config.mjs) and tests, its page, its styles.
+    Invoke-Check 'eslint (receiver)' {
+        & (Get-NodeTool 'eslint') --max-warnings 0 --config scripts/ci/eslint.config.mjs receiver/receiver.js tests/receiver.test.js tests/receiver.browser.test.js scripts/e2e/cast-client.mjs | Out-Host
+    }
+    Invoke-Check 'html-validate (receiver)' {
+        & (Get-NodeTool 'html-validate') --max-warnings 0 --config scripts/ci/htmlvalidate.cjs receiver/index.html | Out-Host
+    }
+    Invoke-Check 'stylelint (receiver)' {
+        & (Get-NodeTool 'stylelint') --max-warnings 0 --config scripts/ci/stylelint.config.mjs receiver/index.html | Out-Host
+    }
     Invoke-Check 'editorconfig-checker' { & (Get-Tool 'editorconfig-checker') | Out-Host }
     Invoke-Check 'gitleaks (working tree)' { & gitleaks dir --redact --no-banner . | Out-Host }
     Invoke-Check 'gitleaks (history)' { & gitleaks git --redact --no-banner . | Out-Host }
@@ -88,7 +99,8 @@ try {
         $markers = @(
             ('no' + 'qa'), ('type: ' + 'ignore'), ('Suppress' + 'Message'), ('markdownlint-' + 'disable'),
             ('cspell:' + 'disable'), ('cspell:' + 'ignore'), ('yamllint ' + 'disable'), ('zizmor: ' + 'ignore'),
-            ('gitleaks:' + 'allow'), ('editorconfig-checker-' + 'disable'), ('pylint: ' + 'disable')
+            ('gitleaks:' + 'allow'), ('editorconfig-checker-' + 'disable'), ('pylint: ' + 'disable'),
+            ('eslint-' + 'disable'), ('stylelint-' + 'disable'), ('html-validate-' + 'disable')
         )
         $pattern = ($markers | ForEach-Object { [regex]::Escape($_) }) -join '|'
         $files = @(git ls-files --cached --others --exclude-standard | Where-Object { $_ -notmatch '^(RadioLogos/|.*package-lock\.json$)' })

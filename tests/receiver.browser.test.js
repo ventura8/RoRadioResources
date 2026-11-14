@@ -12,6 +12,7 @@
 
 const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const http = require('node:http');
 const os = require('node:os');
@@ -38,6 +39,10 @@ function probe() {
     };
     window.probe = record;
     window.interceptors = {};
+    record.cspViolations = [];
+    document.addEventListener('securitypolicyviolation', (e) => {
+        record.cspViolations.push(`${e.effectiveDirective} ${e.blockedURI}`);
+    });
     const Context = cast.framework.CastReceiverContext;
     const getInstance = Context.getInstance.bind(Context);
     let wrapped = null;
@@ -52,6 +57,7 @@ function probe() {
         context.start = (options) => {
             record.started = true;
             record.maxInactivity = options && options.maxInactivity;
+            record.touchScreenOptimizedApp = Boolean(options && options.uiConfig && options.uiConfig.touchScreenOptimizedApp);
             // Off a device the framework has no platform to answer it; reaching start() is the page's part.
             try {
                 return start(options);
@@ -84,8 +90,17 @@ function probe() {
             record.commands.push(commands);
             return setSupported(commands, broadcast);
         };
+        // No stream off a device: a tap's pause / play is recorded instead.
+        record.playback = [];
+        player.pause = () => record.playback.push('pause');
+        player.play = () => record.playback.push('play');
+        // Every status says what the screen shows (record.shown, the last one); step presses are also in broadcasts.
         player.broadcastStatus = (includeMedia, requestId, customData) => {
-            record.broadcasts.push(customData);
+            record.shown = customData.shown;
+            record.statusRequestIds = [...new Set([...(record.statusRequestIds || []), requestId])];
+            if (customData.step) {
+                record.broadcasts.push(customData);
+            }
         };
         // No media session off a device: the media information the page gives the player is kept here.
         let playing = null;
@@ -101,6 +116,12 @@ function probe() {
     };
 }
 
+/** Waits `ms`: separate presses are a moment apart (the page takes a press repeated within 600 ms as the same). */
+const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** The receiver's files beside its page, with their content types. */
+const ownFiles = { '/receiver/receiver.js': 'text/javascript; charset=utf-8', '/receiver/icon.png': 'image/png' };
+
 /** The page as a device gets it, with the probe after the framework; pictures served from /img/<name>.png. */
 function serve(withPage) {
     const png = Buffer.from(
@@ -109,9 +130,18 @@ function serve(withPage) {
     );
     const server = http.createServer((request, response) => {
         if (request.url === '/receiver/') {
-            const html = withPage.replace(sdkTag, `${sdkTag}\n<script>(${probe})();</script>`);
+            // The page's Content-Security-Policy stays in force; the injected probe is allowed by its own hash.
+            const probeScript = `(${probe})();`;
+            const probeHash = crypto.createHash('sha256').update(probeScript, 'utf8').digest('base64');
+            const html = withPage
+                .replace("script-src 'self'", `script-src 'sha256-${probeHash}' 'self'`)
+                .replace(sdkTag, `${sdkTag}\n<script>${probeScript}</script>`);
             response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
             response.end(html);
+        } else if (ownFiles[request.url]) {
+            // The page's own files as GitHub Pages serves them: a missing one is a 404 here too.
+            response.writeHead(200, { 'content-type': ownFiles[request.url] });
+            response.end(fs.readFileSync(path.join(__dirname, '..', request.url)));
         } else if (request.url.startsWith('/img/')) {
             response.writeHead(200, { 'content-type': 'image/png' });
             response.end(png);
@@ -441,6 +471,11 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
         assert.deepEqual(session.errors, []);
     });
 
+    await t.test('runs under its Content-Security-Policy with nothing blocked', async () => {
+        const record = await evaluate('window.probe');
+        assert.deepEqual(record.cspViolations, []);
+    });
+
     await t.test('reaches context.start(), with the receiver kept for an hour of inactivity', async () => {
         const record = await evaluate('window.probe');
         assert.equal(record.started, true);
@@ -459,6 +494,82 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
         assert.equal(screen.idleVisible, true);
         assert.equal(screen.mainVisible, false);
         assert.equal(await evaluate('document.querySelector("#idle p").textContent'), 'Ready to play');
+    });
+
+    await t.test('the idle screen shows the app icon, which loads (no 404)', async () => {
+        const icon = await waitFor(
+            async () => {
+                const state = await evaluate(`(() => {
+                    const icon = document.getElementById('appIcon');
+                    return { complete: icon.complete, width: icon.naturalWidth, shown: icon.getBoundingClientRect().width > 0 };
+                })()`);
+                return state.complete ? state : null;
+            },
+            'the icon to load',
+            10000,
+        );
+        assert.equal(icon.width, 256);
+        assert.equal(icon.shown, true);
+    });
+
+    await t.test('declares the touch UI and plays through its own media element', async () => {
+        const record = await evaluate('window.probe');
+        assert.equal(record.touchScreenOptimizedApp, true);
+        assert.equal(await evaluate('document.querySelector("cast-media-player")'), null);
+        assert.equal(await evaluate('document.getElementById("media").tagName'), 'AUDIO');
+    });
+
+    await t.test('on a touch display the buttons stay on screen, under the song, with a full song and a caption, and tap', async () => {
+        const long = 'A song title long enough to wrap over two lines on any screen the receiver meets';
+        const data = JSON.stringify({ caption: `${long} ${long}`, previous: true, next: true, station: 'Pro FM' });
+        const m = media(origin, { title: long, artist: long, album: long, releaseDate: '2025', cover: 'cover', logo: 'logo', customData: data });
+        await evaluate('document.body.classList.add("touch")');
+        await evaluate(intercept('LOAD', loadRequest(m)));
+        await settle(session, (s) => s.logo !== null, 'the logo');
+        const placed = await evaluate(`(() => {
+            // Their own row in the safe area, under the song and clear of the caption band.
+            const main = document.querySelector('main').getBoundingClientRect();
+            const song = document.getElementById('song').getBoundingClientRect();
+            const captions = document.getElementById('captions').getBoundingClientRect();
+            return ['previous', 'playPause', 'next'].map((id) => {
+                const r = document.getElementById(id).getBoundingClientRect();
+                const inside = r.top >= song.bottom - 0.5 && r.bottom <= captions.top + 0.5 && r.bottom <= main.bottom + 0.5;
+                return { id, width: r.width, inside };
+            });
+        })()`);
+        for (const button of placed) {
+            assert.ok(button.width > 0, `${button.id} is drawn`);
+            assert.equal(button.inside, true, `${button.id} is under the song, above the captions, in the safe area`);
+        }
+
+        await pause(700);
+        const before = (await evaluate('window.probe')).broadcasts.length;
+        await evaluate('document.getElementById("next").click()');
+        await pause(700);
+        await evaluate('document.getElementById("previous").click()');
+        const steps = (await evaluate('window.probe')).broadcasts.slice(before).map((b) => b.step);
+        assert.deepEqual(steps, ['next', 'previous']);
+
+        // Pause and resume: a tap pauses while it plays; the player's PAUSE shows play, and a tap then plays.
+        await evaluate('document.getElementById("playPause").click()');
+        await evaluate('window.events[cast.framework.events.EventType.PAUSE]({})');
+        assert.equal(await evaluate('document.getElementById("playPause").getAttribute("aria-label")'), 'Play');
+        await evaluate('window.events[cast.framework.events.EventType.PLAYING]({})');
+        assert.equal(await evaluate('document.getElementById("playPause").getAttribute("aria-label")'), 'Pause');
+        assert.deepEqual((await evaluate('window.probe')).playback, ['pause']);
+        await evaluate('document.body.classList.remove("touch")');
+    });
+
+    await t.test('a stream that fails shows the idle screen with why, and the next station clears it', async () => {
+        await evaluate('window.events[cast.framework.events.EventType.MEDIA_FINISHED]({ endedReason: "ERROR" })');
+        let screen = await evaluate(SCREEN);
+        assert.equal(screen.idleVisible, true);
+        assert.match(await evaluate('document.getElementById("status").textContent'), /could not be played/);
+        assert.equal(await evaluate('document.body.classList.contains("failed")'), true);
+        await evaluate(intercept('LOAD', loadRequest(media(origin, { title: 'Back', customData: '' }))));
+        screen = await evaluate(SCREEN);
+        assert.equal(screen.mainVisible, true);
+        assert.equal(await evaluate('document.body.classList.contains("failed")'), false);
     });
 
     await t.test('a LOAD with the old bare-string caption shows the song and the caption, with no steps', async () => {
@@ -530,9 +641,13 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
     });
 
     await t.test('previous / next jumps broadcast {step, stepId} with rising ids and are not passed on', async () => {
+        await pause(700);
         const before = (await evaluate('window.probe.broadcasts')).length;
+        // Separate presses: each a moment after the last.
         assert.equal(await evaluate(intercept('QUEUE_UPDATE', { jump: 1 })), null);
+        await pause(700);
         assert.equal(await evaluate(intercept('QUEUE_UPDATE', { jump: -1 })), null);
+        await pause(700);
         assert.equal(await evaluate(intercept('QUEUE_UPDATE', { jump: 1 })), null);
         const steps = (await evaluate('window.probe.broadcasts')).slice(before);
         assert.deepEqual(
@@ -542,6 +657,52 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
         for (let i = 1; i < steps.length; i += 1) {
             assert.ok(steps[i].stepId > steps[i - 1].stepId, `stepId rises: ${JSON.stringify(steps)}`);
         }
+    });
+
+    await t.test('one press is one step: the same jump delivered five times with one request id steps once', async () => {
+        await pause(700);
+        const before = (await evaluate('window.probe.broadcasts')).length;
+        const jump = { jump: 1, requestId: 4242, senderId: 'tablet' };
+        for (let i = 0; i < 5; i += 1) {
+            assert.equal(await evaluate(intercept('QUEUE_UPDATE', jump)), null);
+            // Resent after the press's moment has passed: only the request id tells it is the same press.
+            await pause(700);
+        }
+        const steps = (await evaluate('window.probe.broadcasts')).slice(before);
+        assert.deepEqual(steps.map((s) => s.step), ['next']);
+    });
+
+    await t.test('the media status tells the senders what the screen shows, pictures once loaded', async () => {
+        const data = JSON.stringify({ caption: 'Live words', previous: true, next: false, station: 'Pro FM' });
+        const m = media(origin, { title: 'A song', artist: 'A band', cover: 'cover', logo: 'logo', customData: data });
+        await evaluate(intercept('QUEUE_UPDATE', updateRequest(m)));
+        const shown = await waitFor(
+            async () => {
+                const s = (await evaluate('window.probe')).shown;
+                return s && s.cover && s.logo && s.title === 'A song' ? s : null;
+            },
+            'the pictures in the reported screen',
+            10000,
+        );
+        assert.deepEqual(shown, {
+            title: 'A song',
+            artist: 'A band',
+            station: 'Pro FM',
+            caption: 'Live words',
+            logo: true,
+            cover: true,
+            steps: { previous: true, next: false },
+            defaultTitle: false,
+        });
+        assert.deepEqual((await evaluate('window.probe')).statusRequestIds, [0]);
+    });
+
+    await t.test('a double tap on the touch next button is one step', async () => {
+        await pause(700);
+        const before = (await evaluate('window.probe.broadcasts')).length;
+        await evaluate('document.getElementById("next").click(); document.getElementById("next").click()');
+        const steps = (await evaluate('window.probe.broadcasts')).slice(before);
+        assert.deepEqual(steps.map((s) => s.step), ['next']);
     });
 
     await t.test('a metadata update during playback replaces title, artist and cover, never leaving the old one', async () => {

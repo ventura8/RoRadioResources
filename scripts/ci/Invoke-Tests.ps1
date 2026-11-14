@@ -52,8 +52,8 @@ $configuration.CodeCoverage.Path = @($updater | ForEach-Object { Join-Path $root
 $configuration.CodeCoverage.OutputPath = Join-Path ([IO.Path]::GetTempPath()) "roradio-coverage-$PID.xml"
 $configuration.CodeCoverage.CoveragePercentTarget = 100
 $pesterResult = Invoke-Pester -Configuration $configuration
-$coverage = $pesterResult.CodeCoverage
-$missed = @($coverage.CommandsMissed)
+$updaterCoverage = $pesterResult.CodeCoverage
+$missed = @($updaterCoverage.CommandsMissed)
 foreach ($command in $missed) { Write-Information "  not covered: $($command.File):$($command.Line) $($command.Command)" -InformationAction Continue }
 
 Push-Location $root
@@ -61,8 +61,13 @@ try {
     # The Python tests, and the updater's Python (scripts/lib: the logo check) measured at 100%.
     & $Python -m pytest tests --cov=scripts/lib --cov-report=term-missing --cov-fail-under=100 -q
     $pythonFailed = $LASTEXITCODE -ne 0
-    # The Cast receiver's script (receiver/index.html).
-    & node --test (Get-ChildItem tests -Filter '*.test.js' | ForEach-Object FullName)
+    # The Cast receiver (receiver/receiver.js): unit tests and the real framework in Chrome. Below 100 % line, branch
+    # or function coverage of the script, Node's runner fails the run.
+    $coverage = @(
+        '--experimental-test-coverage', '--test-coverage-include=receiver/receiver.js',
+        '--test-coverage-lines=100', '--test-coverage-branches=100', '--test-coverage-functions=100'
+    )
+    & node --test @coverage (Get-ChildItem tests -Filter '*.test.js' | ForEach-Object FullName)
     $nodeFailed = $LASTEXITCODE -ne 0
 } finally {
     Pop-Location
@@ -74,4 +79,4 @@ if ($failures -gt 0 -or $missed.Count -gt 0 -or $pythonFailed -or $nodeFailed) {
     $receiver = if ($nodeFailed) { 'failed' } else { 'passed' }
     Write-Error "Tests failed: $failures Pester failure(s), $($missed.Count) updater command(s) not covered, Python tests $python, receiver tests $receiver."
 }
-Write-Information "All tests passed ($($pesterResult.PassedCount) Pester, updater coverage $([Math]::Round($coverage.CoveragePercent, 2))% of $($coverage.CommandsAnalyzedCount) commands, the Python tests and the receiver tests)." -InformationAction Continue
+Write-Information "All tests passed ($($pesterResult.PassedCount) Pester, updater coverage $([Math]::Round($updaterCoverage.CoveragePercent, 2))% of $($updaterCoverage.CommandsAnalyzedCount) commands, the Python tests and the receiver tests)." -InformationAction Continue

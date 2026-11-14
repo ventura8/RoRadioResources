@@ -81,8 +81,27 @@ runspaces that coverage cannot see.
 
 The linters are PSScriptAnalyzer (every rule, every severity), ruff (every rule, lint and format), yamllint
 (strict), actionlint, zizmor, markdownlint, cspell, editorconfig-checker and gitleaks (working tree and history).
+The Cast receiver adds three: ESLint, html-validate and stylelint. ESLint runs `eslint:all` on
+`receiver/receiver.js` and the recommended and strict rules on its tests and the E2E sender
+(`scripts/ci/eslint.config.mjs`). html-validate runs its recommended and accessibility presets. stylelint runs its
+standard config on the page's `<style>`, through postcss-html.
 A finding is fixed in the file; a comment or attribute that silences a linter fails the run. Two paths are left
 out of spelling on purpose: `RadioStationsData.json` and `docs/releases/` are station names, not English.
+
+### The Cast receiver's tests
+
+- `receiver/receiver.js` is the page's whole script (none inline in `receiver/index.html`).
+  `tests/receiver.test.js` loads it with the framework stubbed. `Invoke-Tests.ps1` runs Node's coverage over it and
+  fails below 100 % lines, branches and functions. Every change to the script comes with the tests that keep it at
+  100 %.
+- `tests/receiver.browser.test.js` serves the page and its files (a missing file is a 404) to headless Chrome with
+  Google's real Cast framework. It plays every user flow: the splash with the icon, a load, a song update, a station
+  switch, the touch buttons (on screen, under the song, tapped), pause and resume, a failed stream, and the end
+  back to idle.
+- `scripts/e2e/Test-ReceiverOnTablet.ps1` plays the same flows on a real Pixel Tablet over adb and Cast (a small
+  sender in `scripts/e2e/cast-client.mjs`, no packages). It saves a screenshot per step, then checks
+  `dumpsys media_session` and logcat. It launches the receiver and plays audio at volume 10, so run it only when
+  the device is free.
 
 One-time setup: `python -m pip install -r scripts/ci/requirements.txt`, `npm ci --prefix scripts/ci`,
 `Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser`,
@@ -148,6 +167,14 @@ What the manual revival of 2026-09-29 (137 failing stations, two rounds) taught,
 A candidate is written only when it played twice (in the candidate probe and again just before it is chosen), and
 the written list is checked against the old one: the same stations in the same order, only the fixed urls changed.
 Two stations are never given the same new stream in one run.
+
+**Branch protection and the refresh's own pull request.** `master` requires the Lint and Tests checks and refuses
+force pushes. A branch pushed with `GITHUB_TOKEN` starts no workflow, so the refresh pushes with the repository
+secret `REFRESH_TOKEN` (a fine-grained personal access token for this repository only: Contents, Pull requests and
+Issues read and write). That push starts CI on the pull request, and `Publish-Refresh.ps1 -AutoMerge` turns on
+auto-merge, so GitHub merges it once Lint and Tests pass. The refresh job also runs the tests itself before it
+commits. Without the secret the workflow uses `GITHUB_TOKEN` and merges at once, which only works while `master`
+is unprotected.
 
 **Dry run against the live list:** Run workflow with `dry_run` checked (the report goes to the run's summary; no
 commit, pull request or issue), or locally `./scripts/Update-StationUrls.ps1 -ReplaceOnlyDead -WhatIf -ReportPath

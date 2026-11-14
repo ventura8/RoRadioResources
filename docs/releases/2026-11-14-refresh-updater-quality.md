@@ -40,6 +40,9 @@ itself does not change.
   - the source pages the refresh scrapes, and logos.
 - **100% coverage** of the refresh's PowerShell (Pester code coverage) and Python (`pytest --cov-fail-under=100`).
   `scripts/ci/Invoke-Tests.ps1` fails below it.
+- **Ready for branch protection on `master`** (required Lint and Tests checks, no force push). The refresh pushes
+  with the `REFRESH_TOKEN` secret, so its pull request starts CI. It turns on auto-merge, and GitHub merges once the
+  checks pass.
 - **Dry run against the live list:** the workflow's `dry_run` input, or
   `./scripts/Update-StationUrls.ps1 -ReplaceOnlyDead -WhatIf`.
 - The tests open loopback addresses with `RORADIO_REFRESH_ALLOW_LOOPBACK=1`. Private networks and the metadata
