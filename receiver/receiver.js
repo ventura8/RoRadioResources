@@ -72,7 +72,7 @@ const text = (value) => (typeof value === 'string' ? value : '');
  * app builds) is the caption alone, with no steps.
  */
 function appData(customData) {
-    const none = { caption: '', logo: '', next: false, previous: false, station: '' };
+    const none = { caption: '', logo: '', next: false, previous: false, rects: false, station: '' };
     if (typeof customData !== 'string') {
         return none;
     }
@@ -85,6 +85,7 @@ function appData(customData) {
                 logo: text(data.logo),
                 next: data.next === true,
                 previous: data.previous === true,
+                rects: data.rects === true,
                 station: text(data.station),
             };
         } catch {
@@ -99,9 +100,12 @@ const { Command } = cast.framework.messages;
 const stepCommands = Command.QUEUE_PREV | Command.QUEUE_NEXT;
 let baseCommands = null;
 
+/** The steps the station has, as declared to the device (and reported in "shown"). */
+const steps = { next: false, previous: false };
+
 /**
  * Previous / next as the app offers them: declared only for a step the station has, so the device's own media
- * controls (smart display, Google TV, Google Home) and the page's own buttons show exactly those.
+ * controls (smart display, Google TV, Google Home) show exactly those.
  */
 function showSteps(previous, next) {
     if (baseCommands === null) {
@@ -110,8 +114,8 @@ function showSteps(previous, next) {
 
     const commands = baseCommands | (previous ? Command.QUEUE_PREV : 0) | (next ? Command.QUEUE_NEXT : 0);
     player.setSupportedMediaCommands(commands, true);
-    byId('previous').classList.toggle('hidden', !previous);
-    byId('next').classList.toggle('hidden', !next);
+    steps.next = next;
+    steps.previous = previous;
 }
 
 /*
@@ -152,6 +156,9 @@ function showStatus(failed) {
         : 'Ready to play';
 }
 
+/** Asked for by a test sender only ({"rects": true} in its customData). */
+let withRects = false;
+
 /**
  * What the screen shows, for the senders: {"title", "artist", "station", "caption", "logo", "cover", "steps",
  * "defaultTitle"} in the media status's customData, so an E2E test (or the app) can check the screen without OCR.
@@ -168,9 +175,29 @@ function shownNow() {
         defaultTitle: !title || title === station,
         logo: byId('station').querySelector('img').hasAttribute('src'),
         station,
-        steps: { next: !byId('next').classList.contains('hidden'), previous: !byId('previous').classList.contains('hidden') },
+        steps: { ...steps },
         title,
+        ...(withRects ? layoutNow() : {}),
     };
+}
+
+/** The leaves an on-device test measures on the device's own screenshot. */
+const LEAVES = ['cover', 'stationName', 'title', 'artist', 'release', 'captionText'];
+
+/**
+ * Test mode: each visible leaf's box (CSS px, [left, top, right, bottom]), its text colour, the device pixel ratio
+ * and the viewport, so an on-device E2E can check overlaps and contrast on the device's real screenshot.
+ */
+function layoutNow() {
+    const rects = {};
+    for (const id of [...LEAVES, 'station']) {
+        const box = (id === 'station' ? byId(id).querySelector('img') : byId(id)).getBoundingClientRect();
+        if (box.width > 0 && box.height > 0) {
+            rects[id] = { box: [box.left, box.top, box.right, box.bottom], color: getComputedStyle(byId(id)).color };
+        }
+    }
+
+    return { rects, scale: window.devicePixelRatio, viewport: [window.innerWidth, window.innerHeight] };
 }
 
 /**
@@ -191,15 +218,25 @@ function showBackdrop(url) {
 
 /** The song's text, the station's name and the caption. */
 function showText(metadata, data) {
-    byId('title').textContent = metadata.title || metadata.songName || '';
-    byId('artist').textContent = metadata.artist || metadata.subtitle || '';
-    byId('album').textContent = metadata.albumName || '';
+    // The station's name once (owner, 2026-11-14): with no song the app sends it as title and artist too, and "Pro FM"
+    // showed three times. A field that is only the station's name is left out; a song's own fields may repeat each
+    // other (a title, album and artist that are the same string are the song's data).
+    const station = data.station.trim().toLowerCase();
+    const notStation = (value) => ((value || '').trim().toLowerCase() === station ? '' : value || '');
+    byId('title').textContent = notStation(metadata.title || metadata.songName);
+    byId('artist').textContent = notStation(metadata.artist || metadata.subtitle);
+    byId('album').textContent = notStation(metadata.albumName);
     byId('year').textContent = yearOf(metadata.releaseDate);
-    byId('release').classList.toggle('empty', !metadata.albumName && !yearOf(metadata.releaseDate));
+    byId('release').classList.toggle('empty', !byId('album').textContent && !yearOf(metadata.releaseDate));
     byId('stationName').textContent = data.station;
-    byId('captionText').textContent = data.caption;
-    byId('captions').classList.toggle('empty', !data.caption);
-    document.body.classList.toggle('captioned', Boolean(data.caption));
+    showCaption(data.caption);
+}
+
+/** The live caption on its own line, or none. */
+function showCaption(caption) {
+    byId('captionText').textContent = caption;
+    byId('captions').classList.toggle('empty', !caption);
+    document.body.classList.toggle('captioned', Boolean(caption));
 }
 
 /**
@@ -227,6 +264,7 @@ function showPictures(metadata, data) {
 function show(media) {
     const metadata = media.metadata || {};
     const data = appData(media.customData);
+    withRects = data.rects;
     showText(metadata, data);
     showSteps(data.previous, data.next);
     showPictures(metadata, data);
@@ -291,28 +329,13 @@ const { EventType } = cast.framework.events;
 player.addEventListener(EventType.MEDIA_FINISHED, (event) => showStatus(Boolean(event) && event.endedReason === 'ERROR'));
 player.addEventListener(EventType.ERROR, () => showStatus(true));
 
-/** The pause button shows what a tap does: pause while it plays, play while it is paused. */
-function showPaused(paused) {
-    const button = byId('playPause');
-    button.textContent = paused ? '▶' : '⏸';
-    button.setAttribute('aria-label', paused ? 'Play' : 'Pause');
-}
+/*
+ * No buttons of the page's own: a touch display (Pixel Tablet) always draws its system media bar (progress,
+ * LIVE, the output chip, previous / pause / next) over the page's bottom, whatever the receiver declares. Its
+ * previous / next reach the page as a QUEUE_UPDATE jump (above), so a second set of buttons only duplicated them.
+ */
 
-player.addEventListener(EventType.PAUSE, () => showPaused(true));
-player.addEventListener(EventType.PLAYING, () => showPaused(false));
-
-// A touch display's taps: previous / next step through the group in the app, as the device's own buttons do.
-byId('previous').addEventListener('click', () => step('previous'));
-byId('next').addEventListener('click', () => step('next'));
-byId('playPause').addEventListener('click', () => {
-    if (player.getPlayerState() === cast.framework.messages.PlayerState.PAUSED) {
-        player.play();
-    } else {
-        player.pause();
-    }
-});
-
-/** Whether this device takes touch (Pixel Tablet, Nest Hub): its buttons show on the page then. */
+/** Whether this device takes touch (Pixel Tablet, Nest Hub): the page then keeps clear of the system media bar. */
 function isTouch() {
     try {
         const capabilities = context.getDeviceCapabilities() || {};

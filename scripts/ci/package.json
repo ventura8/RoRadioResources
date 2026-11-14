@@ -2,13 +2,14 @@
   "name": "roradioresources-lint-tools",
   "version": "1.0.0",
   "private": true,
-  "description": "Pinned Node-based linters of scripts/ci/Invoke-Lint.ps1 (markdownlint, cspell, editorconfig-checker, ESLint, html-validate, stylelint).",
+  "description": "Pinned Node-based linters of scripts/ci/Invoke-Lint.ps1 (markdownlint, cspell, editorconfig-checker, ESLint, html-validate, stylelint) and axe-core for the receiver's accessibility tests.",
   "license": "MIT",
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "axe-core": "4.14.0",
     "cspell": "10.4.1",
     "editorconfig-checker": "7.0.0",
-    "eslint": "10.15.0",
+    "eslint": "10.14.0",
     "globals": "17.13.0",
     "html-validate": "11.17.0",
     "markdownlint-cli2": "0.24.1",
@@ -17,6 +18,9 @@
     "stylelint-config-standard": "40.0.0"
   },
   "overrides": {
-    "katex": "0.19.0"
+    "katex": "0.19.0",
+    "eslint": {
+      "minimatch": "11.0.3"
+    }
   }
 }

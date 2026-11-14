@@ -1,6 +1,11 @@
 Alexandrescu
 allowzero
 Amma
+IDAT
+IHDR
+Paeth
+rects
+WCAG
 CASTV
 colours
 Constan
