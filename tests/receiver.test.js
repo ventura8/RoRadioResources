@@ -143,16 +143,19 @@ function run(
         document: { getElementById: (id) => (elements[id] ??= element()), body: element() },
         Image,
     };
-    // The page's globals for one fresh load of the script; a clock that stands still: the step ids must still rise.
+    // The page's globals for one fresh load of the script. The clock moves on a second before each message and tap
+    // unless the message says otherwise (`gap`): a press repeated within a moment is the same press.
     const saved = Object.fromEntries(Object.keys(sandbox).map((name) => [name, globalThis[name]]));
     const now = Date.now;
+    did.clock = 1000;
     Object.assign(globalThis, sandbox);
-    Date.now = () => 1000;
+    Date.now = () => did.clock;
     try {
         delete require.cache[script];
         require(script);
         play(messages, interceptors, did);
         for (const id of taps) {
+            did.clock += 1000;
             elements[id].listeners.click();
         }
     } finally {
@@ -165,7 +168,7 @@ function run(
     // Later work in the same page (more messages, a framework event, a picture that settles), with its globals.
     did.within = (work) => {
         Object.assign(globalThis, sandbox);
-        Date.now = () => 1000;
+        Date.now = () => did.clock;
         try {
             return work((more) => play(more, interceptors, did));
         } finally {
@@ -179,6 +182,7 @@ function run(
 /** Plays `messages` through the page's interceptors. */
 function play(messages, interceptors, did) {
     for (const message of messages) {
+        did.clock += message.gap ?? 1000;
         const result = interceptors[message.type](message.request ?? {});
         did.results.push(result === null ? null : 'request');
     }
@@ -255,8 +259,8 @@ test('the page starts the receiver, or the launch is never answered and the app 
     assert.equal(run([]).started, true);
 });
 
-test('repeated jumps broadcast steps with rising ids, and play nothing', () => {
-    const jump = (by) => ({ type: 'QUEUE_UPDATE', request: { jump: by } });
+test('repeated jumps broadcast steps with rising ids, and play nothing, even on a clock set back', () => {
+    const jump = (by) => ({ type: 'QUEUE_UPDATE', request: { jump: by }, gap: -100 });
     const did = run([load(appData('', true, true)), jump(1), jump(-1), jump(1)]);
     assert.deepEqual(did.results, ['request', null, null, null]);
     assert.deepEqual(
@@ -265,9 +269,36 @@ test('repeated jumps broadcast steps with rising ids, and play nothing', () => {
     );
     const ids = did.broadcasts.map((entry) => entry.customData.stepId);
     for (let i = 1; i < ids.length; i++) {
-        assert.ok(ids[i] > ids[i - 1], `step id ${ids[i]} rises above ${ids[i - 1]} on a clock that stands still`);
+        assert.ok(ids[i] > ids[i - 1], `step id ${ids[i]} rises above ${ids[i - 1]} on a clock set back`);
     }
     assert.ok(did.broadcasts.every((entry) => entry.includeMedia === false));
+});
+
+test('one press is one step: a jump resent with its request id, or repeated at once, steps once (Pixel Tablet)', () => {
+    const resent = { type: 'QUEUE_UPDATE', request: { jump: 1, requestId: 7, senderId: 'tablet' } };
+    const did = run([load(appData('', true, true)), resent, resent, resent, resent, resent]);
+    assert.deepEqual(
+        did.broadcasts.map((entry) => entry.customData.step),
+        ['next'],
+    );
+
+    const quick = { type: 'QUEUE_UPDATE', request: { jump: 1 }, gap: 100 };
+    const fast = run([load(appData('', true, true)), quick, quick, quick]);
+    assert.equal(fast.broadcasts.length, 1);
+
+    // Another sender's request with the same number, a moment later, is its own press.
+    const other = { type: 'QUEUE_UPDATE', request: { jump: -1, requestId: 7, senderId: 'phone' } };
+    const both = run([resent, other]);
+    assert.deepEqual(
+        both.broadcasts.map((entry) => entry.customData.step),
+        ['next', 'previous'],
+    );
+});
+
+test('a double tap on a touch button within a moment is one step', () => {
+    const did = run([load(appData('', true, true))], { taps: ['next'] });
+    did.within(() => did.elements.next.listeners.click());
+    assert.equal(did.broadcasts.length, 1);
 });
 
 test("a sender's queue jump of +1 / -1 is a step, and the song is left alone", () => {

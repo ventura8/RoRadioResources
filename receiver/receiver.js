@@ -95,10 +95,32 @@ function showSteps(previous, next) {
     byId('next').classList.toggle('hidden', !next);
 }
 
-/** A previous / next press, for the app: a media status whose customData names it, numbered upwards. */
+/*
+ * One press is one step. A device's controller resends a jump it got no answer to, with the same request id, and a
+ * press could fire twice within a moment: one tap on the Pixel Tablet's next went seven stations on (2026-11-14). A
+ * request id seen before is the same press, and a step within STEP_GAP_MS of the last one is the same press too.
+ */
+const STEP_GAP_MS = 600;
+const seenRequests = new Set();
+let lastStepAt = -Infinity;
 let lastStepId = 0;
-function step(name) {
-    lastStepId = Math.max(Date.now(), lastStepId + 1);
+
+/** A previous / next press, for the app: a media status whose customData names it, numbered upwards. */
+function step(name, request) {
+    const key = request && request.requestId !== undefined ? `${request.senderId}/${request.requestId}` : '';
+    const now = Date.now();
+    // A clock set back (the device synced its time) is no repeat: only a press just after the last one is.
+    const repeat = now >= lastStepAt && now - lastStepAt < STEP_GAP_MS;
+    if (seenRequests.has(key) || repeat) {
+        return;
+    }
+
+    if (key) {
+        seenRequests.add(key);
+    }
+
+    lastStepAt = now;
+    lastStepId = Math.max(now, lastStepId + 1);
     player.broadcastStatus(false, undefined, { step: name, stepId: lastStepId });
 }
 
@@ -170,7 +192,7 @@ player.setMessageInterceptor(MessageType.QUEUE_UPDATE, (request) => {
     // A sender's previous / next (the Google Home app, an Android notification) is a jump in the queue: the app steps
     // instead, and loads the station it reaches.
     if (request.jump === 1 || request.jump === -1) {
-        step(request.jump === 1 ? 'next' : 'previous');
+        step(request.jump === 1 ? 'next' : 'previous', request);
         return null;
     }
 

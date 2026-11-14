@@ -111,6 +111,9 @@ function probe() {
     };
 }
 
+/** Waits `ms`: separate presses are a moment apart (the page takes a press repeated within 600 ms as the same). */
+const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /** The receiver's files beside its page, with their content types. */
 const ownFiles = { '/receiver/receiver.js': 'text/javascript; charset=utf-8', '/receiver/icon.png': 'image/png' };
 
@@ -534,8 +537,11 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
             assert.equal(button.inside, true, `${button.id} is under the song, above the captions, in the safe area`);
         }
 
+        await pause(700);
         const before = (await evaluate('window.probe')).broadcasts.length;
-        await evaluate('document.getElementById("next").click(); document.getElementById("previous").click()');
+        await evaluate('document.getElementById("next").click()');
+        await pause(700);
+        await evaluate('document.getElementById("previous").click()');
         const steps = (await evaluate('window.probe')).broadcasts.slice(before).map((b) => b.step);
         assert.deepEqual(steps, ['next', 'previous']);
 
@@ -630,9 +636,13 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
     });
 
     await t.test('previous / next jumps broadcast {step, stepId} with rising ids and are not passed on', async () => {
+        await pause(700);
         const before = (await evaluate('window.probe.broadcasts')).length;
+        // Separate presses: each a moment after the last.
         assert.equal(await evaluate(intercept('QUEUE_UPDATE', { jump: 1 })), null);
+        await pause(700);
         assert.equal(await evaluate(intercept('QUEUE_UPDATE', { jump: -1 })), null);
+        await pause(700);
         assert.equal(await evaluate(intercept('QUEUE_UPDATE', { jump: 1 })), null);
         const steps = (await evaluate('window.probe.broadcasts')).slice(before);
         assert.deepEqual(
@@ -642,6 +652,27 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
         for (let i = 1; i < steps.length; i += 1) {
             assert.ok(steps[i].stepId > steps[i - 1].stepId, `stepId rises: ${JSON.stringify(steps)}`);
         }
+    });
+
+    await t.test('one press is one step: the same jump delivered five times with one request id steps once', async () => {
+        await pause(700);
+        const before = (await evaluate('window.probe.broadcasts')).length;
+        const jump = { jump: 1, requestId: 4242, senderId: 'tablet' };
+        for (let i = 0; i < 5; i += 1) {
+            assert.equal(await evaluate(intercept('QUEUE_UPDATE', jump)), null);
+            // Resent after the press's moment has passed: only the request id tells it is the same press.
+            await pause(700);
+        }
+        const steps = (await evaluate('window.probe.broadcasts')).slice(before);
+        assert.deepEqual(steps.map((s) => s.step), ['next']);
+    });
+
+    await t.test('a double tap on the touch next button is one step', async () => {
+        await pause(700);
+        const before = (await evaluate('window.probe.broadcasts')).length;
+        await evaluate('document.getElementById("next").click(); document.getElementById("next").click()');
+        const steps = (await evaluate('window.probe.broadcasts')).slice(before);
+        assert.deepEqual(steps.map((s) => s.step), ['next']);
     });
 
     await t.test('a metadata update during playback replaces title, artist and cover, never leaving the old one', async () => {
