@@ -316,13 +316,12 @@ Describe 'The dry run, a source that is down, and a run with nothing to fix' {
         Get-Content $odd -Raw | Should -Be $json
     }
 
-    It 'writes nothing when the result would change more than the fixed urls' {
-        $twice = Join-Path $work 'twice.json'
-        $guid = [Guid]::NewGuid().ToString()
-        $json = "[{`"Name`": `"Test`", `"List`": [{`"GUID`": `"$guid`", `"Title`": `"Radio Beta`", `"Url`": `"http://127.0.0.1:1/x`"}, {`"GUID`": `"$guid`", `"Title`": `"Radio Alpha`", `"Url`": `"$base/stream/alpha`"}]}]"
-        [IO.File]::WriteAllText($twice, $json)
-        { Invoke-Quiet 'Update-StationUrls.ps1' (@{ Catalog = $twice } + $sources + $fast) } | Should -Throw '*nothing was written*'
-        Get-Content $twice -Raw | Should -Be $json
+    It 'checks that a written list changes nothing but the fixed urls' {
+        . (Join-Path $scripts 'lib/Catalog.ps1')
+        $text = '[{"Name": "T", "List": [{"GUID": "a", "Title": "A", "Url": "http://new"}, {"GUID": "b", "Title": "B", "Url": "http://b"}]}]'
+        $before = @(Read-StationList '[{"Name": "T", "List": [{"GUID": "a", "Title": "A", "Url": "http://old"}, {"GUID": "b", "Title": "B", "Url": "http://b"}]}]')
+        { Assert-OnlyUrlChange $before $text @([pscustomobject]@{ Guid = 'a'; NewUrl = 'http://new' }) } | Should -Not -Throw
+        { Assert-OnlyUrlChange $before $text @() } | Should -Throw '*nothing was written*'
     }
 }
 
@@ -515,12 +514,12 @@ Describe 'Publishing the refresh (Publish-Refresh.ps1: the release note, the pul
     It 'commits the list, the logos and the note, pushes, opens the pull request, merges it and asks Pages to rebuild' {
         $checkout = Initialize-Checkout 'merge'
         $log = Invoke-Publish $checkout @{ UrlCount = 1; LogoCount = 1; Merge = $true }
-        $log | Should -Contain ('pr create --base master --head automation/station-refresh --title Refresh 1 station url(s), 1 logo(s), 0 station(s) retired or restored (2026-11-16) --body-file ' + (Join-Path $checkout.Temp 'refresh-body.md') + $repo)
+        $log | Should -Contain ('pr create --base master --head automation/station-refresh --title Refresh 1 station url(s), 1 logo(s), 0 station(s) retired, restored or rechecked (2026-11-16) --body-file ' + (Join-Path $checkout.Temp 'refresh-body.md') + $repo)
         $log | Should -Contain "pr merge automation/station-refresh --squash --delete-branch$repo"
         $log | Should -Contain 'api -X POST repos/ventura8/RoRadioResources/pages/builds --silent'
         $files = @(git --git-dir $checkout.Remote ls-tree -r --name-only automation/station-refresh)
         $files | Should -Contain 'docs/releases/2026-11-16-refresh.md'
-        git --git-dir $checkout.Remote log -1 --format=%s automation/station-refresh | Should -Be 'Refresh 1 station url(s), 1 logo(s), 0 station(s) retired or restored (2026-11-16)'
+        git --git-dir $checkout.Remote log -1 --format=%s automation/station-refresh | Should -Be 'Refresh 1 station url(s), 1 logo(s), 0 station(s) retired, restored or rechecked (2026-11-16)'
         $sha = git --git-dir $checkout.Remote rev-parse automation/station-refresh
         $body = Get-Content (Join-Path $checkout.Temp 'refresh-body.md') -Raw
         $body | Should -Match ([regex]::Escape("https://raw.githubusercontent.com/ventura8/RoRadioResources/$sha/RadioLogos/radio-fav.png"))

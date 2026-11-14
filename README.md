@@ -182,18 +182,22 @@ report.md`.
 
 ### Retired stations
 
-A station that is dead and for which no source finds anything, not even a suggestion, in every run for 30 days is
-**retired** by `Update-StationLifecycle.ps1`:
+A station that is dead, with every source read and nothing found (not even a suggestion), for 30 counted days is
+**retired** by `Update-StationLifecycle.ps1`. A run that cannot judge a station pauses its count instead of adding the
+days. Two kinds of run cannot judge it: one where a source could not be read for that station, and one where too many
+stations fail at once.
 
 - Its block leaves `RadioStationsData.json` and goes verbatim to `RetiredStations.json`, with:
   - its category, and the station it followed;
-  - its last url and logo;
+  - its last url and logo (the file stays in `RadioLogos/`, for when it comes back);
   - since when it failed, when it was retired, and the evidence.
 - Retired stations are **rechecked** 30 days after retirement, then 60 days after that check, then 90, then 120.
-  A recheck tries the old url and every source.
-- A url that plays in two probes **restores** the station, in its old place.
-- The date each station started failing lives in `state/failing.json` on the `refresh-data` branch, so the count
-  survives between runs.
+  A recheck tries the old url and every source. A failed recheck is published too, so the next check waits.
+- A url that played in two probes **restores** the station. The old url gets a second probe of its own. The station
+  goes after the station it followed while that one is still in the same category; otherwise it goes first in its
+  category.
+- Each station's counted days live in `state/failing.json` on the `refresh-data` branch, so the count survives
+  between runs. A station keeps its count until the pull request that retires it is merged.
 - Nothing is retired or rechecked in a run where more than 10% of the stations fail: that is a source or the
   network, not the stations.
 - Retirements and restorations are listed in the pull request, the release note and the tracking issue.
@@ -220,7 +224,7 @@ contacts untrusted broadcaster servers.
 | The runner's network is blocked (over half the stations fail) | Nothing is searched or written. With over 10% failing, nothing is retired. |
 | `REFRESH_TOKEN` is missing or expired | The run falls back to the workflow token. Sentry and the summary say so. Without any working token it stops with that reason. |
 | A probe or a step hangs | Each probe has its own timeout, each step and the job have one too. |
-| A run fails | A daily retry (Tuesday to Saturday) runs the refresh again until one succeeds. Run workflow reruns it by hand. |
+| A run fails | A daily retry (Tuesday to Saturday) runs the refresh again until one succeeds. "Succeeded" is read from the recorded runs, so a skipped retry does not count. Run workflow reruns it by hand. A failed run is recorded too: its stage, its reason, its times. |
 
 **Sentry:** every failure and unhandled exception goes to the Sentry project `roradioresources-updater`
 (organization 77bits), through the envelope API. The DSN is the `SENTRY_DSN` secret. Each event carries:

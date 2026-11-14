@@ -36,7 +36,9 @@
     How many logos Update-StationLogos.ps1 added.
 
 .PARAMETER StationCount
-    How many stations Update-StationLifecycle.ps1 retired or restored.
+    How many stations Update-StationLifecycle.ps1 retired, restored or rechecked. A failed recheck changes only the
+    date of the next one in RetiredStations.json, and that change is published too: otherwise the next run, from a
+    fresh checkout, would recheck again at once instead of waiting 60, 90 or 120 days (Greptile, #44).
 
 .PARAMETER Merge
     Merge the pull request when the change is small enough.
@@ -226,7 +228,7 @@ if ($UrlCount -eq 0 -and $LogoCount -eq 0 -and $StationCount -eq 0) {
 }
 
 # 3: the pull request, on top of the newest base.
-$title = "Refresh $UrlCount station url(s), $LogoCount logo(s), $StationCount station(s) retired or restored ($Date)"
+$title = "Refresh $UrlCount station url(s), $LogoCount logo(s), $StationCount station(s) retired, restored or rechecked ($Date)"
 Invoke-Git @('config', 'user.name', 'github-actions[bot]') | Out-Null
 Invoke-Git @('config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com') | Out-Null
 Invoke-Git @('switch', '-q', '-C', $Branch) | Out-Null

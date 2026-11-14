@@ -1,9 +1,15 @@
 ﻿# Retries shared by the refresh scripts (dot-sourced). Everything the weekly refresh talks to can fail for a moment:
 # a directory answers 503, the GitHub API is rate-limited, a push races another one. Such a step is tried again with
-# a growing pause (1 s, 2 s, 4 s, ... times -BaseDelaySeconds) before the run gives up, and every retry is counted
-# for the run's metrics (scripts/lib/Telemetry.ps1).
+# a growing pause (1 s, 2 s, 4 s, ... times -BaseDelaySeconds) before the run gives up.
+#
+# Every retry is counted in the process's environment (RORADIO_REFRESH_RETRIES), not in a script variable: the refresh
+# runs its scripts inside each other, and each one dot-sources this file into its own scope, so a script-level counter
+# lost the retries of the scripts it called (Greptile, #44). Invoke-Refresh.ps1 reads the total for the run's metrics.
 
-$script:RetryCount = 0
+# The retries counted so far in this process.
+function Get-RetryTotal {
+    [int]"0$env:RORADIO_REFRESH_RETRIES"
+}
 
 # Runs $Action until it succeeds or -Attempts runs out; the last failure is thrown. $Action fails by throwing.
 function Invoke-WithRetry([scriptblock]$Action, [int]$Attempts = 3, [double]$BaseDelaySeconds = 1, [string]$What = 'step') {
@@ -12,7 +18,7 @@ function Invoke-WithRetry([scriptblock]$Action, [int]$Attempts = 3, [double]$Bas
             return & $Action
         } catch {
             if ($attempt -ge $Attempts) { throw }
-            $script:RetryCount++
+            $env:RORADIO_REFRESH_RETRIES = "$((Get-RetryTotal) + 1)"
             $delay = $BaseDelaySeconds * [Math]::Pow(2, $attempt - 1)
             Write-Warning "$What failed (attempt $attempt of $Attempts): $($_.Exception.Message); trying again in $delay s."
             Start-Sleep -Milliseconds ([int]($delay * 1000))

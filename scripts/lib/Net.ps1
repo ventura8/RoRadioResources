@@ -8,6 +8,7 @@
 # station server on this machine and set RORADIO_REFRESH_ALLOW_LOOPBACK=1 for that. It opens the loopback addresses
 # (127.0.0.0/8, ::1) and nothing else: private networks and the metadata address stay refused. No workflow sets it.
 
+. (Join-Path $PSScriptRoot 'Resilience.ps1')
 $script:StationUserAgent = 'RoRadio-station-refresh (+https://github.com/ventura8/RoRadioResources)'
 # curl.exe on Windows (Windows PowerShell's "curl" was an alias of Invoke-WebRequest), curl elsewhere.
 $script:Curl = ('curl', 'curl.exe')[[int][bool](Get-Command curl.exe -CommandType Application -ErrorAction SilentlyContinue)]
@@ -87,16 +88,22 @@ function Get-PublicText([string]$Url, [long]$MaxBytes = 10MB, [int]$TimeoutSecon
     }
 }
 
-# A web page's text; '' (with a warning, and the url noted for the report) when it cannot be read. Two retries:
-# directories answer slowly at times.
+# A web page's text; '' (with a warning, and the url noted for the report) when it cannot be read. Tried three times
+# with a growing pause (RORADIO_REFRESH_RETRY_DELAY seconds, then twice that; 1 by default): directories answer
+# slowly or rate-limit at times. The retries are this file's own, not curl's, so the run's metrics count them.
 function Get-Text([string]$Url) {
-    $text = Get-PublicText $Url -Retries 2
-    if ($null -eq $text) {
+    $delay = @($env:RORADIO_REFRESH_RETRY_DELAY, '1') | Where-Object { $_ } | Select-Object -First 1
+    try {
+        Invoke-WithRetry -What "Reading $Url" -BaseDelaySeconds ([double]$delay) {
+            $text = Get-PublicText $Url
+            if ($null -eq $text) { throw "no answer from $Url" }
+            $text
+        } 3>$null
+    } catch {
         Write-Warning "Could not read $Url"
         $script:UnreadableSource.Add($Url)
-        return ''
+        ''
     }
-    $text
 }
 
 # A lookup that is allowed to find nothing (a status page most servers do not have): no retries, no warning.

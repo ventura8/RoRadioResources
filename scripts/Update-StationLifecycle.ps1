@@ -101,21 +101,32 @@ if (Test-Path $StatePath) {
 $mass = $Probed -gt 0 -and $results.Count -gt $MassFailureRatio * $Probed
 # Gone this run: dead, and nothing found for it, not even a suggestion.
 $gone = @($results | Where-Object { $_.OldVerdict -eq 'dead' -and -not $_.NewUrl -and -not $_.Suggested })
-if (-not $mass) {
-    $next = [ordered]@{}
-    foreach ($result in $gone) {
-        $first = @($state[$result.Guid].FirstFailed, $Date) | Where-Object { $_ } | Select-Object -First 1
-        $next[$result.Guid] = [ordered]@{ Title = $result.Title; FirstFailed = $first }
-    }
-    $state = $next
-}
 
-# 2: retire.
+# The failing days are counted, not taken from a calendar: each station's state has the days counted so far (Days)
+# and the day they were last counted (LastCounted). A run that cannot judge a station - too many stations failing at
+# once, or a source that could not be read for it (Complete = false) - pauses its count: the time since the last
+# count is not added, and the count starts again from today (Greptile, #44: outage days must not count toward the
+# 30). An entry from before 2026-11-14 has only FirstFailed, which then stands for its last count.
+function Get-StationState([object]$Previous, [string]$Title, [bool]$Count) {
+    $last = Read-Day (@($Previous.LastCounted, $Previous.FirstFailed, $Date) | Where-Object { $_ } | Select-Object -First 1)
+    $added = [int]($today - $last).TotalDays * [int]$Count
+    [ordered]@{ Title = $Title; FirstFailed = @($Previous.FirstFailed, $Date) | Where-Object { $_ } | Select-Object -First 1; LastCounted = $Date; Days = [int]$Previous.Days + $added }
+}
+$next = [ordered]@{}
+foreach ($guid in $state.Keys | Where-Object { $mass }) { $next[$guid] = Get-StationState -Previous $state[$guid] -Title $state[$guid].Title -Count $false }
+foreach ($result in $gone | Where-Object { -not $mass }) {
+    $complete = $result.Complete -ne $false
+    if ($complete -or $state[$result.Guid]) { $next[$result.Guid] = Get-StationState -Previous $state[$result.Guid] -Title $result.Title -Count $complete }
+}
+# A station retired in this run keeps its count until the pull request that retires it is merged: until then the
+# list still has it, the next run finds it failing again and proposes the same retirement (Greptile, #44).
+$state = $next
+
+# 2: retire: only a station whose sources were all read, after its counted days.
 $retiredNow = [Collections.Generic.List[object]]::new()
 $kept = [Collections.Generic.List[string]]::new()
-foreach ($result in $gone | Where-Object { -not $mass }) {
-    $since = Read-Day $state[$result.Guid].FirstFailed
-    if (($today - $since).TotalDays -lt $RetireAfterDays) { continue }
+foreach ($result in $gone | Where-Object { -not $mass -and $_.Complete -ne $false }) {
+    if ($state[$result.Guid].Days -lt $RetireAfterDays) { continue }
     $station = $stations | Where-Object Guid -eq $result.Guid | Select-Object -First 1
     $removed = Get-ListWithoutStation $text $result.Guid
     $alone = -not ($stations | Where-Object { $_.Category -eq $station.Category -and $_.Guid -ne $station.Guid -and $retiredNow.GUID -notcontains $_.Guid })
@@ -136,12 +147,11 @@ foreach ($result in $gone | Where-Object { -not $mass }) {
         LastChecked = $Date
         Checks      = 0
         NextCheck   = Format-Day $today.AddDays($RecheckDays)
-        Evidence    = "Dead in every run since $($state[$result.Guid].FirstFailed); no source had a replacement ($($result.Tried) candidate(s) tried on $Date)."
+        Evidence    = "Dead, with every source read and nothing found, for $($state[$result.Guid].Days) counted days since $($state[$result.Guid].FirstFailed) ($($result.Tried) candidate(s) tried on $Date)."
     }
     $text = $removed
     $retiredNow.Add($entry)
     $retired.Add($entry)
-    $state.Remove($result.Guid)
 }
 
 # 3: recheck the retired stations that are due, and restore those that play.
@@ -157,14 +167,28 @@ if ($due) {
     Write-FileAtomic $recheckList (ConvertTo-Json -InputObject @([ordered]@{ Name = 'Retired'; List = $list }) -Depth 5)
     $search = $SearchArguments.Clone()
     foreach ($name in 'Catalog', 'ReportPath', 'ResultsPath', 'MetricsPath', 'Title', 'ReplaceOnlyDead', 'WhatIf') { $search.Remove($name) }
+    # Most retired urls are dead by nature: the network guard of the whole list (which ran before this) must not stop
+    # the search for the ones that moved (Greptile, #44).
+    $search.MaxFailureRatio = 1
     $null = & (Join-Path $PSScriptRoot 'Update-StationUrls.ps1') -Catalog $recheckList -ResultsPath $recheckResults @search -WhatIf:$false 6>$null
     $answers = @(Get-Content $recheckResults -Raw -Encoding utf8 | ConvertFrom-Json | Where-Object { $_ })
+    # The url each due station would come back with: its old one when it is not among the failures, else what the
+    # sources found. Every one is probed once more, so that a restoration always rests on two probes that heard audio
+    # (an old url that played only on the first probe had one; Greptile, #44).
+    $offered = @(foreach ($entry in $due) {
+        $answer = $answers | Where-Object Guid -eq $entry.GUID
+        [pscustomobject]@{ Guid = $entry.GUID; Title = $entry.Title; Url = @($entry.Url, $answer.NewUrl)[[int][bool]$answer] }
+    })
+    $confirmList = Join-Path $scratch 'confirm.json'
+    $confirm = @($offered | Where-Object Url | ForEach-Object { [ordered]@{ GUID = $_.Guid; Title = $_.Title; Url = $_.Url } })
+    Write-FileAtomic $confirmList (ConvertTo-Json -InputObject @([ordered]@{ Name = 'Confirm'; List = $confirm }) -Depth 5)
+    $probeSettings = @{ TimeoutSeconds = @($search.TimeoutSeconds, 20)[[int](-not $search.TimeoutSeconds)] }
+    $confirmed = @(& (Join-Path $PSScriptRoot 'Test-StationStreams.ps1') -Catalog $confirmList @probeSettings 6>$null | Where-Object Verdict -eq 'alive' | ForEach-Object { $_.Guid })
     Remove-Item -Recurse -Force $scratch -WhatIf:$false
     $urls = @($stations | ForEach-Object { $_.Url })
     foreach ($entry in $due) {
-        $answer = $answers | Where-Object Guid -eq $entry.GUID
-        # Not among the failures: the old url played in both probes. A NewUrl played in two probes too.
-        $url = @($entry.Url, $answer.NewUrl)[[int][bool]$answer]
+        $url = ($offered | Where-Object Guid -eq $entry.GUID).Url
+        $url = @($null, $url)[[int]($confirmed -contains $entry.GUID)]
         $clash = $url -and ($urls | Where-Object { $_.Contains($url) -or $url.Contains($_) })
         $restored = $null
         if ($url -and -not $clash) {
@@ -203,7 +227,7 @@ if ($PSCmdlet.ShouldProcess($RetiredPath, 'Write the retired stations')) {
 
 # The report.
 $failingNow = @($state.Keys | ForEach-Object {
-    [pscustomobject]@{ Title = $state[$_].Title; Since = $state[$_].FirstFailed; Days = [int]($today - (Read-Day $state[$_].FirstFailed)).TotalDays }
+    [pscustomobject]@{ Title = $state[$_].Title; Since = $state[$_].FirstFailed; Days = $state[$_].Days }
 } | Sort-Object Days -Descending)
 $lines = [Collections.Generic.List[string]]::new()
 if ($mass) {

@@ -76,13 +76,38 @@ if ($LASTEXITCODE -eq 0) {
     Write-Information 'The refresh data did not change.' -InformationAction Continue
     return
 }
-Invoke-Git @('commit', '-q', '-m', "Refresh data $([DateTime]::UtcNow.ToString('yyyy-MM-dd HH:mm', [Globalization.CultureInfo]::InvariantCulture)) UTC") | Out-Null
+$message = "Refresh data $([DateTime]::UtcNow.ToString('yyyy-MM-dd HH:mm', [Globalization.CultureInfo]::InvariantCulture)) UTC"
+Invoke-Git @('commit', '-q', '-m', $message) | Out-Null
+
+# Another run pushed first: this run's files are put on top of its data by hand, not by a rebase that picks one side
+# of a conflict (which dropped the other run's metrics line; Greptile, #44). A .jsonl file keeps every line of both, the
+# other run's first; any other file (the state) is this run's, the newer one.
+function Merge-RemoteData {
+    $mine = @{}
+    foreach ($file in Get-ChildItem -Path $Path -Recurse -File | Where-Object { $_.FullName -notmatch '[\\/]\.git[\\/]' }) {
+        $mine[[IO.Path]::GetRelativePath($Path, $file.FullName)] = [IO.File]::ReadAllText($file.FullName)
+    }
+    Invoke-Git @('fetch', '-q', $Remote, $Branch) | Out-Null
+    Invoke-Git @('reset', '-q', '--hard', 'FETCH_HEAD') | Out-Null
+    foreach ($name in $mine.Keys) {
+        $target = Join-Path $Path $name
+        $text = $mine[$name]
+        if ($name -like '*.jsonl' -and (Test-Path $target)) {
+            $theirs = @([IO.File]::ReadAllLines($target))
+            $added = @($text -split "\r?\n" | Where-Object { $_ -and $theirs -notcontains $_ })
+            $text = ((@($theirs) + $added) -join "`n") + "`n"
+        }
+        New-Item -ItemType Directory -Force -Path (Split-Path $target -Parent) | Out-Null
+        [IO.File]::WriteAllText($target, $text, [Text.UTF8Encoding]::new($false))
+    }
+    Invoke-Git @('add', '-A') | Out-Null
+    Invoke-Git @('commit', '-q', '--allow-empty', '-m', $message) | Out-Null
+}
+
 Invoke-WithRetry -What 'git push of the refresh data' -BaseDelaySeconds $RetryDelaySeconds {
     & $Git -C $Path push -q $Remote "HEAD:refs/heads/$Branch" 2>$null
     if ($LASTEXITCODE -ne 0) {
-        # Another run pushed first: put this run's commit on top of its data and try again. Both runs only append
-        # metrics lines and rewrite the state file, which the newer run owns.
-        & $Git -C $Path pull -q --rebase -X theirs $Remote $Branch 2>$null | Out-Null
-        throw "The push of $Branch was refused."
+        Merge-RemoteData
+        throw "The push of $Branch was refused: merged with the newer data, trying again."
     }
 }

@@ -20,11 +20,14 @@ function Open-FakeStationServer([object[]]$Routes) {
     $port = $process.StandardOutput.ReadLine()
     if (-not $port) { throw 'The fake station server did not start.' }
     $env:RORADIO_REFRESH_ALLOW_LOOPBACK = '1'
+    # No pause between the retries of a page that cannot be read: the fake answers at once.
+    $env:RORADIO_REFRESH_RETRY_DELAY = '0'
     [pscustomobject]@{ Process = $process; Base = "http://127.0.0.1:$port"; RoutesPath = $routesPath }
 }
 
 function Close-FakeStationServer([object]$Server) {
     $env:RORADIO_REFRESH_ALLOW_LOOPBACK = $null
+    $env:RORADIO_REFRESH_RETRY_DELAY = $null
     if ($Server) {
         $Server.Process.Kill()
         $Server.Process.WaitForExit()

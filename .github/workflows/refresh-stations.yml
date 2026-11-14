@@ -53,11 +53,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Is there work (the retry runs only when no refresh succeeded this week)
+      - name: Is there work (the retry runs only when no refresh succeeded this week, by the recorded runs)
         id: due
         shell: pwsh
         env:
-          GH_TOKEN: ${{ github.token }}
           RETRY: ${{ github.event.schedule == '47 5 * * 2-6' }}
         run: ./scripts/Invoke-Refresh.ps1 -Stage Due -RetryOnly:($env:RETRY -eq 'true') -OutputPath $env:GITHUB_OUTPUT
 
@@ -94,7 +93,9 @@ jobs:
           Get-Content "$env:RUNNER_TEMP/urls.md" | Add-Content $env:GITHUB_STEP_SUMMARY
 
       - name: Publish (the note, the pull request, the issue, the data)
-        if: steps.due.outputs.due == 'true' && env.DRY_RUN != 'true'
+        # Also after a failed or cancelled search: then it publishes nothing and only saves the run's record (a
+        # failed run, with its stage and reason), so the metrics show failed attempts too.
+        if: always() && steps.due.outputs.due == 'true' && env.DRY_RUN != 'true'
         shell: pwsh
         timeout-minutes: 20
         # master's branch protection requires the Lint and Tests checks. A branch pushed with GITHUB_TOKEN starts no

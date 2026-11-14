@@ -29,7 +29,10 @@ function Get-ListWithoutStation([string]$Text, [string]$Guid) {
 function Add-StationBlock([string]$Text, [string]$Block, [string]$AfterGuid, [string]$Category) {
     $newline = ("`n", "`r`n")[[int]$Text.Contains("`r`n")]
     $after = [regex]::Match($Text, '(?<indent>[ \t]*)' + (Get-StationBlockPattern $AfterGuid))
-    if ($AfterGuid -and $after.Success) {
+    # The station it followed counts only while it is still in the same category: one that moved elsewhere since is
+    # no place for it (Greptile, #44); then it goes first in its own category.
+    $neighbor = @(Read-StationList $Text | Where-Object Guid -eq $AfterGuid | Where-Object Category -eq $Category)
+    if ($AfterGuid -and $after.Success -and $neighbor) {
         $end = $after.Index + $after.Length
         return $Text.Substring(0, $end) + ",$newline" + $after.Groups['indent'].Value + $Block + $Text.Substring($end)
     }
@@ -41,6 +44,18 @@ function Add-StationBlock([string]$Text, [string]$Block, [string]$AfterGuid, [st
     $Text.Substring(0, $end) + $Block + ",$space" + $Text.Substring($end)
 }
 
+# Throws unless $Text is the list of $Before (Read-StationList's stations) with only the urls of $Fixed
+# ({ Guid, NewUrl }) changed: the same stations, titles and order.
+function Assert-OnlyUrlChange([object[]]$Before, [string]$Text, [object[]]$Fixed) {
+    $expected = @($Before | ForEach-Object {
+        $guid = $_.Guid
+        $fix = $Fixed | Where-Object Guid -eq $guid
+        "$guid|$($_.Title)|$(@($_.Url, $fix.NewUrl)[[int][bool]$fix])"
+    })
+    $written = @(Read-StationList $Text | ForEach-Object { "$($_.Guid)|$($_.Title)|$($_.Url)" })
+    if (Compare-Object $expected $written -SyncWindow 0) { throw 'The updated station list differs from the list with only the verified urls changed; nothing was written.' }
+}
+
 # The stations of a list as { Guid, Title, Url, Category, After } in order ($After: the station before it in its
 # category, or ''). Throws when the text is not a station list: a list cut short or corrupt is never written.
 function Read-StationList([string]$Text) {
@@ -50,10 +65,13 @@ function Read-StationList([string]$Text) {
     if (-not $categories -or ($categories | Where-Object { -not $_.Name -or $null -eq $_.List })) {
         throw 'This is not a station list: every category needs a Name and a List.'
     }
+    # A GUID twice is refused here, before any probing or editing (Greptile, #44).
+    $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($category in $categories) {
         $previous = ''
         foreach ($station in $category.List) {
             if (-not $station.GUID -or -not $station.Url) { throw "A station of '$($category.Name)' has no GUID or no Url." }
+            if (-not $seen.Add($station.GUID)) { throw "The GUID $($station.GUID) is in the list twice." }
             [pscustomobject]@{ Guid = $station.GUID; Title = $station.Title; Url = $station.Url; ImageUrl = $station.ImageUrl; Category = $category.Name; After = $previous }
             $previous = $station.GUID
         }

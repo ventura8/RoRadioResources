@@ -7,8 +7,9 @@
     Three parts (-Stage), so that the GitHub token is given only to the part that publishes: the search runs the
     station scripts against untrusted broadcaster servers and needs none.
 
-      Due      whether this run has work: the weekly run always; the daily retry (-RetryOnly) only when no refresh
-               succeeded in the last -RetryWithinDays days. Writes due=true|false to -OutputPath.
+      Due      whether this run has work: the weekly run always; the daily retry (-RetryOnly) only when the metrics
+               on the data branch have no successful refresh in the last -RetryWithinDays days. Writes due=true|false
+               to -OutputPath.
       Search   data       fetches the refresh-data branch (anonymously): since when each station fails, earlier metrics
                urls       Update-StationUrls.ps1, its strong sources ranked by their hit rate over the last runs
                lifecycle  Update-StationLifecycle.ps1: retires the stations gone for 30 days, rechecks, restores
@@ -119,6 +120,8 @@ $TestScript = @($TestScript, (Join-Path $PSScriptRoot 'ci/Invoke-Tests.ps1')) | 
 $gh = @($PublishArguments.Gh, 'gh') | Where-Object { $_ } | Select-Object -First 1
 $delay = @($PublishArguments.RetryDelaySeconds, 5) | Where-Object { $null -ne $_ } | Select-Object -First 1
 $script:SentryTags = @{ run_id = "$RunId"; dry_run = "$([bool]$DryRun)"; part = $Stage }
+$script:RunMetrics.Date = [DateTime]::UtcNow.ToString('yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture)
+$script:RunMetrics.RunId = $RunId
 $dataPath = Join-Path $WorkFolder 'refresh-data'
 $urlReport = Join-Path $WorkFolder 'urls.md'
 $logoReport = Join-Path $WorkFolder 'logos.md'
@@ -126,7 +129,7 @@ $runFile = Join-Path $WorkFolder 'refresh-run.json'
 # What the stage functions below read.
 $options = @{
     Logos = [bool]$Logos; Merge = [bool]$Merge; AutoMerge = [bool]$AutoMerge; ReplaceOnlyDead = [bool]$ReplaceOnlyDead
-    RetireAfterDays = $RetireAfterDays; RunUrl = $RunUrl; Search = $SearchArguments; Lifecycle = $LifecycleArguments; Logo = $LogoArguments
+    RetireAfterDays = $RetireAfterDays; RunUrl = $RunUrl; RetryOnly = [bool]$RetryOnly; RetryWithinDays = $RetryWithinDays; Search = $SearchArguments; Lifecycle = $LifecycleArguments; Logo = $LogoArguments
 }
 $metricsPath = Join-Path $dataPath 'metrics/runs.jsonl'
 # The search reads the public data branch without a token; the publish part pushes it with one.
@@ -174,8 +177,6 @@ function Invoke-SearchStage {
     }
 
     $metrics = $script:RunMetrics
-    $metrics.Date = [DateTime]::UtcNow.ToString('yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture)
-    $metrics.RunId = $RunId
     foreach ($name in 'Probed', 'Failing', 'Dead', 'Fixed', 'Suggested', 'Unresolved', 'Blocked', 'Sources') { $metrics[$name] = $found.$name }
     $metrics.Logos = @($script:logoResults | Where-Object File).Count
     $metrics.Retired = $script:lifecycle.Retired.Count
@@ -184,13 +185,38 @@ function Invoke-SearchStage {
     $metrics.FailingDays = [ordered]@{}
     foreach ($item in $script:lifecycle.Failing) { $metrics.FailingDays[$item.Title] = $item.Days }
 
+    $metrics.Rechecked = $script:lifecycle.Rechecked.Count
+
     if ($DryRun) {
         Write-Information (Get-Content $urlReport -Raw -Encoding utf8) -InformationAction Continue
         return
     }
     Measure-Stage 'tests' { & $TestScript -Python $Python }
-    $metrics.Retries = $found.Retries + $script:RetryCount
-    Set-Content -Path $runFile -Value ($metrics | ConvertTo-Json -Depth 6) -Encoding utf8
+    Save-RunFile
+}
+
+# The search part's record for the publish part (another process, and on GitHub another step): its numbers, its
+# stage times, its retries, and whether it failed.
+function Save-RunFile {
+    $script:RunMetrics.Retries = Get-RetryTotal
+    Set-Content -Path $runFile -Value ($script:RunMetrics | ConvertTo-Json -Depth 6) -Encoding utf8
+}
+
+# Adds this run's metrics line and pushes the data branch. A run that failed is recorded too, with its stage and
+# reason, so the trend shows failed attempts (Greptile, #44); the stations it may have changed are not published.
+function Save-RunRecord {
+    # A search that never started left no data checkout: the record goes on top of the branch as it is.
+    if (-not (Test-Path (Join-Path $dataPath '.git'))) { & (Join-Path $PSScriptRoot 'Sync-RefreshData.ps1') -Mode Pull @syncArguments }
+    $script:RunMetrics.Retries = [int]$script:RunMetrics.Retries + (Get-RetryTotal)
+    Write-RunMetric $metricsPath
+    & (Join-Path $PSScriptRoot 'Sync-RefreshData.ps1') -Mode Push @syncArguments
+}
+
+# Records a failure in the run's metrics: the stage that failed (the last one started) and the reason.
+function Add-RunFailure([object]$ErrorRecord) {
+    $script:RunMetrics.Failed = $true
+    $script:RunMetrics.FailedStage = @($script:Breadcrumbs | Where-Object { $_.message -like 'failed *' } | ForEach-Object { $_.message.Substring(7) }) | Select-Object -Last 1
+    $script:RunMetrics.Error = Protect-Text $ErrorRecord.Exception.Message
 }
 
 function Invoke-PublishStage {
@@ -208,45 +234,63 @@ function Invoke-PublishStage {
             Write-Warning 'REFRESH_TOKEN cannot read the repository: using the workflow token; set REFRESH_TOKEN again.'
         }
     }
-    $saved = Get-Content $runFile -Raw -Encoding utf8 | ConvertFrom-Json
-    # The search's numbers; its stage times join this part's own (Stages stays a table the stages add to).
+    # The search's record: a search that did not finish (cancelled, timed out) left none.
+    $saved = [pscustomobject]@{ Failed = $true; FailedStage = 'search'; Error = 'The search part did not finish (cancelled or timed out).'; Stages = $null }
+    if (Test-Path $runFile) { $saved = Get-Content $runFile -Raw -Encoding utf8 | ConvertFrom-Json }
+    # Its numbers; its stage times join this part's own (Stages stays a table the stages add to).
     foreach ($property in $saved.PSObject.Properties | Where-Object Name -ne 'Stages') { $script:RunMetrics[$property.Name] = $property.Value }
-    foreach ($property in $saved.Stages.PSObject.Properties) { $script:RunMetrics.Stages[$property.Name] = $property.Value }
-    Write-RunMetric $metricsPath
+    foreach ($property in @($saved.Stages.PSObject.Properties | Where-Object { $_ })) { $script:RunMetrics.Stages[$property.Name] = $property.Value }
+    if ($saved.Failed) {
+        # A failed search publishes nothing: only its record is saved.
+        Measure-Stage 'save' { Save-RunRecord }
+        return
+    }
     Measure-Stage 'publish' {
         $publish = @{
-            UrlReport = $urlReport; UrlCount = $saved.Fixed; LogoCount = $saved.Logos; StationCount = $saved.Retired + $saved.Restored
+            UrlReport = $urlReport; UrlCount = $saved.Fixed; LogoCount = $saved.Logos; StationCount = $saved.Retired + $saved.Restored + $saved.Rechecked
             Merge = $options.Merge; AutoMerge = $options.AutoMerge; MetricsPath = $metricsPath; Repository = $Repository; RunUrl = $options.RunUrl
         }
         if (Test-Path $logoReport) { $publish.LogoReport = $logoReport }
         foreach ($name in $PublishArguments.Keys) { $publish[$name] = $PublishArguments[$name] }
         & (Join-Path $PSScriptRoot 'Publish-Refresh.ps1') @publish
     }
-    Measure-Stage 'save' { & (Join-Path $PSScriptRoot 'Sync-RefreshData.ps1') -Mode Push @syncArguments }
+    Measure-Stage 'save' { Save-RunRecord }
 }
 
-# Due: whether this run has work.
-if ($Stage -eq 'Due') {
-    $due = $true
-    if ($RetryOnly) {
-        $since = [DateTime]::UtcNow.AddDays(-$RetryWithinDays).ToString('yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture)
-        $runs = @(Invoke-WithRetry -What 'gh run list' -BaseDelaySeconds $delay {
-            Invoke-GhCommand @('run', 'list', '--workflow', 'refresh-stations.yml', '--status', 'success', '--created', ">=$since", '--json', 'databaseId', '--repo', $Repository)
-        } | ConvertFrom-Json)
-        $due = -not $runs
-        Write-Information (@("A refresh succeeded since $since; the retry has nothing to do.", "No refresh succeeded since ${since}: running it again.")[[int]$due]) -InformationAction Continue
-    }
-    if ($OutputPath) { Add-Content -Path $OutputPath -Value "due=$($due.ToString().ToLowerInvariant())" -Encoding utf8 }
-    return $due
+# Due: whether a refresh succeeded within -RetryWithinDays days, from the metrics on the data branch. A skipped retry
+# or a dry run writes no record, and a failed run writes one marked Failed, so neither hides a missing refresh (the
+# list of successful workflow runs did: a skipped retry is a successful run; Greptile, #44).
+function Test-RefreshDue {
+    if (-not $options.RetryOnly) { return $true }
+    $since = [DateTime]::UtcNow.AddDays(-$options.RetryWithinDays).ToString('yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture)
+    $pull = $syncArguments.Clone()
+    $pull.Remote = @("https://github.com/$Repository.git", $pull.Remote)[[int][bool]$pull.Remote]
+    & (Join-Path $PSScriptRoot 'Sync-RefreshData.ps1') -Mode Pull @pull
+    $done = @(Read-RunMetric $metricsPath | Where-Object { -not $_.Failed -and "$($_.Date)" -ge $since })
+    Write-Information (@("No refresh succeeded since ${since}: running it again.", "A refresh succeeded since $since; the retry has nothing to do.")[[int][bool]$done]) -InformationAction Continue
+    -not $done
 }
 
 try {
+    if ($Stage -eq 'Due') {
+        # Inside the reporting boundary: a data branch that cannot be read goes to Sentry like any stage (Greptile, #44).
+        Measure-Stage 'due' { $script:due = [bool](Test-RefreshDue) }
+        if ($OutputPath) { Add-Content -Path $OutputPath -Value "due=$($script:due.ToString().ToLowerInvariant())" -Encoding utf8 }
+        return $script:due
+    }
     if ($Stage -ne 'Publish') { Invoke-SearchStage }
     if ($Stage -ne 'Search' -and -not $DryRun) { Invoke-PublishStage }
 } catch {
     # Measure-Stage reported the stage that failed; this covers what failed between stages.
     if (-not ($script:Breadcrumbs | Where-Object { $_.message -like 'failed *' })) {
         $null = Send-SentryEvent -Message "The refresh failed: $($_.Exception.Message)" -ErrorRecord $_
+    }
+    # The failure goes into the run's record: the search part leaves it for the publish part; the publish part saves
+    # it itself, as far as it still can (the save of a failed save fails too).
+    Add-RunFailure $_
+    if ($Stage -eq 'Search' -and -not $DryRun) { Save-RunFile }
+    if ($Stage -ne 'Search' -and $Stage -ne 'Due' -and -not $DryRun) {
+        try { Save-RunRecord } catch { Write-Warning "Could not save the record of the failed run: $($_.Exception.Message)" }
     }
     throw
 }

@@ -22,6 +22,7 @@ BeforeAll {
         @{ path = '/stream/elsewhere'; type = 'audio/mpeg'; audio = 8192 }
         @{ path = '/stream/moved-new'; type = 'audio/mpeg'; audio = 8192 }
         @{ path = '/stream/flaky-source'; type = 'audio/mpeg'; audio = 8192 }
+        @{ path = '/stream/once'; type = 'audio/mpeg'; audio = 8192; times = 1 }
         @{ path = '/sitemap.xml'; type = 'application/xml'; body = '<url><loc>{base}/radio-moved</loc></url><url><loc>{base}/radio-gamma</loc></url>' }
         @{ path = '/radio-moved'; body = '<audio src="{base}/stream/moved-new"></audio>' }
         @{ path = '/radio-gamma'; status = 503; body = 'busy'; times = 1 }
@@ -105,7 +106,8 @@ Describe 'Retiring stations that are gone (Update-StationLifecycle.ps1)' {
         $gone.FirstFailed | Should -Be '2026-11-16'
         $gone.Retired | Should -Be '2026-12-16'
         $gone.NextCheck | Should -Be '2027-01-15' -Because 'the first recheck is 30 days after retirement'
-        $gone.Evidence | Should -Match 'Dead in every run since 2026-11-16.*2 candidate'
+        $gone.Evidence | Should -Match 'for 30 counted days since 2026-11-16.*2 candidate'
+        $state.($stationIds['Radio Gone']).Days | Should -Be 30 -Because 'the count stays until the retirement reaches master'
     }
 
     It 'keeps a station failing for less than 30 days, the last of its category, and one not in the list, and remembers since when' {
@@ -140,29 +142,64 @@ Describe 'Retiring stations that are gone (Update-StationLifecycle.ps1)' {
         $outcome.MassFailure | Should -BeTrue
         $outcome.Retired | Should -BeNullOrEmpty
         Get-Content $copy -Raw | Should -Be $listBefore
-        (Get-Content $massState -Raw | ConvertFrom-Json).PSObject.Properties.Name | Should -Be ((($stateBefore | ConvertFrom-Json).PSObject.Properties.Name))
+        $paused = Get-Content $massState -Raw | ConvertFrom-Json
+        $paused.PSObject.Properties.Name | Should -Be ((($stateBefore | ConvertFrom-Json).PSObject.Properties.Name))
+        $paused.($stationIds['Radio Young']).LastCounted | Should -Be '2027-03-01' -Because 'the count is paused: the days of the outage are skipped'
+        $paused.($stationIds['Radio Young']).Days | Should -Be 0
         Get-Content (Join-Path $work 'mass.md') -Raw | Should -Match 'too many failed at once'
     }
 
-    It 'writes nothing when the result would not be the expected list' {
+    It 'never counts or retires a station whose sources could not all be read, and skips the days of an outage' {
+        $outageState = Join-Path $work 'outage/failing.json'
+        New-Item -ItemType Directory -Force -Path (Split-Path $outageState) | Out-Null
+        $guid = $stationIds['Radio Young']
+        Set-Content -Path $outageState -Value "{`"$guid`": {`"Title`": `"Radio Young`", `"FirstFailed`": `"2026-11-01`", `"LastCounted`": `"2026-11-25`", `"Days`": 25}}"
+        $outageResults = Join-Path $work 'outage-results.json'
+        Set-Content -Path $outageResults -Value "[{`"Guid`": `"$guid`", `"Title`": `"Radio Young`", `"OldUrl`": `"$dead/young`", `"OldVerdict`": `"dead`", `"Tried`": 0, `"Complete`": false}]"
+        $copy = Join-Path $work 'outage.json'
+        Copy-Item $catalog $copy
+        $common = @{ Catalog = $copy; RetiredPath = (Join-Path $work 'outage-retired.json'); StatePath = $outageState; Probed = 100 }
+        $outcome = Invoke-Lifecycle ($common + @{ ResultsPath = $outageResults; Date = '2026-12-20' })
+        $outcome.Retired | Should -BeNullOrEmpty -Because 'a source was down: no evidence'
+        $kept = Get-Content $outageState -Raw | ConvertFrom-Json
+        $kept.$guid.Days | Should -Be 25 -Because 'the outage days are not counted'
+        $kept.$guid.LastCounted | Should -Be '2026-12-20'
+        Set-Content -Path $outageResults -Value "[{`"Guid`": `"$guid`", `"Title`": `"Radio Young`", `"OldUrl`": `"$dead/young`", `"OldVerdict`": `"dead`", `"Tried`": 0, `"Complete`": true}]"
+        $outcome = Invoke-Lifecycle ($common + @{ ResultsPath = $outageResults; Date = '2026-12-23' })
+        $outcome.Retired | Should -BeNullOrEmpty -Because '25 + 3 counted days is not 30'
+        (Get-Content $outageState -Raw | ConvertFrom-Json).$guid.Days | Should -Be 28
+    }
+
+    It 'refuses a list with a GUID twice before doing anything' {
         $twice = Join-Path $work 'twice-life.json'
         $guid = [Guid]::NewGuid().ToString()
-        $json = "[{`"Name`": `"Test`", `"List`": [{`"GUID`": `"$guid`", `"Title`": `"A`", `"Url`": `"$dead/a`"}, {`"GUID`": `"$guid`", `"Title`": `"B`", `"Url`": `"$dead/b`"}, {`"GUID`": `"other`", `"Title`": `"C`", `"Url`": `"$dead/c`"}]}]"
+        $json = "[{`"Name`": `"Test`", `"List`": [{`"GUID`": `"$guid`", `"Title`": `"A`", `"Url`": `"$dead/a`"}, {`"GUID`": `"$guid`", `"Title`": `"B`", `"Url`": `"$dead/b`"}]}]"
         [IO.File]::WriteAllText($twice, $json)
-        $results = Join-Path $work 'twice-results.json'
-        Set-Content -Path $results -Value "[{`"Guid`": `"$guid`", `"Title`": `"A`", `"OldUrl`": `"$dead/a`", `"OldVerdict`": `"dead`", `"Tried`": 0}]"
-        $twiceState = Join-Path $work 'twice/failing.json'
-        New-Item -ItemType Directory -Force -Path (Split-Path $twiceState) | Out-Null
-        Set-Content -Path $twiceState -Value "{`"$guid`": {`"Title`": `"A`", `"FirstFailed`": `"2026-01-01`"}}"
-        { Invoke-Lifecycle @{ Catalog = $twice; RetiredPath = (Join-Path $work 'twice-retired.json'); StatePath = $twiceState; ResultsPath = $results; Probed = 100; Date = '2026-12-16' } } | Should -Throw '*nothing was written*'
+        { Invoke-Lifecycle @{ Catalog = $twice; RetiredPath = (Join-Path $work 'twice-retired.json'); StatePath = (Join-Path $work 'twice/failing.json'); ResultsPath = $resultsPath; Probed = 100 } } | Should -Throw '*twice*'
         Get-Content $twice -Raw | Should -Be $json
+    }
+
+    It 'writes nothing when the result would not be the expected list (a retired block with another GUID)' {
+        $odd = Join-Path $work 'odd-life.json'
+        Write-CategoryList $odd ([ordered]@{ Test = @(@{ Title = 'Radio Alive'; Url = "$base/stream/alive" }) }) | Out-Null
+        $before = Get-Content $odd -Raw
+        $oddRetired = Join-Path $work 'odd-retired.json'
+        $wrongBlock = "{`n        `"GUID`": `"not-the-entry`",`n        `"Title`": `"Radio Odd`",`n        `"Url`": `"$base/stream/hand`"`n      }"
+        Set-Content -Path $oddRetired -Value (ConvertTo-Json -InputObject @([ordered]@{ GUID = 'odd-guid'; Title = 'Radio Odd'; Url = "$base/stream/hand"; Category = 'Test'; Block = $wrongBlock; NextCheck = '2026-12-01' }))
+        $empty = Join-Path $work 'odd-results.json'
+        Set-Content -Path $empty -Value '[]'
+        { Invoke-Lifecycle @{ Catalog = $odd; RetiredPath = $oddRetired; StatePath = (Join-Path $work 'odd/failing.json'); ResultsPath = $empty; Probed = 100; Date = '2026-12-16'; SearchArguments = $search } } | Should -Throw '*nothing was written*'
+        Get-Content $odd -Raw | Should -Be $before
     }
 }
 
 Describe 'Rechecking and restoring retired stations' {
     BeforeAll {
         $script:catalog = Join-Path $work 'recheck.json'
-        $script:stationIds = Write-CategoryList $catalog ([ordered]@{ Test = @(@{ Title = 'Radio Alive'; Url = "$base/stream/alive" }, @{ Title = 'Radio Other'; Url = "$base/stream/elsewhere" }) })
+        $script:stationIds = Write-CategoryList $catalog ([ordered]@{
+            Test  = @(@{ Title = 'Radio Alive'; Url = "$base/stream/alive" }, @{ Title = 'Radio Other'; Url = "$base/stream/elsewhere" })
+            Moved = @(@{ Title = 'Radio Away'; Url = "$base/stream/away" })
+        })
         $block = "{`n        `"GUID`": `"back-guid`",`n        `"Title`": `"Radio Back`",`n        `"Url`": `"$base/stream/back`",`n        `"ImageUrl`": `"back.png`"`n      }"
         $retired = @(
             [ordered]@{ GUID = 'back-guid'; Title = 'Radio Back'; Url = "$base/stream/back"; Category = 'Test'; After = $stationIds['Radio Alive']; Block = $block; Retired = '2026-11-01'; Checks = 0; NextCheck = '2026-12-01' }
@@ -173,12 +210,20 @@ Describe 'Rechecking and restoring retired stations' {
             [ordered]@{ GUID = 'later-guid'; Title = 'Radio Later'; Url = "$dead/later"; Category = 'Test'; Retired = '2026-12-01'; Checks = 0; NextCheck = '2026-12-31' }
             [ordered]@{ GUID = 'homeless-guid'; Title = 'Radio Homeless'; Url = "$base/stream/back?homeless"; Category = 'Gone category'; NextCheck = '2026-12-01'; Checks = 0 }
             [ordered]@{ GUID = 'clash-guid'; Title = 'Radio Clash'; Url = "$base/stream/elsewhere"; Category = 'Test'; NextCheck = '2026-12-01'; Checks = 0 }
-        )
+            [ordered]@{ GUID = 'once-guid'; Title = 'Radio Once'; Url = "$base/stream/once"; Category = 'Test'; NextCheck = '2026-12-01'; Checks = 0 }
+            # Its neighbor moved to another category since: it goes first in its own (Test), not after the neighbor.
+            [ordered]@{ GUID = 'follow-guid'; Title = 'Radio Follow'; Url = "$base/stream/back?follow"; Category = 'Test'; After = $stationIds['Radio Away']; NextCheck = '2026-12-01'; Checks = 0 }
+        ) + @(1..6 | ForEach-Object { [ordered]@{ GUID = "dead-$_"; Title = "Radio Dead $_"; Url = "$dead/dead-$_"; Category = 'Test'; NextCheck = '2026-12-01'; Checks = 0 } })
         $script:retiredPath = Join-Path $work 'recheck-retired.json'
         Set-Content -Path $retiredPath -Value (ConvertTo-Json -InputObject $retired -Depth 4)
         $results = Join-Path $work 'recheck-results.json'
         Set-Content -Path $results -Value '[]'
-        $script:outcome = Invoke-Lifecycle @{ Catalog = $catalog; RetiredPath = $retiredPath; StatePath = (Join-Path $work 'recheck/failing.json'); ResultsPath = $results; Probed = 100; Date = '2026-12-16'; SearchArguments = ($search + @{ Catalog = 'ignored.json' }); ReportPath = (Join-Path $work 'recheck.md') }
+        # The whole list's network guard (half failing) passed in to the recheck, with more than ten retired stations
+        # due and most of them still dead: the recheck must search anyway.
+        $recheckSearch = $search.Clone()
+        $recheckSearch.Catalog = 'ignored.json'
+        $recheckSearch.MaxFailureRatio = 0.5
+        $script:outcome = Invoke-Lifecycle @{ Catalog = $catalog; RetiredPath = $retiredPath; StatePath = (Join-Path $work 'recheck/failing.json'); ResultsPath = $results; Probed = 100; Date = '2026-12-16'; SearchArguments = $recheckSearch; ReportPath = (Join-Path $work 'recheck.md') }
         $script:after = Read-TestCatalog $catalog
         $script:left = @(Get-Content $retiredPath -Raw | ConvertFrom-Json)
         $script:order = @(foreach ($category in (Get-Content $catalog -Raw | ConvertFrom-Json)) { $category.List | ForEach-Object { $_.Title } })
@@ -192,9 +237,15 @@ Describe 'Rechecking and restoring retired stations' {
 
     It 'restores a station found at a new url, and one added by hand without its block' {
         $after['Radio Moved'].Url | Should -Be "$base/stream/moved-new"
-        $order[0] | Should -BeIn @('Radio Moved', 'Radio Hand') -Because 'without the station before it, it goes first in its category'
+        $order.IndexOf('Radio Moved') | Should -BeLessThan $order.IndexOf('Radio Alive') -Because 'without the station before it, it goes first in its category'
         $after['Radio Hand'].Url | Should -Be "$base/stream/hand"
         @($left.Title) | Should -Not -Contain 'Radio Back'
+    }
+
+    It 'restores only on two probes that heard audio, and never after a neighbor that moved to another category' {
+        @($left.Title) | Should -Contain 'Radio Once' -Because 'its old url played once, then failed'
+        $order.IndexOf('Radio Follow') | Should -BeLessThan $order.IndexOf('Radio Alive') -Because 'it goes first in Test'
+        $after['Radio Away'] | Should -Not -BeNullOrEmpty
     }
 
     It 'rechecks on a growing schedule: 30 days after retirement, then 60, then 90' {
@@ -228,6 +279,7 @@ Describe 'Libraries: catalogue edits, retries, Sentry, metrics' {
         { Read-StationList '[{"Name": "T"}]' } | Should -Throw '*every category needs*'
         { Read-StationList '[{"Name": "T", "List": [{"Title": "no guid"}]}]' } | Should -Throw '*no GUID or no Url*'
         { Read-StationList '[]' } | Should -Throw '*not a station list*'
+        { Read-StationList '[{"Name": "T", "List": [{"GUID": "a", "Url": "u"}, {"GUID": "A", "Url": "v"}]}]' } | Should -Throw '*twice*'
     }
 
     It 'never writes a list cut short: the refresh stops before probing' {
@@ -253,10 +305,10 @@ Describe 'Libraries: catalogue edits, retries, Sentry, metrics' {
     }
 
     It 'tries again with a growing pause, counts the retries, and gives up with the last error' {
-        $script:RetryCount = 0
+        $env:RORADIO_REFRESH_RETRIES = $null
         $script:calls = 0
         Invoke-WithRetry -BaseDelaySeconds 0 { $script:calls++; if ($script:calls -lt 3) { throw 'busy' }; 'done' } 3>$null | Should -Be 'done'
-        $script:RetryCount | Should -Be 2
+        Get-RetryTotal | Should -Be 2 -Because 'the count lives in the process, where the scripts the refresh runs inside each other all see it'
         { Invoke-WithRetry -Attempts 2 -BaseDelaySeconds 0 { throw 'down' } 3>$null } | Should -Throw 'down'
     }
 
@@ -380,6 +432,8 @@ Describe 'The whole run (Invoke-Refresh.ps1) and its data branch' {
         $run.Fixed | Should -Be 1
         $run.Sources.myradioonline.Hits | Should -Be 1
         $run.Stages.urls | Should -Not -BeNullOrEmpty
+        $run.Stages.publish | Should -Not -BeNullOrEmpty -Because 'the record is written after publishing'
+        $run.Retries | Should -BeGreaterThan 0 -Because 'the source that answered 503 once was read again'
         $run.FailingDays.'Radio Gone' | Should -Be 0
     }
 
@@ -421,37 +475,93 @@ Describe 'The whole run (Invoke-Refresh.ps1) and its data branch' {
         Get-Content $sentryLog -Raw | Should -Match '"stage":"token"'
     }
 
-    It 'reports a failure between stages to Sentry' {
+    It 'records a search that never finished, without publishing anything' {
+        Invoke-Run 'no-search' @{ Stage = 'Publish' }
+        (Get-Content (Join-Path $work 'no-search/gh.log') | Where-Object { $_ -like 'pr *' }) | Should -BeNullOrEmpty
+        $last = git --git-dir $remote show refresh-data:metrics/runs.jsonl | Select-Object -Last 1 | ConvertFrom-Json
+        $last.Failed | Should -BeTrue
+        $last.Error | Should -Match 'did not finish'
+    }
+
+    It 'records a failed search with its stage, and the publish part saves it' {
+        $broken = Join-Path $work 'broken-list.json'
+        [IO.File]::WriteAllText($broken, '[{"Name": "Test", "List": [')
+        $searchBroken = $runArguments.SearchArguments.Clone()
+        $searchBroken.Catalog = $broken
+        { Invoke-Run 'failed-search' @{ Stage = 'Search'; SearchArguments = $searchBroken } } | Should -Throw '*not complete JSON*'
+        (Get-Content (Join-Path $work 'failed-search/refresh-run.json') -Raw | ConvertFrom-Json).FailedStage | Should -Be 'urls'
+        Invoke-Run 'failed-search' @{ Stage = 'Publish' }
+        $last = git --git-dir $remote show refresh-data:metrics/runs.jsonl | Select-Object -Last 1 | ConvertFrom-Json
+        $last.FailedStage | Should -Be 'urls'
+    }
+
+    It 'records a failed publication, and reports a failure between stages to Sentry' {
+        $env:FAKE_GH_FAIL = 'issue list'
+        try {
+            { Invoke-Run 'failed-publish' @{ Stage = 'All'; Merge = $true } } | Should -Throw '*issue list*'
+        } finally {
+            $env:FAKE_GH_FAIL = $null
+        }
+        $last = git --git-dir $remote show refresh-data:metrics/runs.jsonl | Select-Object -Last 1 | ConvertFrom-Json
+        $last.FailedStage | Should -Be 'publish'
+        $last.Stages.publish | Should -Not -BeNullOrEmpty
+
         Remove-Item $sentryLog -ErrorAction SilentlyContinue
         $env:SENTRY_DSN = $dsn
-        { Invoke-Run 'no-search' @{ Stage = 'Publish' } } | Should -Throw
+        $folder = Join-Path $work 'corrupt-run'
+        New-Item -ItemType Directory -Force -Path $folder | Out-Null
+        Set-Content -Path (Join-Path $folder 'refresh-run.json') -Value '{ not json'
+        # Its data remote is gone too: the record of the failure cannot be saved, which is said, not hidden.
+        $publishNowhere = $runArguments.PublishArguments.Clone()
+        $publishNowhere.Remote = Join-Path $work 'gone-remote.git'
+        { Invoke-Run 'corrupt-run' @{ Stage = 'Publish'; PublishArguments = $publishNowhere; WarningVariable = 'warned' } } | Should -Throw
         Get-Content $sentryLog -Raw | Should -Match 'The refresh failed'
     }
 
-    It 'runs the daily retry only when no refresh succeeded this week' {
+    It 'runs the daily retry only when no refresh succeeded this week, judged by the recorded runs' {
         $output = Join-Path $work 'due.txt'
-        $env:FAKE_GH_LOG = Join-Path $work 'due.log'
-        $env:FAKE_GH_RUNS = '[{"databaseId": 1}]'
-        & (Join-Path $scripts 'Invoke-Refresh.ps1') -Stage Due -RetryOnly -OutputPath $output -PublishArguments @{ Gh = $fakeGh; RetryDelaySeconds = 0 } 6>$null | Should -BeFalse
-        $env:FAKE_GH_RUNS = '[]'
-        & (Join-Path $scripts 'Invoke-Refresh.ps1') -Stage Due -RetryOnly -OutputPath $output -PublishArguments @{ Gh = $fakeGh; RetryDelaySeconds = 0 } 6>$null | Should -BeTrue
+        $due = @{ Stage = 'Due'; RetryOnly = $true; OutputPath = $output; WorkFolder = (Join-Path $work 'due-1'); PublishArguments = @{ Remote = $remote; RetryDelaySeconds = 0 } }
+        & (Join-Path $scripts 'Invoke-Refresh.ps1') @due 6>$null | Should -BeFalse -Because 'today''s successful run is recorded'
+        $failedOnly = Join-Path $work 'failed-only.git'
+        git init -q --bare -b master $failedOnly
+        $seed = Join-Path $work 'failed-only-seed'
+        & (Join-Path $scripts 'Sync-RefreshData.ps1') -Mode Pull -Path $seed -Remote $failedOnly
+        New-Item -ItemType Directory -Force -Path (Join-Path $seed 'metrics') | Out-Null
+        Set-Content -Path (Join-Path $seed 'metrics/runs.jsonl') -Value "{`"Date`": `"$([DateTime]::UtcNow.ToString('yyyy-MM-dd'))`", `"Failed`": true}"
+        & (Join-Path $scripts 'Sync-RefreshData.ps1') -Mode Push -Path $seed -Remote $failedOnly
+        $due.WorkFolder = Join-Path $work 'due-2'
+        $due.PublishArguments = @{ Remote = $failedOnly; RetryDelaySeconds = 0 }
+        & (Join-Path $scripts 'Invoke-Refresh.ps1') @due 6>$null | Should -BeTrue -Because 'a failed run, or a skipped retry, is no refresh'
         & (Join-Path $scripts 'Invoke-Refresh.ps1') -Stage Due | Should -BeTrue -Because 'the weekly run always has work'
         Get-Content $output | Should -Be @('due=false', 'due=true')
     }
 
-    It 'wins a race for the data branch by rebasing onto the other run''s data' {
+    It 'reports a retry check that cannot read the data to Sentry' {
+        Remove-Item $sentryLog -ErrorAction SilentlyContinue
+        $env:SENTRY_DSN = $dsn
+        { & (Join-Path $scripts 'Invoke-Refresh.ps1') -Stage Due -RetryOnly -WorkFolder (Join-Path $work 'due-3') -PublishArguments @{ Remote = (Join-Path $work 'no-such.git'); RetryDelaySeconds = 0 } 6>$null 3>$null } | Should -Throw
+        Get-Content $sentryLog -Raw | Should -Match '"stage":"due"'
+    }
+
+    It 'keeps both runs'' metrics lines when two runs race for the data branch' {
         $one = Join-Path $work 'race-one'
         $two = Join-Path $work 'race-two'
         & (Join-Path $scripts 'Sync-RefreshData.ps1') -Mode Pull -Path $one -Remote $remote
         & (Join-Path $scripts 'Sync-RefreshData.ps1') -Mode Pull -Path $two -Remote $remote
-        Set-Content -Path (Join-Path $one 'one.txt') -Value 'one'
-        Set-Content -Path (Join-Path $two 'two.txt') -Value 'two'
+        Add-Content -Path (Join-Path $one 'metrics/runs.jsonl') -Value '{"RunId": "one"}'
+        Add-Content -Path (Join-Path $two 'metrics/runs.jsonl') -Value '{"RunId": "two"}'
+        Set-Content -Path (Join-Path $one 'state/failing.json') -Value '{"from": "one"}'
+        Set-Content -Path (Join-Path $two 'state/failing.json') -Value '{"from": "two"}'
+        Set-Content -Path (Join-Path $two 'new.txt') -Value 'two'
         & (Join-Path $scripts 'Sync-RefreshData.ps1') -Mode Push -Path $one -Remote $remote -RetryDelaySeconds 0
         & (Join-Path $scripts 'Sync-RefreshData.ps1') -Mode Push -Path $two -Remote $remote -RetryDelaySeconds 0 3>$null
         & (Join-Path $scripts 'Sync-RefreshData.ps1') -Mode Push -Path $two -Remote $remote -RetryDelaySeconds 0 6>$null
-        $files = @(git --git-dir $remote ls-tree --name-only refresh-data)
-        $files | Should -Contain 'one.txt'
-        $files | Should -Contain 'two.txt'
+        $lines = @(git --git-dir $remote show refresh-data:metrics/runs.jsonl)
+        $lines | Should -Contain '{"RunId": "one"}'
+        $lines | Should -Contain '{"RunId": "two"}'
+        $lines.IndexOf('{"RunId": "one"}') | Should -BeLessThan $lines.IndexOf('{"RunId": "two"}')
+        git --git-dir $remote show refresh-data:state/failing.json | Should -Be '{"from": "two"}' -Because 'the newer run owns the state'
+        @(git --git-dir $remote ls-tree -r --name-only refresh-data) | Should -Contain 'new.txt'
     }
 
     It 'stops when the data remote cannot be reached' {

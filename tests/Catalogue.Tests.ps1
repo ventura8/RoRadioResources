@@ -109,8 +109,9 @@ Describe 'RadioLogos' {
         $bad | Should -BeNullOrEmpty
     }
 
-    It 'keeps no file that no station uses' {
-        $used = @($stations | ForEach-Object { $_.ImageUrl } | Where-Object { $_ })
+    It 'keeps no file that no station uses (a retired station keeps its logo, for when it comes back)' {
+        $retired = @(Get-Content (Join-Path (Split-Path $PSScriptRoot -Parent) 'RetiredStations.json') -Raw | ConvertFrom-Json)
+        $used = @(@($stations) + $retired | ForEach-Object { $_.ImageUrl } | Where-Object { $_ })
         @($logoNames | Where-Object { $used -cnotcontains $_ }) | Should -BeNullOrEmpty
     }
 

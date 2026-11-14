@@ -258,14 +258,20 @@ function Invoke-Source([string]$Name, [scriptblock]$Search) {
 
 # 3: candidates.
 $slugs = @()
+# The sitemap is read once for every station: when it is down, no search is complete.
+$sitemapBefore = $UnreadableSource.Count
 if ($searched) {
     $slugs = Get-MyRadioOnlineSitemap $MyRadioOnlineUrl
     Write-Information "myradioonline.ro lists $($slugs.Count) stations." -InformationAction Continue
 }
+$sitemapRead = $UnreadableSource.Count -eq $sitemapBefore
 
 $notStream = '\.(png|jpe?g|webp|gif|svg|ico|css|js|json|html?)(\?|$)|google|facebook|apple\.com|twitter|instagram|youtube|myradioonline|schema\.org|w3\.org'
 $claimed = [Collections.Generic.List[string]]::new()
 $results = foreach ($station in $failing) {
+    # Whether every source could be read for this station: a station whose search was cut short by an outage is not
+    # evidence that it is gone (Update-StationLifecycle.ps1 neither counts nor retires it; Greptile, #44).
+    $unreadableBefore = $UnreadableSource.Count
     $plainTitle = ConvertTo-PlainTitle $station.Title
     $marks = Get-NameMark $station.Title
     $strong = @(if ($searched) {
@@ -342,6 +348,7 @@ $results = foreach ($station in $failing) {
         Suggested  = @($null, $best.Url)[[int][bool]$held]
         Source     = $best.Source
         Tried      = $unique.Count
+        Complete   = [bool]$searched -and $UnreadableSource.Count -eq $unreadableBefore -and $sitemapRead
     }
 }
 $results = @($results)
@@ -361,13 +368,7 @@ foreach ($fix in $fixed) {
 
 # The written list must be the same stations in the same order, with only the fixed urls changed: a station is
 # never removed, renamed or moved by the refresh, and no url is written that was not verified above.
-$expected = @($stations | ForEach-Object {
-    $guid = $_.Guid
-    $fix = $fixed | Where-Object Guid -eq $guid
-    "$guid|$($_.Title)|$(@($_.Url, $fix.NewUrl)[[int][bool]$fix])"
-})
-$written = @(foreach ($category in ($text | ConvertFrom-Json)) { foreach ($station in $category.List) { "$($station.GUID)|$($station.Title)|$($station.Url)" } })
-if (Compare-Object $expected $written -SyncWindow 0) { throw 'The updated station list differs from the list with only the verified urls changed; nothing was written.' }
+Assert-OnlyUrlChange $stations $text $fixed
 if ($fixed -and $PSCmdlet.ShouldProcess($Catalog, "Update $($fixed.Count) station url(s)")) {
     Write-FileAtomic $Catalog $text $hasBom
 }
@@ -433,7 +434,7 @@ if ($MetricsPath) {
     $metrics = [ordered]@{
         Probed = $toProbe.Count; Failing = $failing.Count; Dead = @($failing | Where-Object Verdict -eq 'dead').Count
         Fixed = $fixed.Count; Suggested = $review.Count; Unresolved = $unresolved.Count; Blocked = $blocked
-        Retries = $RetryCount; Sources = $sourceStats; Unreadable = $unreadable
+        Retries = Get-RetryTotal; Sources = $sourceStats; Unreadable = $unreadable
     }
     Set-Content -Path $MetricsPath -Value ($metrics | ConvertTo-Json -Depth 5) -Encoding utf8 -WhatIf:$false
 }
