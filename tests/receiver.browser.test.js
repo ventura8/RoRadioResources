@@ -941,6 +941,19 @@ test('layout and accessibility in every state, at 1920 x 1080, on the tablet (25
         });
     }
 
+    await t.test('no room for its own line (a small screen with the system bar and a caption): the year joins the album\'s line', async () => {
+        await resize(session, 1280, 720);
+        await evaluate("document.body.classList.toggle('touch', true)");
+        const words = 'A title that needs two lines of room at its full size on this screen, or a little more than that';
+        const tight = { media: song(words, words, { station: 'Pro FM', album: words, caption: `${words} ${words}` }, [logo('90er-stream'), logo('Profm')]) };
+        tight.media.metadata.releaseDate = '2015';
+        await evaluate(intercept('LOAD', tight));
+        await pause(800);
+        assert.deepEqual(await evaluate(yearState), { alone: '', joined: '2015', shown: false });
+        assert.deepEqual(await problems(session, { width: 1280, height: 720, touch: true }), []);
+        await evaluate("document.body.classList.toggle('touch', false)");
+    });
+
     for (const size of sizes) {
         await t.test(`${size.name}: a short text is one line at full size; a long one takes two lines, smaller, before it is cut`, async () => {
             await resize(session, size.width, size.height);
