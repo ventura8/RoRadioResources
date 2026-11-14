@@ -6,6 +6,7 @@
   "useGitignore": true,
   "ignorePaths": [
     "RadioStationsData.json",
+    "RetiredStations.json",
     "docs/releases/**",
     "RadioLogos/**",
     "index.html",
