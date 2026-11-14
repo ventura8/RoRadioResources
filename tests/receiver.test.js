@@ -402,8 +402,9 @@ test('repeated jumps broadcast steps with rising ids, and play nothing, even on 
 });
 
 test('one press is one step: a jump resent with its request id, or repeated at once, steps once (Pixel Tablet)', () => {
-    const resent = { type: 'QUEUE_UPDATE', request: { jump: 1, requestId: 7, senderId: 'tablet' } };
-    const did = run([load(appData('', true, true)), resent, resent, resent, resent, resent]);
+    // Resent 0.7 s apart: past the moment between presses, within the time a resend comes in.
+    const resent = { type: 'QUEUE_UPDATE', request: { jump: 1, requestId: 7, senderId: 'tablet' }, gap: 700 };
+    const did = run([load(appData('', true, true)), resent, resent, resent, resent, resent, resent, resent]);
     assert.deepEqual(
         did.broadcasts.map((entry) => entry.customData.step),
         ['next'],
@@ -429,7 +430,18 @@ test('the tablet bar sends every press with one request id: later presses still 
         did.broadcasts.map((entry) => entry.customData.step),
         ['next', 'previous', 'next', 'previous'],
     );
-    assert.equal(did.broadcasts[0].customData.via, 'local/1');
+    assert.equal(did.broadcasts[0].customData.via, 'local/1/next');
+
+    // Next, then previous 2 s later and next again 0.8 s after: the bar's one request id, three presses (Greptile, #43).
+    const quick = run([load(appData('', true, true)), bar(1), bar(-1, 2000), bar(1, 800)]);
+    assert.deepEqual(
+        quick.broadcasts.map((entry) => entry.customData.step),
+        ['next', 'previous', 'next'],
+    );
+
+    // The same direction twice, 2 s apart (past a resend's time): two presses.
+    const twice = run([load(appData('', true, true)), bar(1), bar(1, 2000)]);
+    assert.equal(twice.broadcasts.length, 2);
 
     // Request id 0 (or none) tells no resend: only the moment between presses does.
     const zero = (gap) => ({ type: 'QUEUE_UPDATE', request: { jump: -1, requestId: 0, senderId: 'local' }, gap });
@@ -440,10 +452,10 @@ test('the tablet bar sends every press with one request id: later presses still 
 
 test('test mode reports a press taken for a repeat, and why; other apps never see it', () => {
     const data = JSON.stringify({ rects: true, previous: true, next: true });
-    const resent = { type: 'QUEUE_UPDATE', request: { jump: 1, requestId: 9, senderId: 'tablet' } };
+    const resent = { type: 'QUEUE_UPDATE', request: { jump: 1, requestId: 9, senderId: 'tablet' }, gap: 700 };
     const did = run([load(data), resent, resent]);
     assert.deepEqual(did.statuses.at(-1).customData.skipped, 'next');
-    assert.equal(did.statuses.at(-1).customData.via, 'tablet/9');
+    assert.equal(did.statuses.at(-1).customData.via, 'tablet/9/next');
 
     // A resend after the device set its clock back is no resend: it steps.
     const setBack = run([load(appData('', true, true)), resent, { ...resent, gap: -60000 }]);

@@ -9,8 +9,10 @@ Merge this before RoRadio 2.4.5 ships.
   every time. The page remembered each request id forever to drop a resent jump (#36), so it took every later
   press for a resend of the first. The on-device test showed it: previous stepped when it was the first press, and
   previous, next or a second previous after another press gave nothing.
-- **Fix.** A request id now marks a resend for 5 s only, and an id of 0 (or none) never does. Two presses within
-  600 ms are still one press, so a resent or doubled jump steps once.
+- **Fix.** A resend is the same sender, request id and direction, within 1.5 s of the last time it was seen. Each
+  resend starts that time again, so a controller that keeps resending still steps once. An id of 0 (or none) never
+  marks a resend. Next, then previous a moment later, is two presses (Greptile, #43). Two presses within 600 ms are
+  still one press.
 - **Two lines for the title, the artist and the album** (owner). Each takes up to two lines. A text that needs
   more shrinks in steps, down to 24 px at 1080p, before its second line ends in an ellipsis. When the three
   together pass the station's line at the bottom of the song's column, all three shrink a step more. They are
@@ -23,8 +25,12 @@ Merge this before RoRadio 2.4.5 ships.
 
 ## Checked
 
-- `tests/receiver.test.js`: the bar's presses with one request id, 6 to 7 s apart, all step. Request id 0 never
-  dedupes. A resend within 5 s steps once. Test mode reports what it dropped.
-- `tests/receiver.browser.test.js` (real framework): next, then previous 6 s later with the same request id, both
-  step.
+- `tests/receiver.test.js`:
+  - The bar's presses with one request id all step: next, previous 2 s later, next 0.8 s after.
+  - The same direction 2 s apart is two presses.
+  - Seven resends 0.7 s apart step once.
+  - Request id 0 never dedupes.
+  - Test mode reports what it dropped.
+- `tests/receiver.browser.test.js` (real framework): next, previous 1 s later and next 2 s later, with one request
+  id, all step.
 - `scripts/e2e/Test-ReceiverOnTablet.ps1`: next, previous and next again on the tablet's bar, each exactly one step.

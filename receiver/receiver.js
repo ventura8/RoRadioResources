@@ -148,10 +148,11 @@ function showSteps(previous, next) {
  * request id seen within RETRY_MS is the same press, and a step within STEP_GAP_MS of the last one is the same press
  * too. A request id counts for a few seconds only, and 0 (or none) not at all: the tablet's own media bar sends every
  * press with the same request id, and a remembered id took every later previous / next for the first one's repeat
- * (one previous worked, then nothing, 2026-11-14).
+ * (one previous worked, then nothing, 2026-11-14). A resend is the same direction too, and comes within RETRY_MS:
+ * next, then previous a moment later with the bar's one request id, is two presses (Greptile, #43).
  */
 const STEP_GAP_MS = 600;
-const RETRY_MS = 5000;
+const RETRY_MS = 1500;
 
 /** Test mode, asked for by a test sender only ({"rects": true} in its customData). */
 let withRects = false;
@@ -159,9 +160,9 @@ const seenRequests = new Map();
 let lastStepAt = -Infinity;
 let lastStepId = 0;
 
-/** The press a request is: its sender and request id, or '' when it carries no id to tell a resend by. */
-function pressKey(request) {
-    return request && request.requestId ? `${request.senderId}/${request.requestId}` : '';
+/** The press a request is: its sender, request id and direction, or '' when it carries no id to tell a resend by. */
+function pressKey(request, name) {
+    return request && request.requestId ? `${request.senderId}/${request.requestId}/${name}` : '';
 }
 
 /**
@@ -176,15 +177,17 @@ function isRepeat(key, now) {
 
 /** A previous / next press, for the app: a media status whose customData names it, numbered upwards. */
 function step(name, request) {
-    const key = pressKey(request);
+    const key = pressKey(request, name);
     const now = Date.now();
-    if (isRepeat(key, now)) {
+    const repeat = isRepeat(key, now);
+    // Each resend starts a resend's time again: a controller resending for longer than RETRY_MS never steps twice.
+    seenRequests.set(key, now);
+    if (repeat) {
         // Test mode: a press taken for a repeat is reported too, so the device test sees what was dropped and why.
         report(withRects ? { skipped: name, via: key } : {});
         return;
     }
 
-    seenRequests.set(key, now);
     lastStepAt = now;
     lastStepId = Math.max(now, lastStepId + 1);
     // "via" names the request that made the step, for the on-device test (older apps read only step and stepId).
