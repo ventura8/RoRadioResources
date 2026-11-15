@@ -832,6 +832,16 @@ test('every outgoing media status, a GET_STATUS answer too, says what the screen
     assert.equal(did.within(() => did.interceptors.MEDIA_STATUS({ customData: press })).customData, press);
 });
 
+test('live radio: a status with media is LIVE with no duration and no seekable range', () => {
+    const did = run([load('')]);
+    const status = did.within(() =>
+        did.interceptors.MEDIA_STATUS({ liveSeekableRange: { start: 0, end: 9 }, media: { streamType: 'BUFFERED', duration: 9 } }),
+    );
+    assert.equal('liveSeekableRange' in status, false);
+    assert.equal(status.media.streamType, 'LIVE');
+    assert.equal('duration' in status.media, false);
+});
+
 test("the app's cover colour theme: its colours on the page and in the status; off, the default look", () => {
     const themed = JSON.stringify({ theme: { accent: '#F0E040', tint: '#5A5418' } });
     const did = run([load(themed)]);
