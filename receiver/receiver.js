@@ -127,8 +127,12 @@ function appData(customData) {
 }
 
 const { Command } = cast.framework.messages;
-const stepCommands = Command.QUEUE_PREV | Command.QUEUE_NEXT;
-let baseCommands = null;
+/*
+ * A radio station is live: pause and the volume, never SEEK. With SEEK declared (the framework's default) a touch
+ * display drew a scrubber and a time over the system media bar that moved nothing on a live stream; the app has no
+ * time bar either (owner, 2026-11-15).
+ */
+const baseCommands = Command.PAUSE | Command.STREAM_VOLUME | Command.STREAM_MUTE;
 
 /** The steps the station has, as declared to the device (and reported in "shown"). */
 const steps = { next: false, previous: false };
@@ -138,10 +142,6 @@ const steps = { next: false, previous: false };
  * controls (smart display, Google TV, Google Home) show exactly those.
  */
 function showSteps(previous, next) {
-    if (baseCommands === null) {
-        baseCommands = player.getSupportedMediaCommands() & ~stepCommands;
-    }
-
     const commands = baseCommands | (previous ? Command.QUEUE_PREV : 0) | (next ? Command.QUEUE_NEXT : 0);
     player.setSupportedMediaCommands(commands, true);
     steps.next = next;
@@ -344,9 +344,18 @@ function updateSong(media) {
 
 const { MessageType } = cast.framework.messages;
 
-/** A LOAD: the station starts; its song is shown with it. */
+/**
+ * A station is a live stream whatever a sender says: LIVE, no duration, so the device draws no time and no scrubber.
+ */
+function asLive(media) {
+    media.streamType = 'LIVE';
+    delete media.duration;
+}
+
+/** A LOAD: the station starts, as a live stream; its song is shown with it. */
 player.setMessageInterceptor(MessageType.LOAD, (request) => {
     if (request.media) {
+        asLive(request.media);
         show(request.media);
     }
 
@@ -356,10 +365,15 @@ player.setMessageInterceptor(MessageType.LOAD, (request) => {
 /**
  * Every media status the page sends says what the screen shows, a sender's GET_STATUS answer too: a sender (or a
  * test) asks at any time, without waiting for the next change. A status that already carries custom data (a step
- * press) keeps it.
+ * press) keeps it. A live station has no range to seek in: none is reported.
  */
 player.setMessageInterceptor(MessageType.MEDIA_STATUS, (status) => {
     status.customData ||= { shown: shownNow() };
+    delete status.liveSeekableRange;
+    if (status.media) {
+        asLive(status.media);
+    }
+
     return status;
 });
 
@@ -429,6 +443,8 @@ player.setMediaElement(byId('media'));
 const options = new cast.framework.CastReceiverOptions();
 // A radio station plays until it is stopped; the receiver stays while it is idle between two stations.
 options.maxInactivity = 3600;
+// Live radio from the start: no SEEK before the first station's steps are declared.
+options.supportedCommands = baseCommands;
 // This page is the touch UI (Cast's smart display guide): no default controls or opaque scrim over it.
 options.uiConfig = new cast.framework.ui.UiConfig();
 options.uiConfig.touchScreenOptimizedApp = true;

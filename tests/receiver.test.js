@@ -68,7 +68,8 @@ test('the Content-Security-Policy allows the page\'s own receiver.js, no inline 
 
 // The framework's own values (cast.framework.messages.Command).
 const Command = { PAUSE: 1, SEEK: 2, STREAM_VOLUME: 4, STREAM_MUTE: 8, QUEUE_NEXT: 64, QUEUE_PREV: 128 };
-const BASE = Command.PAUSE | Command.SEEK | Command.STREAM_VOLUME | Command.STREAM_MUTE;
+// Live radio: pause and the volume, never SEEK (no scrubber or time on a touch display's media bar).
+const BASE = Command.PAUSE | Command.STREAM_VOLUME | Command.STREAM_MUTE;
 const { QUEUE_NEXT, QUEUE_PREV } = Command;
 
 function element() {
