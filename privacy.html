@@ -106,16 +106,22 @@
 
   <h2>Album art and song titles</h2>
   <p>While a station plays, it broadcasts the current song's title. To show cover art, RoRadio looks that title up —
-    first in its own cache (MongoDB Atlas), then at Qwant and Google Programmable Search. Those services receive the
+    first in its own cache (RoRadio's sync service on Cloudflare Workers, which keeps the cache in MongoDB Atlas),
+    then at Qwant and Google Programmable Search. Those services receive the
     song title and the usual technical data of a web request, such as your IP address, under their own privacy
     policies; they do not receive your installation identifier. Song titles are not attached to diagnostics.</p>
 
   <h2>Cloud sync (Windows and Xbox only, off until you sign in)</h2>
   <p>If you turn on user data synchronisation, RoRadio signs you in with the Microsoft account already on your device
     and stores your favourites, your added stations and your settings in MongoDB Atlas so another device can restore
-    them. The stored record is keyed by a one-way hash of your account identifier: RoRadio does not store your
-    account name, e-mail address or any token. Turn the setting off to stop syncing; what was already stored stays
-    in Atlas until you ask for it to be deleted at the contact address below.</p>
+    them. Since version 2.4.5 the app sends them to RoRadio's own sync service (hosted on Cloudflare Workers), not to
+    the database directly. With each request the app sends the sign-in token Microsoft issued for RoRadio; the
+    service checks that token, works out the one-way hash of your account identifier from it, and reads or writes
+    only the record with that key. Cloudflare sees the usual technical data of a web request, such as your IP
+    address, which the service uses only to limit the request rate and does not store. The stored record is keyed by
+    that hash: RoRadio does not store your account name, e-mail address or any token. Turn the setting off to stop
+    syncing; what was already stored stays in Atlas until you ask for it to be deleted at the contact address
+    below.</p>
 
   <h2>Live captions (2.x, experimental, off until you turn them on)</h2>
   <p>Captions are made on your device by a speech model running on its graphics card or processor. The station's audio
