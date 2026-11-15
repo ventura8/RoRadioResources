@@ -68,7 +68,8 @@ test('the Content-Security-Policy allows the page\'s own receiver.js, no inline 
 
 // The framework's own values (cast.framework.messages.Command).
 const Command = { PAUSE: 1, SEEK: 2, STREAM_VOLUME: 4, STREAM_MUTE: 8, QUEUE_NEXT: 64, QUEUE_PREV: 128 };
-const BASE = Command.PAUSE | Command.SEEK | Command.STREAM_VOLUME | Command.STREAM_MUTE;
+// Live radio: pause and the volume, never SEEK (no scrubber or time on a touch display's media bar).
+const BASE = Command.PAUSE | Command.STREAM_VOLUME | Command.STREAM_MUTE;
 const { QUEUE_NEXT, QUEUE_PREV } = Command;
 
 function element() {
@@ -829,6 +830,16 @@ test('every outgoing media status, a GET_STATUS answer too, says what the screen
     assert.equal(status.customData.shown.title, 'Song');
     const press = { step: 'next', stepId: 5 };
     assert.equal(did.within(() => did.interceptors.MEDIA_STATUS({ customData: press })).customData, press);
+});
+
+test('live radio: a status with media is LIVE with no duration and no seekable range', () => {
+    const did = run([load('')]);
+    const status = did.within(() =>
+        did.interceptors.MEDIA_STATUS({ liveSeekableRange: { start: 0, end: 9 }, media: { streamType: 'BUFFERED', duration: 9 } }),
+    );
+    assert.equal('liveSeekableRange' in status, false);
+    assert.equal(status.media.streamType, 'LIVE');
+    assert.equal('duration' in status.media, false);
 });
 
 test("the app's cover colour theme: its colours on the page and in the status; off, the default look", () => {

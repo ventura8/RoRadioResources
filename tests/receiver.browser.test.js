@@ -58,6 +58,7 @@ function probe() {
         context.start = (options) => {
             record.started = true;
             record.maxInactivity = options && options.maxInactivity;
+            record.supportedCommands = options && options.supportedCommands;
             record.touchScreenOptimizedApp = Boolean(options && options.uiConfig && options.uiConfig.touchScreenOptimizedApp);
             // Off a device the framework has no platform to answer it; reaching start() is the page's part.
             try {
@@ -546,6 +547,29 @@ test('the receiver page in Chrome with the real Cast framework', { timeout: 3000
         );
         assert.equal(icon.width, 256);
         assert.equal(icon.shown, true);
+    });
+
+    await t.test('live radio: starts without SEEK, keeps pause and the volume, and no step declares SEEK', async () => {
+        const C = await evaluate('(({ SEEK, PAUSE, STREAM_VOLUME, STREAM_MUTE, QUEUE_NEXT, QUEUE_PREV }) => ({ SEEK, PAUSE, STREAM_VOLUME, STREAM_MUTE, QUEUE_NEXT, QUEUE_PREV }))(cast.framework.messages.Command)');
+        const record = await evaluate('window.probe');
+        assert.equal(record.supportedCommands, C.PAUSE | C.STREAM_VOLUME | C.STREAM_MUTE);
+        const data = JSON.stringify({ previous: true, next: true, station: 'Live' });
+        await evaluate(intercept('LOAD', loadRequest(media(origin, { title: 'Steps', customData: data }))));
+        const commands = (await evaluate('window.probe.commands')).at(-1);
+        assert.equal(commands & C.SEEK, 0);
+        assert.equal(commands, C.PAUSE | C.STREAM_VOLUME | C.STREAM_MUTE | C.QUEUE_NEXT | C.QUEUE_PREV);
+        assert.equal(await evaluate('window.probe.commands.some((c) => c & cast.framework.messages.Command.SEEK)'), false);
+    });
+
+    await t.test('a LOAD is made LIVE with no duration, and a status reports no seekable range', async () => {
+        const request = { media: { ...media(origin, { title: 'Buffered', customData: '' }), streamType: 'BUFFERED', duration: 3600 } };
+        const out = await evaluate(`window.interceptors.LOAD(${JSON.stringify(request)})`);
+        assert.equal(out.media.streamType, 'LIVE');
+        assert.equal('duration' in out.media, false);
+        const status = await evaluate(`window.interceptors.MEDIA_STATUS({ playerState: 'PLAYING', liveSeekableRange: { start: 0, end: 60 }, media: { streamType: 'BUFFERED', duration: 60 } })`);
+        assert.equal('liveSeekableRange' in status, false);
+        assert.equal(status.media.streamType, 'LIVE');
+        assert.equal('duration' in status.media, false);
     });
 
     await t.test('declares the touch UI and plays through its own media element', async () => {
