@@ -1,8 +1,10 @@
-# No time bar on the cast receiver, 2026-11-15
+# No seeking on the cast receiver, 2026-11-15
 
-A radio station is live, so the cast receiver no longer offers seeking. A touch display (Pixel Tablet) drew a
-progress / time bar in its system media bar that could not move a live stream. The RoRadio app has no time bar
-either.
+A radio station is live, so the cast receiver no longer offers seeking. The RoRadio app has no time bar either.
+
+The Pixel Tablet's system UI still draws its time bar and LIVE counter: the system draws them, and the receiver
+cannot remove them. The bar moves nothing: before this change a drag across it did nothing, and now seeking is not
+offered at all (the device's media session no longer lists seek). The Google TV Streamer shows no bar.
 
 ## What changed
 
@@ -20,5 +22,5 @@ either.
   - The receiver starts without SEEK and keeps pause and the volume; a station with steps adds exactly previous /
     next, never SEEK.
   - A BUFFERED LOAD with a duration comes out LIVE without one; a status loses its seekable range.
-- `tests/receiver.test.js`: the declared commands no longer include SEEK.
-- `scripts/e2e/Test-ReceiverOnTablet.ps1` on the Pixel Tablet and the Google TV Streamer.
+- `tests/receiver.test.js`: the declared commands no longer include SEEK; a status with media is made LIVE.
+- `scripts/e2e/Test-ReceiverOnTablet.ps1` passed on the Pixel Tablet and the Google TV Streamer.
