@@ -11,7 +11,7 @@
     "editorconfig-checker": "7.0.0",
     "eslint": "10.14.0",
     "globals": "17.13.0",
-    "html-validate": "11.17.0",
+    "html-validate": "11.21.0",
     "markdownlint-cli2": "0.24.1",
     "postcss-html": "2.0.0",
     "stylelint": "17.16.0",
