@@ -2,31 +2,25 @@
   "58295af5-92a9-47dd-92b4-8d95be835faf": {
     "Title": "Radio Capital FM Etno",
     "FirstFailed": "2026-11-16",
-    "LastCounted": "2026-11-16",
-    "Days": 0
+    "LastCounted": "2026-11-17",
+    "Days": 1
   },
-  "0786222a-a52d-4fd8-a6de-1e751ac1cb86": {
-    "Title": "Radio Etno Mania",
-    "FirstFailed": "2026-11-16",
-    "LastCounted": "2026-11-16",
+  "e5267c33-d0eb-4331-988c-282caa56385a": {
+    "Title": "Radio SOS",
+    "FirstFailed": "2026-11-17",
+    "LastCounted": "2026-11-17",
     "Days": 0
   },
   "f684f703-0cc5-432f-a4b8-cc16a7c611ad": {
     "Title": "Radio Traditional",
     "FirstFailed": "2026-11-16",
-    "LastCounted": "2026-11-16",
-    "Days": 0
+    "LastCounted": "2026-11-17",
+    "Days": 1
   },
   "55578395-bcfd-4fff-abad-0d7adb66ffe0": {
     "Title": "Radio Tradiţional Popular",
     "FirstFailed": "2026-11-16",
-    "LastCounted": "2026-11-16",
-    "Days": 0
-  },
-  "51496512-69b3-407e-ad96-897e2d98aae7": {
-    "Title": "Vox FM",
-    "FirstFailed": "2026-11-16",
-    "LastCounted": "2026-11-16",
-    "Days": 0
+    "LastCounted": "2026-11-17",
+    "Days": 1
   }
 }
