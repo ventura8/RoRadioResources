@@ -4,8 +4,9 @@
 // SharpcasterTransport does: LOAD with the app's customData, QUEUE_UPDATE for a song, a step press read back from the
 // media status, PAUSE / PLAY, STOP.
 //
-//   node cast-client.mjs <address> <step> [json]
+//   node cast-client.mjs <address> <step> [json|@path]
 //   steps: avail | launch | load | song | tap | jump | pause | play | status | shown | stop
+//   On Windows, pass @path (UTF-8 file) so PowerShell cannot strip the JSON's quotes from argv.
 //   "shown" needs no session of its own: it reads what the receiver shows in whichever session runs it (the app's).
 // Prints one JSON line: what the device answered. The session (transport id, media session id) is kept in
 // %TEMP%/roradio-cast-e2e.json between calls, so each step is its own call and the script screenshots in between.
@@ -176,8 +177,11 @@ const load = (url, title, artist, extra) => ({
 });
 
 async function main() {
+    // Windows PowerShell strips " from a JSON argv (native command quoting), so the e2e script can pass @path
+    // to a UTF-8 file instead of the JSON text. A bare JSON string still works from bash / cmd.
     const [address, step, json] = process.argv.slice(2);
-    const input = json ? JSON.parse(json) : {};
+    const raw = json && json.startsWith('@') ? fs.readFileSync(json.slice(1), 'utf8') : json;
+    const input = raw ? JSON.parse(raw) : {};
     const state = fs.existsSync(stateFile) ? JSON.parse(fs.readFileSync(stateFile, 'utf8')) : {};
     const cast = await connect(address);
     const app = () => {
