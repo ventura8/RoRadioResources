@@ -75,11 +75,18 @@ function Save-Screen([string]$Name) {
 }
 
 function Invoke-Cast([string]$Step, [hashtable]$Data = @{}) {
-    $json = $Data | ConvertTo-Json -Compress -Depth 5
-    $answer = & node $client $script:Address $Step $json
-    if ($LASTEXITCODE -ne 0) { throw "Cast step $Step failed" }
-    Write-Information "  $Step -> $answer" -InformationAction Continue
-    $answer | ConvertFrom-Json
+    # PowerShell's native argv quoting strips " from JSON on Windows; cast-client.mjs accepts @path instead.
+    $json = if ($Data.Count -eq 0) { '{}' } else { $Data | ConvertTo-Json -Compress -Depth 5 }
+    $argFile = Join-Path ([IO.Path]::GetTempPath()) ("roradio-cast-e2e-arg-{0}.json" -f [guid]::NewGuid().ToString('N'))
+    try {
+        [IO.File]::WriteAllText($argFile, $json)
+        $answer = & node $client $script:Address $Step "@$argFile"
+        if ($LASTEXITCODE -ne 0) { throw "Cast step $Step failed" }
+        Write-Information "  $Step -> $answer" -InformationAction Continue
+        $answer | ConvertFrom-Json
+    } finally {
+        Remove-Item -LiteralPath $argFile -Force -ErrorAction SilentlyContinue
+    }
 }
 
 function Test-Step([string]$Name, [scriptblock]$Check) {
