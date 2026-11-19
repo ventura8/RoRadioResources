@@ -26,7 +26,7 @@
 
 <body>
   <h1>RoRadio privacy policy</h1>
-  <p class="updated">Last updated 4 November 2026. Applies to RoRadio for Windows (2.x) and RoRadio for Xbox and
+  <p class="updated">Last updated 19 November 2026. Applies to RoRadio for Windows (2.x) and RoRadio for Xbox and
     Windows 10 (1.x) in the Microsoft Store, RoRadio for Android on Google Play, and RoRadio for Linux in the Snap
     Store and as a package.</p>
 
@@ -110,18 +110,23 @@
     song title and the usual technical data of a web request, such as your IP address, under their own privacy
     policies; they do not receive your installation identifier. Song titles are not attached to diagnostics.</p>
 
-  <h2>Cloud sync (Windows and Xbox only, off until you sign in)</h2>
-  <p>If you turn on user data synchronisation, RoRadio signs you in with the Microsoft account already on your device
-    and stores your favourites, your added stations and your settings in MongoDB Atlas so another device can restore
-    them. The stored record is keyed by a one-way hash of your account identifier: RoRadio does not store your
-    account name, e-mail address or any token. Turn the setting off to stop syncing; what was already stored stays
-    in Atlas until you ask for it to be deleted at the contact address below.</p>
+  <h2>Cloud sync (off until you sign in)</h2>
+  <p>If you turn on user data synchronisation, RoRadio signs you in with a <strong>Microsoft</strong> or
+    <strong>Google</strong> account (on Windows, Xbox, Android and Linux; on Android phones you can use Google's
+    in-app account picker, and on every platform you can sign in with a QR code on another device) and stores your
+    favourites, your added stations and your settings through RoRadio's sync service in MongoDB Atlas so another
+    device can restore them. The stored record is keyed by a one-way hash of your account identifier: RoRadio does
+    not store your account name, e-mail address or any token in Atlas. Settings may show your name and picture from
+    the sign-in provider on the device. Turn the setting off or sign out to stop syncing; what was already stored
+    stays in Atlas until you ask for it to be deleted at the contact address below. Google and Microsoft records
+    are kept apart.</p>
 
   <h2>Live captions (2.x, experimental, off until you turn them on)</h2>
-  <p>Captions are made on your device by a speech model running on its graphics card or processor. The station's audio
-    and the recognised text never leave the device and are not stored: they are not sent to us, to the model's
-    publisher or to diagnostics. While captions are on, the app opens a second connection to the station you are
-    playing, so its server sees one more connection from your IP address.</p>
+  <p>Captions are made on your device by a speech model running on its graphics card, NPU or processor. The station's
+    audio is decoded from the radio stream on the device (the app does not use the microphone). The audio and the
+    recognised text never leave the device and are not stored: they are not sent to us, to the model's publisher or
+    to diagnostics. While captions are on, the app opens a second connection to the station you are playing, so its
+    server sees one more connection from your IP address.</p>
   <p>The first time you turn captions on, RoRadio asks before downloading the model you chose (several hundred
     megabytes to a few gigabytes) from Hugging Face, GitHub and this site. Those hosts see your IP address and which
     file was requested, under their own policies; the download carries no installation identifier. The model stays
