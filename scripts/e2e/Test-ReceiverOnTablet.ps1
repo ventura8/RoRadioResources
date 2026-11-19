@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     End-to-end check of the RoRadio Cast receiver (F38F9694) on a real Cast device over adb: a touch display (the
     Pixel Tablet) or a TV (the Google TV Streamer).
