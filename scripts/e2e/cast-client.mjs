@@ -180,7 +180,7 @@ async function main() {
     // Windows PowerShell strips " from a JSON argv (native command quoting), so the e2e script can pass @path
     // to a UTF-8 file instead of the JSON text. A bare JSON string still works from bash / cmd.
     const [address, step, json] = process.argv.slice(2);
-    const raw = json && json.startsWith('@') ? fs.readFileSync(json.slice(1), 'utf8') : json;
+    const raw = json && json.startsWith('@') ? fs.readFileSync(json.slice(1), 'utf8').replace(/^\uFEFF/, '') : json;
     const input = raw ? JSON.parse(raw) : {};
     const state = fs.existsSync(stateFile) ? JSON.parse(fs.readFileSync(stateFile, 'utf8')) : {};
     const cast = await connect(address);
