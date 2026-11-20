@@ -1,20 +1,32 @@
 {
+  "0d2953f4-20d7-462d-b604-5ce3b01cc878": {
+    "Title": "Fun fm",
+    "FirstFailed": "2026-11-20",
+    "LastCounted": "2026-11-20",
+    "Days": 0
+  },
+  "017e3434-f1fc-4019-a795-ebb383a25c73": {
+    "Title": "Jazz & Chill",
+    "FirstFailed": "2026-11-20",
+    "LastCounted": "2026-11-20",
+    "Days": 0
+  },
   "58295af5-92a9-47dd-92b4-8d95be835faf": {
     "Title": "Radio Capital FM Etno",
     "FirstFailed": "2026-11-16",
-    "LastCounted": "2026-11-19",
-    "Days": 3
+    "LastCounted": "2026-11-20",
+    "Days": 4
   },
   "f684f703-0cc5-432f-a4b8-cc16a7c611ad": {
     "Title": "Radio Traditional",
     "FirstFailed": "2026-11-16",
-    "LastCounted": "2026-11-19",
-    "Days": 3
+    "LastCounted": "2026-11-20",
+    "Days": 4
   },
   "55578395-bcfd-4fff-abad-0d7adb66ffe0": {
     "Title": "Radio Tradiţional Popular",
     "FirstFailed": "2026-11-16",
-    "LastCounted": "2026-11-19",
-    "Days": 3
+    "LastCounted": "2026-11-20",
+    "Days": 4
   }
 }
