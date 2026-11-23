@@ -1,74 +1,20 @@
 {
-  "5879fd3e-9d7e-476a-80e0-d2f1ce2b60a9": {
-    "Title": "Radio Atentat",
-    "FirstFailed": "2026-11-21",
-    "LastCounted": "2026-11-21",
-    "Days": 0
-  },
-  "7c7964a1-63ae-4ef3-9d52-1128d50ae877": {
-    "Title": "Radio Bucovina",
-    "FirstFailed": "2026-11-21",
-    "LastCounted": "2026-11-21",
-    "Days": 0
-  },
   "58295af5-92a9-47dd-92b4-8d95be835faf": {
     "Title": "Radio Capital FM Etno",
     "FirstFailed": "2026-11-16",
-    "LastCounted": "2026-11-21",
-    "Days": 5
-  },
-  "9fa8fb1b-ed13-4c15-88bc-cee535b8468d": {
-    "Title": "Radio Gansta",
-    "FirstFailed": "2026-11-21",
-    "LastCounted": "2026-11-21",
-    "Days": 0
-  },
-  "ace78d90-9970-4eed-808b-9becbd826f58": {
-    "Title": "Radio Hot Style",
-    "FirstFailed": "2026-11-21",
-    "LastCounted": "2026-11-21",
-    "Days": 0
-  },
-  "78a556fc-6b2e-400a-afc3-8552fd34fba2": {
-    "Title": "Radio Nebunya",
-    "FirstFailed": "2026-11-21",
-    "LastCounted": "2026-11-21",
-    "Days": 0
-  },
-  "1f51d395-0ad4-4614-919a-b482d474de26": {
-    "Title": "Radio Petrecaretzu",
-    "FirstFailed": "2026-11-21",
-    "LastCounted": "2026-11-21",
-    "Days": 0
-  },
-  "b47a4c31-f5a4-4fd0-bdd9-1478ba56bdae": {
-    "Title": "Radio Stil",
-    "FirstFailed": "2026-11-21",
-    "LastCounted": "2026-11-21",
-    "Days": 0
-  },
-  "ccc17760-1aaf-433d-a4d5-e889ae7bceb0": {
-    "Title": "Radio Tequila Hip hop",
-    "FirstFailed": "2026-11-21",
-    "LastCounted": "2026-11-21",
-    "Days": 0
-  },
-  "7e9ed5fd-de42-4bba-be8e-098771c66e04": {
-    "Title": "Radio Tequila Manele",
-    "FirstFailed": "2026-11-21",
-    "LastCounted": "2026-11-21",
-    "Days": 0
+    "LastCounted": "2026-11-23",
+    "Days": 7
   },
   "f684f703-0cc5-432f-a4b8-cc16a7c611ad": {
     "Title": "Radio Traditional",
     "FirstFailed": "2026-11-16",
-    "LastCounted": "2026-11-21",
-    "Days": 5
+    "LastCounted": "2026-11-23",
+    "Days": 7
   },
   "55578395-bcfd-4fff-abad-0d7adb66ffe0": {
     "Title": "Radio Tradiţional Popular",
     "FirstFailed": "2026-11-16",
-    "LastCounted": "2026-11-21",
-    "Days": 5
+    "LastCounted": "2026-11-23",
+    "Days": 7
   }
 }
