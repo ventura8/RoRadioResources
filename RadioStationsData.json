@@ -930,7 +930,7 @@
       {
         "GUID": "573a9104-b539-4541-b200-464f35510f7a",
         "Title": "Gherla FM",
-        "Url": "http://stream.adradio.ro/gherlafm",
+        "Url": "http://89.39.189.52:8000/stream",
         "ImageUrl": "gherlafm.png"
       }
     ]
@@ -983,7 +983,7 @@
       {
         "GUID": "879c9e21-24d9-427a-9eba-1fc2034a87c1",
         "Title": "Radio GMusic Colinde",
-        "Url": "https://s9.webradio-hosting.com/proxy/rgmcolinde/stream",
+        "Url": "https://s10.webradio-hosting.com/proxy/rgmcolinde?mp=/stream",
         "ImageUrl": "gmusic-colinde.jpg"
       }
     ]
