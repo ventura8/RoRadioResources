@@ -575,3 +575,17 @@ Describe 'The whole run (Invoke-Refresh.ps1) and its data branch' {
         }
     }
 }
+
+Describe 'The weekly workflow installs what its test stage needs' {
+    It 'installs the pinned Python tools and the pinned npm packages (axe-core), as CI does' {
+        # Regression: from 2026-11-24 every run failed in the search stage's tests because
+        # tests/receiver.browser.test.js loads axe-core from scripts/ci/node_modules and only CI installed it.
+        $workflows = Join-Path (Split-Path $PSScriptRoot -Parent) '.github/workflows'
+        $refresh = Get-Content -Raw (Join-Path $workflows 'refresh-stations.yml')
+        $ci = Get-Content -Raw (Join-Path $workflows 'ci.yml')
+        foreach ($install in 'npm ci --prefix scripts/ci', 'pip install --quiet -r scripts/ci/requirements.txt') {
+            $ci | Should -Match ([regex]::Escape($install)) -Because 'CI is the reference for the test stage'
+            $refresh | Should -Match ([regex]::Escape($install)) -Because 'the refresh runs the same tests'
+        }
+    }
+}
