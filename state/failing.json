@@ -1,6 +1,12 @@
 {
-  "94a6e00f-88b2-4594-98d4-80c53f371e3e": {
-    "Title": "Radio Băilesti",
+  "5879fd3e-9d7e-476a-80e0-d2f1ce2b60a9": {
+    "Title": "Radio Atentat",
+    "FirstFailed": "2026-11-28",
+    "LastCounted": "2026-11-28",
+    "Days": 0
+  },
+  "7c7964a1-63ae-4ef3-9d52-1128d50ae877": {
+    "Title": "Radio Bucovina",
     "FirstFailed": "2026-11-28",
     "LastCounted": "2026-11-28",
     "Days": 0
@@ -11,26 +17,44 @@
     "LastCounted": "2026-11-28",
     "Days": 12
   },
+  "9fa8fb1b-ed13-4c15-88bc-cee535b8468d": {
+    "Title": "Radio Gansta",
+    "FirstFailed": "2026-11-28",
+    "LastCounted": "2026-11-28",
+    "Days": 0
+  },
+  "ace78d90-9970-4eed-808b-9becbd826f58": {
+    "Title": "Radio Hot Style",
+    "FirstFailed": "2026-11-28",
+    "LastCounted": "2026-11-28",
+    "Days": 0
+  },
+  "78a556fc-6b2e-400a-afc3-8552fd34fba2": {
+    "Title": "Radio Nebunya",
+    "FirstFailed": "2026-11-28",
+    "LastCounted": "2026-11-28",
+    "Days": 0
+  },
+  "1f51d395-0ad4-4614-919a-b482d474de26": {
+    "Title": "Radio Petrecaretzu",
+    "FirstFailed": "2026-11-28",
+    "LastCounted": "2026-11-28",
+    "Days": 0
+  },
   "b47a4c31-f5a4-4fd0-bdd9-1478ba56bdae": {
     "Title": "Radio Stil",
     "FirstFailed": "2026-11-26",
     "LastCounted": "2026-11-28",
     "Days": 2
   },
-  "7e3b81b7-5bdb-4c7e-882d-45266c332b16": {
-    "Title": "Radio Sun Dance",
+  "ccc17760-1aaf-433d-a4d5-e889ae7bceb0": {
+    "Title": "Radio Tequila Hip hop",
     "FirstFailed": "2026-11-28",
     "LastCounted": "2026-11-28",
     "Days": 0
   },
-  "390f58e2-5e24-4c9f-8d42-704fb14318ed": {
-    "Title": "Radio SunGold",
-    "FirstFailed": "2026-11-28",
-    "LastCounted": "2026-11-28",
-    "Days": 0
-  },
-  "aaac8821-bcc2-45ca-aaf8-878e778165df": {
-    "Title": "Radio SunLove",
+  "7e9ed5fd-de42-4bba-be8e-098771c66e04": {
+    "Title": "Radio Tequila Manele",
     "FirstFailed": "2026-11-28",
     "LastCounted": "2026-11-28",
     "Days": 0
