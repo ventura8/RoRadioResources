@@ -78,6 +78,14 @@ jobs:
           python -m pip install --quiet -r scripts/ci/requirements.txt
           Install-Module Pester -RequiredVersion 6.2.0 -Scope CurrentUser -Force -SkipPublisherCheck
 
+      # The search stage runs the whole test suite, and tests/receiver.browser.test.js loads axe-core from
+      # scripts/ci/node_modules: without it every run since 2026-11-24 failed before publishing. No package
+      # lifecycle scripts, as in CI.
+      - name: Install axe-core (pinned)
+        if: steps.due.outputs.due == 'true'
+        timeout-minutes: 10
+        run: npm ci --prefix scripts/ci --ignore-scripts --no-audit --no-fund
+
       - name: Search (probe, fix urls, retire and restore, logos, tests)
         if: steps.due.outputs.due == 'true'
         shell: pwsh
